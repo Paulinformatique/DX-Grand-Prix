@@ -3847,6 +3847,24 @@ function chocDistant(m, o){
   { const vx = o.x - m.x, vz = o.z - m.z;
     if (Math.abs(vx*sa + vz*ca) > 2*DEMI_LONG + 1.0 || Math.abs(vx*ca - vz*sa) > 2*DEMI_LARG + 0.5) return; }
   m.derContact = jeu.chrono;
+  /* Kaimaxus est un bot sur le serveur : comme en solo, c'est surtout lui qui
+     s'écarte. On décale donc sa voiture affichée (le serveur confirme juste
+     après) au lieu de nous repousser nous, sinon on se battait avec le serveur. */
+  if (srv && o.kaimaxus){
+    if (penL < penC){
+      const sg = Math.sign(avant) || 1;          // +1 : il est devant nous
+      ecarterLong(m, -sg * penL * 0.3);
+      o.affD = (o.affD ?? o.distance) + sg * penL * 0.7;
+      if (sg > 0 && m.v > o.v && !(m.contactT > 0)){ const ec = m.v - o.v; m.v -= ec * 0.4; m.contactT = 0.3; m.sonne = 0.35; }
+      const f = Math.min(1, penL / 1.6); if (f > (m.choc || 0)) m.choc = f;
+    } else {
+      const sens = Math.sign(cote) || 1;
+      ecarterLat(m, -sens * penC * 0.3, ca, sa);
+      o.affLat = (o.affLat ?? o.lat) + (Math.sign((o.affLat ?? o.lat) - (m.lat || 0)) || 1) * penC * 0.7;
+      const f = Math.min(1, penC / 1.2) * 0.35; if (f > (m.choc || 0)) m.choc = f;
+    }
+    return;
+  }
   /* Mêmes règles qu'avec les bots (« percuter » et le contact latéral du
      solo), appliquées à NOTRE voiture ; l'autre reçoit sa part par message.
      Sa position n'étant jamais parfaite, on ne nous déplace que de quelques
@@ -5882,7 +5900,7 @@ function serveurEtat(d){
       }
       const brut = tr - d.ts;
       if (reseau.decalMoi == null || brut < reseau.decalMoi) reseau.decalMoi = brut; else reseau.decalMoi += Math.min(5, brut - reseau.decalMoi) * 0.02;
-      reseau.srvMoi = { ts: d.ts, x, z, cap, v, lat, d: dd, tour, tf };
+      reseau.srvMoi = { ts: d.ts, tr, x, z, cap, v, lat, d: dd, tour, tf };
       continue;
     }
     recevoirCourse({ type: "pos", id, ts: d.ts, x, y, z, cap, tg, rl, br, v, lat, d: dd, tour, m, tf, hp });
@@ -5894,18 +5912,29 @@ function serveurEtat(d){
 function reconcilier(dt){
   const s = reseau.srvMoi, J = jeu.joueur;
   if (!s || !J || jeu.phase !== "course" || !piste) return;
+  /* plus de nouvelles du serveur depuis un moment (internet ou serveur qui
+     coince) : on roule librement plutôt que de se faire retenir en arrière */
+  if (performance.now() - s.tr > 300){ reseau.sansSrv = true; return; }
   const age = Math.max(0, Math.min(0.6, (performance.now() - s.ts - (reseau.decalMoi || 0)) / 1000 + 0.04 + (reseau.rtt || 0) / 2000));
   const cible = s.d + (s.v || 0) * age;
-  const errD = cible - J.distance, errLat = (s.lat || 0) - (J.lat || 0);
+  let errD = cible - J.distance, errLat = (s.lat || 0) - (J.lat || 0);
   const L = piste.longueur, p = auPoint(piste, ((J.s % L) + L) % L);
-  if (Math.abs(errD) > 25 || Math.abs(errLat) > 8){
+  // juste après une coupure, on rejoint le serveur plus vite, sans téléporter (sauf écart énorme)
+  if (reseau.sansSrv){ reseau.sansSrv = false; reseau.repriseT = performance.now(); }
+  const reprise = performance.now() - (reseau.repriseT || -1e9) < 1500;
+  if (Math.abs(errD) > 60 || Math.abs(errLat) > 25){
     const q = auPoint(piste, ((cible % L) + L) % L);
     J.x = q.x + q.nx * s.lat; J.z = q.z + q.nz * s.lat; J.cap = s.cap; J.capVit = s.cap; J.v = s.v;
     return;
   }
   /* de côté, on suit vite le serveur : c'est là que les chocs entre joueurs
      se jouent (sinon on se voit à travers l'autre pendant qu'il nous pousse) */
-  const k = Math.min(1, dt * 4), kL = Math.min(1, dt * 12);
+  /* Petits écarts : ce n'est que l'incertitude sur le temps de trajet des
+     messages, on n'y touche pas (sinon la voiture est sans cesse retenue :
+     les mini-retours en arrière). Au-delà, on corrige seulement l'excédent. */
+  const zone = (e, z) => Math.sign(e) * Math.max(0, Math.abs(e) - z);
+  errD = zone(errD, 1.5); errLat = zone(errLat, 0.25);
+  const k = Math.min(1, dt * (reprise || Math.abs(errD) > 15 ? 8 : 3)), kL = Math.min(1, dt * 12);
   J.x += p.tx * errD * k + p.nx * errLat * kL;
   J.z += p.tz * errD * k + p.nz * errLat * kL;
   // le serveur nous a ralentis (un choc) : on suit sa vitesse
