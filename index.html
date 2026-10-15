@@ -5786,6 +5786,13 @@ const messageErreurReseau = e => e && e.message === "signal" ? "Impossible de jo
 function connecterServeur(){
   return new Promise((ok, ko) => {
     const url = adresseServeur(), t0 = performance.now();
+    // au bout de 2 s sans réponse, c'est qu'il dormait : on le dit, avec les secondes qui passent
+    const minuteur = setInterval(() => {
+      const s = Math.round((performance.now() - t0) / 1000);
+      if (s >= 2) multiStatut("Le serveur se réveille (il dormait)… " + s + " s — ça peut prendre jusqu'à une minute, ne quitte pas.");
+    }, 1000);
+    const fini = f => x => { clearInterval(minuteur); f(x); };
+    ok = fini(ok); ko = fini(ko);
     // réveille le serveur s'il dormait (offre gratuite) pendant qu'on essaie de se connecter
     try { fetch(url.replace(/^ws/, "http"), { mode: "no-cors" }).catch(() => {}); } catch (e) {}
     const tenter = () => {
@@ -5794,14 +5801,15 @@ function connecterServeur(){
       ws.onopen = () => { ouvert = true; ok(ws); };
       ws.onclose = () => {
         if (ouvert) return;
-        if (performance.now() - t0 < 100000){ multiStatut("Réveil du serveur… (jusqu'à une minute s'il dormait)"); setTimeout(tenter, 3000); }
+        if (performance.now() - t0 < 100000) setTimeout(tenter, 3000);
         else ko(new Error("serveur"));
       };
     };
     tenter();
   });
 }
-async function serveurOuvrir(premier){
+async function serveurOuvrir(premier, debut){
+  debut = debut || performance.now();
   multiReinit();
   multiStatut("Connexion au serveur…");
   let ws;
@@ -5809,13 +5817,24 @@ async function serveurOuvrir(premier){
   Object.assign(reseau, { serveur: true, ws, peer: { destroy(){ try { ws.close(); } catch (e) {} } } });
   reseau.conn = { open: true, serveur: true, send(o){ serveurEnvoyer(o); }, close(){ multiStatut("Le groupe est fermé."); groupeFerme(); } };
   ws.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch (_) { return; } serveurRecoit(d); };
-  ws.onclose = () => { if (reseau.ws === ws){ reseau.ws = null; multiStatut("Connexion au serveur perdue."); groupeFerme(); } };
+  ws.onclose = () => {
+    if (reseau.ws !== ws) return;
+    reseau.ws = null;
+    // coupé avant d'être accueilli (le serveur finissait de se réveiller) : on recommence tout seul
+    if (!reseau.moi && performance.now() - debut < 120000){
+      multiStatut("Le serveur finit de se réveiller… on réessaie.");
+      clearInterval(reseau.veille); setTimeout(() => serveurOuvrir(premier, debut), 2000); return;
+    }
+    multiStatut("Connexion au serveur perdue."); groupeFerme();
+  };
   ws.send(JSON.stringify(premier));
   reseau.vuHote = performance.now();
+  if (performance.now() - debut > 2500) multiStatut("Connecté ! Le serveur prépare le jeu…");
   reseau.veille = setInterval(() => {
     if (!reseau.ws || reseau.ws.readyState !== 1) return;
     reseau.ws.send(JSON.stringify({ t: "ping", t0: performance.now() }));
-    if (performance.now() - reseau.vuHote > 15000){ multiStatut("Plus de nouvelles du serveur."); try { reseau.ws.close(); } catch (e) {} }
+    // avant d'être accueilli, le serveur qui vient de se réveiller peut mettre longtemps à préparer le jeu
+    if (performance.now() - reseau.vuHote > (reseau.moi ? 15000 : 90000)){ multiStatut("Plus de nouvelles du serveur."); try { reseau.ws.close(); } catch (e) {} }
   }, 3000);
 }
 function serveurEnvoyer(o){
@@ -5828,7 +5847,8 @@ function serveurEnvoyer(o){
 }
 function serveurRecoit(d){
   reseau.vuHote = performance.now();
-  if (d.t === "bienvenue"){ reseau.moi = d.id; reseau.code = d.code; reseau.hote = !!d.hote; return; }
+  if (d.t === "attente"){ multiStatut("Connecté ! Le serveur prépare le jeu (il vient de se réveiller)…"); return; }
+  if (d.t === "bienvenue"){ multiStatut(""); reseau.moi = d.id; reseau.code = d.code; reseau.hote = !!d.hote; return; }
   if (d.t === "salon"){
     if (d.v !== MULTI_VERSION){ multiStatut("Le serveur n'a pas la même version du jeu : recharge la page."); multiReinit(); afficherEntree(); return; }
     reseau.joueurs = d.joueurs || []; reseau.circuit = d.circuit; reseau.kaimaxus = !!d.kaimaxus; reseau.code = d.code;
