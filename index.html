@@ -3630,7 +3630,7 @@ function collisions(dt){
         if (a.distant && b.distant) continue;
         const loc = a.distant ? b : a, dis = a.distant ? a : b;
         // choc seulement si sa position est récente (moins d'une demi-seconde) : sinon on taperait une position devinée
-        if (jeu.multi && heurtable(loc) && heurtable(dis) && performance.now() - (dis.dernierMsg || 0) < 700) chocDistant(loc, dis);
+        if (jeu.multi && heurtable(loc) && heurtable(dis) && performance.now() - (dis.dernierMsg || 0) < (reseau.serveur ? 1500 : 700)) chocDistant(loc, dis);
         continue;
       }
       const dx = b.x - a.x, dz = b.z - a.z;
@@ -5915,6 +5915,8 @@ function reconcilier(dt){
   /* plus de nouvelles du serveur depuis un moment (internet ou serveur qui
      coince) : on roule librement plutôt que de se faire retenir en arrière */
   if (performance.now() - s.tr > 300){ reseau.sansSrv = true; return; }
+  // ou bien ses nouvelles arrivent avec beaucoup de retard (connexion engorgée) : pareil, on ne se recale pas sur du vieux
+  if ((performance.now() - s.ts - (reseau.decalMoi || 0)) > 500){ reseau.sansSrv = true; return; }
   const age = Math.max(0, Math.min(0.6, (performance.now() - s.ts - (reseau.decalMoi || 0)) / 1000 + 0.04 + (reseau.rtt || 0) / 2000));
   const cible = s.d + (s.v || 0) * age;
   let errD = cible - J.distance, errLat = (s.lat || 0) - (J.lat || 0);
