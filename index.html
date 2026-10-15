@@ -3630,7 +3630,7 @@ function collisions(dt){
         if (a.distant && b.distant) continue;
         const loc = a.distant ? b : a, dis = a.distant ? a : b;
         // choc seulement si sa position est récente (moins d'une demi-seconde) : sinon on taperait une position devinée
-        if (jeu.multi && !reseau.serveur && heurtable(loc) && heurtable(dis) && performance.now() - (dis.dernierMsg || 0) < 700) chocDistant(loc, dis);
+        if (jeu.multi && heurtable(loc) && heurtable(dis) && performance.now() - (dis.dernierMsg || 0) < 700) chocDistant(loc, dis);
         continue;
       }
       const dx = b.x - a.x, dz = b.z - a.z;
@@ -5845,8 +5845,17 @@ function serveurEtat(d){
   if (!jeu.multi) return;
   const tr = performance.now();
   for (const c of d.c){
-    const [id, x, y, z, cap, tg, rl, br, v, lat, dd, tour, m, tf, hp] = c;
+    const [id, x, y, z, cap, tg, rl, br, v, lat, dd, tour, m, tf, hp, , nP, dX, dZ] = c;
     if (id === reseau.moi){
+      // le serveur nous a poussés (coup de volant d'un autre joueur) : on glisse tout de suite chez nous
+      const J = jeu.joueur;
+      if (J && nP != null){
+        if (J.nPousseVu != null && nP > J.nPousseVu && jeu.phase === "course"){
+          J.deriveX = dX || 0; J.deriveZ = dZ || 0; J.deriveT = 0.6;
+          secousse = Math.max(secousse, 1.0);
+        }
+        J.nPousseVu = nP;
+      }
       const brut = tr - d.ts;
       if (reseau.decalMoi == null || brut < reseau.decalMoi) reseau.decalMoi = brut; else reseau.decalMoi += Math.min(5, brut - reseau.decalMoi) * 0.02;
       reseau.srvMoi = { ts: d.ts, x, z, cap, v, lat, d: dd, tour, tf };
@@ -5870,7 +5879,7 @@ function reconcilier(dt){
     J.x = q.x + q.nx * s.lat; J.z = q.z + q.nz * s.lat; J.cap = s.cap; J.capVit = s.cap; J.v = s.v;
     return;
   }
-  const k = Math.min(1, dt * 2.5);
+  const k = Math.min(1, dt * 4);
   J.x += (p.tx * errD + p.nx * errLat) * k;
   J.z += (p.tz * errD + p.nz * errLat) * k;
   // le serveur nous a ralentis (un choc) : on suit sa vitesse
