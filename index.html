@@ -3777,11 +3777,25 @@ function collisions(dt){
 function subirChoc(d){
   if (d.cible === "kaimaxus"){
     const k = jeu.voitures.find(v => v.kaimaxus && !v.distant); if (!k) return;
+    const auteurK = jeu.voitures.find(v => v.distant && v.idDistant === d.id);
+    if (!auteurK || Math.hypot((auteurK.xChoc ?? auteurK.x) - k.x, (auteurK.zChoc ?? auteurK.z) - k.z) > 4.5) return;
     if (d.f){ const cote = Math.sign((k.lat || 0) - (d.lat || 0)) || 1; k.vlat += cote * d.f; k.trouble = Math.max(k.trouble || 0, 1.4); }
-    if (d.lon) k.v += Math.min(8, d.lon);
+    if (d.lon){ const g = Math.min(10, d.lon); k.v += g * 0.4; changerVitesse(k, g * 0.6, 0.6); k.pousse = 0.9; if (d.ds) destabiliser(k, d.ds); }
     return;
   }
   const J = jeu.joueur; if (!J || jeu.phase !== "course") return;
+  /* On ne prend le coup que si, sur NOTRE écran aussi, celui qui tape est
+     vraiment collé à nous (sa voiture affichée ou sa position estimée) :
+     avec le décalage d'internet, il pouvait croire nous toucher alors qu'il
+     était à 4 m. */
+  const auteur = jeu.voitures.find(v => v.distant && v.idDistant === d.id);
+  if (!auteur || auteur.cache) return;
+  const colle = (x, z) => {
+    if (x == null) return false;
+    const ca = Math.cos(J.cap), sa = Math.sin(J.cap), dx = x - J.x, dz = z - J.z;
+    return Math.abs(dx * sa + dz * ca) < 4.6 && Math.abs(dx * ca - dz * sa) < 2.3;
+  };
+  if (!colle(auteur.x, auteur.z) && !colle(auteur.xChoc, auteur.zChoc)) return;
   if (d.f){
     const ca = Math.cos(J.cap), sa = Math.sin(J.cap);
     const sJ = Math.sign((J.x - d.x) * ca - (J.z - d.z) * sa) || 1;     // poussé du côté opposé à celui qui tape
@@ -3789,7 +3803,12 @@ function subirChoc(d){
     J.cap += sJ * 0.05; J.capVit = J.cap;
     secousse = Math.max(secousse, 1.0);
   }
-  if (d.lon){ J.v += Math.min(8, d.lon); secousse = Math.max(secousse, 0.6); }
+  if (d.lon){
+    const g = Math.min(10, d.lon);
+    J.v += g * 0.4; changerVitesse(J, g * 0.6, 0.6);      // poussé vers l'avant, comme un bot percuté
+    if (d.ds) destabiliser(J, d.ds);
+    secousse = Math.max(secousse, 0.6);
+  }
 }
 function heurtable(v){
   if (v.tempsFinal != null || v.parti) return false;
@@ -3803,12 +3822,12 @@ function vitesseMonde(m, dt){
   if (m.xPrecW != null && dt > 0){ m.vxW = (m.x - m.xPrecW) / dt; m.vzW = (m.z - m.zPrecW) / dt; }
   m.xPrecW = m.x; m.zPrecW = m.z;
 }
-function envoyerChoc(m, o, force, lon){
+function envoyerChoc(m, o, force, lon, destab){
   const t = performance.now(); m.chocsEnvoyes = m.chocsEnvoyes || {};
   const id = o.idDistant; if (!id || t - (m.chocsEnvoyes[id] || 0) < 400) return;
   m.chocsEnvoyes[id] = t;
   envoyerTous({ type: "choc", id: reseau.moi, cible: id, x: Math.round(m.x * 100) / 100, z: Math.round(m.z * 100) / 100, lat: m.lat || 0,
-                f: Math.round(force * 100) / 100, lon: Math.round(lon * 100) / 100 });
+                f: Math.round(force * 100) / 100, lon: Math.round(lon * 100) / 100, ds: Math.round((destab || 0) * 100) / 100 });
 }
 function chocDistant(m, o){
   if (o.cache) return;
@@ -3820,38 +3839,51 @@ function chocDistant(m, o){
   const avant = dx*sa + dz*ca, cote = dx*ca - dz*sa;
   const penL = 2*DEMI_LONG - Math.abs(avant), penC = 2*DEMI_LARG - Math.abs(cote);
   if (penL <= 0 || penC <= 0) return;
+  // et sa voiture telle qu'on la VOIT doit être collée à nous aussi (pas de coup « dans le vide »)
+  { const vx = o.x - m.x, vz = o.z - m.z;
+    if (Math.abs(vx*sa + vz*ca) > 2*DEMI_LONG + 1.0 || Math.abs(vx*ca - vz*sa) > 2*DEMI_LARG + 0.5) return; }
   m.derContact = jeu.chrono;
-  /* La position de l'autre n'étant jamais parfaite, on ne nous déplace que
-     de quelques centimètres par image (pas de « recul » brutal), et l'échange
-     de vitesse ne se fait qu'une fois par contact (pas à chaque image). */
+  /* Mêmes règles qu'avec les bots (« percuter » et le contact latéral du
+     solo), appliquées à NOTRE voiture ; l'autre reçoit sa part par message.
+     Sa position n'étant jamais parfaite, on ne nous déplace que de quelques
+     centimètres par image (pas de recul brutal). */
   const borne = (x, a) => Math.max(-a, Math.min(a, x));
-  const tc = performance.now(); m.chocsVit = m.chocsVit || {};
-  const nouveauContact = tc - (m.chocsVit[o.idDistant] || 0) > 350;
-  m.chocsVit[o.idDistant] = tc;
+  const mM = m.R ? m.R.masse : 1, mO = o.R ? o.R.masse : 1, total = mM + mO;
+  const tape = (force) => {             // nous tapons l'autre par l'arrière : « percuter », comme en solo
+    if (m.contactT > 0 || m.v <= o.v - 0.5) return;
+    const v1 = m.v, v2 = o.v, ecart = Math.max(0, v1 - v2), e = 0.30;
+    const n2 = (mM*v1 + mO*v2 + mM*e*(v1 - v2)) / total;
+    const vo = o.v; percuter(m, o, mM, mO, total); o.v = vo;           // percuter ne touche que nous (o est une copie distante)
+    envoyerChoc(m, o, force || 0, Math.max(0, n2 - v2), Math.min(1.4, 0.6 + ecart / 8));
+  };
   if (penL < penC){
     if (avant > 0){
-      // l'autre est devant : on le tape, on perd la vitesse en trop
       ecarterLong(m, borne(-penL / 2, 0.12));
-      if (nouveauContact){
-        if (m.v > o.v + 1) envoyerChoc(m, o, 0, (m.v - o.v) * 0.5);     // on le pousse vers l'avant
-        if (m.v > o.v) m.v -= (m.v - o.v) * 0.55;
-      } else if (m.v > o.v) m.v -= Math.min(m.v - o.v, 0.15);          // on reste derrière sans le traverser
-      m.choc = Math.max(m.choc || 0, Math.min(0.6, penL / 2));
+      tape(0);
+      if (m.v > o.v) m.v -= Math.min(m.v - o.v, 0.2);          // on reste derrière sans le traverser
+      const f = Math.min(1, penL / 1.6); if (f > (m.choc || 0)) m.choc = f;
     } else {
-      // on se fait taper : poussé vers l'avant, un peu d'élan en plus
+      // on se fait taper : c'est lui qui nous envoie l'élan ; ici on ne fait que se séparer
       ecarterLong(m, borne(penL / 2, 0.12));
-      if (nouveauContact && o.v > m.v){ m.v += (o.v - m.v) * 0.35; if (m.joueur) secousse = Math.max(secousse, 0.6); }
     }
   } else {
     const sens = Math.sign(cote) || 1;            // +1 : l'autre est à notre droite
-    // coup de volant vers lui : il se fait sortir (comme un adversaire qu'on bouscule)
+    // coup de volant vers lui : il se fait sortir, comme un bot qu'on bouscule
     const dl = Math.hypot(dx, dz) || 1, vers = ((m.vxW || 0) * dx + (m.vzW || 0) * dz) / dl - (o.v || 0) * (Math.sin(o.cap) * dx + Math.cos(o.cap) * dz) / dl;
-    if (vers > 1.2) envoyerChoc(m, o, Math.min(9, 2.5 + vers * 1.4), 0);
-    ecarterLat(m, borne(-sens * penC / 2, 0.08), ca, sa);
-    if (!(m.contactT > 0)){ pousserLat(m, -sens * 2.0); m.contactT = 0.25; }
-    // côte à côte, celui qui est en arrière dans la course recule un peu
-    if (m.distance < o.distance && Math.abs(avant) <= DEMI_LONG * 0.5 && !(m.repliT > 0)){ m.v *= 0.95; m.repliT = 0.6; }
-    m.choc = Math.max(m.choc || 0, Math.min(1, penC / 1.2) * 0.35);
+    if (vers > 1.2) envoyerChoc(m, o, Math.min(9, 2 + vers * 1.3), 0, 0);
+    // côte à côte : celui qui est le plus en arrière dans la course recule (8 % sur le coup, puis 14 % en 0,35 s)
+    if (Math.abs(avant) <= DEMI_LONG * 0.5 && m.distance < o.distance && !(m.repliT > 0)){
+      m.v *= 0.92; changerVitesse(m, -m.v * 0.14, 0.35); m.repliT = 1.0;
+    }
+    if (Math.abs(avant) > DEMI_LONG * 0.5){
+      // notre avant dans son flanc : c'est nous qui percutons
+      if (avant > 0){ ecarterLat(m, borne(-sens * penC * 0.2, 0.08), ca, sa); ecarterLong(m, borne(-0.25, 0.12)); tape(0); }
+      else ecarterLat(m, borne(-sens * penC * 0.8, 0.08), ca, sa);
+    } else {
+      ecarterLat(m, borne(-sens * penC / 2, 0.08), ca, sa);
+      if (!(m.contactT > 0) && !(m.repliT > 0.9)){ pousserLat(m, -sens * 2.6 * (2 * mO / total)); m.contactT = 0.25; }
+    }
+    const f = Math.min(1, penC / 1.2) * 0.35; if (f > (m.choc || 0)) m.choc = f;
   }
 }
 
