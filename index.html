@@ -2913,7 +2913,7 @@ function preparerCourse(indexCircuit){
       a.vmax = a.R.vmax;
       jeu.voitures.push(a);
     }
-    if (jeu.multi.kaimaxus && !reseau.hote){
+    if (jeu.multi.kaimaxus && (!reseau.hote || reseau.serveur)){
       const vk = PILOTES.find(p => p.nom === "Kaimaxus").voiture, VK = VOITURES[vk];
       const k = creerConcurrent({ nom: "Kaimaxus", coul: VK.couleur || MODELES[VK.modele].couleur }, false, def, jeu.multi.placeKai);
       Object.assign(k, { distant: true, idDistant: "kaimaxus", kaimaxus: true, modele: vk, R: reglages(VK.stats), ligneIdx: 0, tampon: [] });
@@ -3630,7 +3630,7 @@ function collisions(dt){
         if (a.distant && b.distant) continue;
         const loc = a.distant ? b : a, dis = a.distant ? a : b;
         // choc seulement si sa position est récente (moins d'une demi-seconde) : sinon on taperait une position devinée
-        if (jeu.multi && heurtable(loc) && heurtable(dis) && performance.now() - (dis.dernierMsg || 0) < 700) chocDistant(loc, dis);
+        if (jeu.multi && !reseau.serveur && heurtable(loc) && heurtable(dis) && performance.now() - (dis.dernierMsg || 0) < 700) chocDistant(loc, dis);
         continue;
       }
       const dx = b.x - a.x, dz = b.z - a.z;
@@ -5647,7 +5647,14 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 4;
+const MULTI_VERSION = 5;
+/* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
+   ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
+const SERVEUR_URL = "";
+function adresseServeur(){
+  try { const q = new URLSearchParams(location.search).get("serveur"); if (q) return q; } catch (e) {}
+  return SERVEUR_URL;
+}
 const MULTI_MAX = 12;                // joueurs ; avec Kaimaxus, 13 voitures
 /* Kaimaxus garde sa Koenigsegg, bridée juste au-dessus des M3, avec le
    pilotage du champion (trajectoires parfaites, sans erreur). */
@@ -5758,6 +5765,8 @@ function coursesMulti(){
   return ordreCourses().map(([c]) => c).filter(c => !perso.has(c.nom));
 }
 function multiReinit(){
+  if (reseau.serveur && reseau.ws){ const ws = reseau.ws; reseau.ws = null; try { ws.send(JSON.stringify({ t: "quitte" })); } catch (e) {} try { ws.close(); } catch (e) {} }
+  reseau.serveur = false;
   if (reseau.conn && reseau.conn.open && !reseau.hote) try { reseau.conn.send({ type: "quitte" }); } catch (e) {}
   if (reseau.hote) try { envoyerTous({ type: "fin-groupe" }); } catch (e) {}
   clearInterval(reseau.veille);
@@ -5769,7 +5778,107 @@ function multiReinit(){
   jeu.multi = null;
 }
 const messageErreurReseau = e => e && e.message === "signal" ? "Impossible de joindre le serveur du multijoueur (connexion internet ?)." : "Erreur réseau.";
+/* ───── Mode serveur : c'est le serveur qui fait rouler la course ───── */
+function connecterServeur(){
+  return new Promise((ok, ko) => {
+    const url = adresseServeur(), t0 = performance.now();
+    // réveille le serveur s'il dormait (offre gratuite) pendant qu'on essaie de se connecter
+    try { fetch(url.replace(/^ws/, "http"), { mode: "no-cors" }).catch(() => {}); } catch (e) {}
+    const tenter = () => {
+      let ws, ouvert = false;
+      try { ws = new WebSocket(url); } catch (e) { ko(e); return; }
+      ws.onopen = () => { ouvert = true; ok(ws); };
+      ws.onclose = () => {
+        if (ouvert) return;
+        if (performance.now() - t0 < 100000){ multiStatut("Réveil du serveur… (jusqu'à une minute s'il dormait)"); setTimeout(tenter, 3000); }
+        else ko(new Error("serveur"));
+      };
+    };
+    tenter();
+  });
+}
+async function serveurOuvrir(premier){
+  multiReinit();
+  multiStatut("Connexion au serveur…");
+  let ws;
+  try { ws = await connecterServeur(); } catch (e) { multiStatut("Le serveur ne répond pas. Réessaie dans un moment."); return; }
+  Object.assign(reseau, { serveur: true, ws, peer: { destroy(){ try { ws.close(); } catch (e) {} } } });
+  reseau.conn = { open: true, serveur: true, send(o){ serveurEnvoyer(o); }, close(){ multiStatut("Le groupe est fermé."); groupeFerme(); } };
+  ws.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch (_) { return; } serveurRecoit(d); };
+  ws.onclose = () => { if (reseau.ws === ws){ reseau.ws = null; multiStatut("Connexion au serveur perdue."); groupeFerme(); } };
+  ws.send(JSON.stringify(premier));
+  reseau.vuHote = performance.now();
+  reseau.veille = setInterval(() => {
+    if (!reseau.ws || reseau.ws.readyState !== 1) return;
+    reseau.ws.send(JSON.stringify({ t: "ping", t0: performance.now() }));
+    if (performance.now() - reseau.vuHote > 15000){ multiStatut("Plus de nouvelles du serveur."); try { reseau.ws.close(); } catch (e) {} }
+  }, 3000);
+}
+function serveurEnvoyer(o){
+  const ws = reseau.ws; if (!ws || ws.readyState !== 1) return;
+  if (o.type === "ping") o = { t: "ping", t0: o.t };
+  else if (o.type === "quitte") o = { t: "quitte" };
+  else if (o.type === "abandon") o = { t: "abandon" };
+  else if (!o.t) return;          // positions, chocs, arrivées : c'est le serveur qui les calcule
+  ws.send(JSON.stringify(o));
+}
+function serveurRecoit(d){
+  reseau.vuHote = performance.now();
+  if (d.t === "bienvenue"){ reseau.moi = d.id; reseau.code = d.code; reseau.hote = !!d.hote; return; }
+  if (d.t === "salon"){
+    if (d.v !== MULTI_VERSION){ multiStatut("Le serveur n'a pas la même version du jeu : recharge la page."); multiReinit(); afficherEntree(); return; }
+    reseau.joueurs = d.joueurs || []; reseau.circuit = d.circuit; reseau.kaimaxus = !!d.kaimaxus; reseau.code = d.code;
+    reseau.hote = !!(reseau.joueurs[0] && reseau.joueurs[0].id === reseau.moi);
+    reseau.enCourse = !!d.enCourse;
+    multiStatut(reseau.enCourse && !jeu.multi ? "Une course est en cours, attends la fin…" : "");
+    afficherSalon(); return;
+  }
+  if (d.t === "refus"){ multiStatut(d.raison || "Refusé."); multiReinit(); afficherEntree(); return; }
+  if (d.t === "refus-course"){ multiStatut(d.raison || ""); return; }
+  if (d.t === "depart"){ demarrerMulti(d); return; }
+  if (d.t === "pong"){ const r = performance.now() - d.t0; reseau.rtt = reseau.rtt ? reseau.rtt * 0.7 + r * 0.3 : r; return; }
+  if (d.t === "parti"){ recevoirCourse({ type: "parti", id: d.id }); return; }
+  if (d.t === "e"){ serveurEtat(d); return; }
+}
+// l'état de la course envoyé par le serveur
+function serveurEtat(d){
+  if (!jeu.multi) return;
+  const tr = performance.now();
+  for (const c of d.c){
+    const [id, x, y, z, cap, tg, rl, br, v, lat, dd, tour, m, tf, hp] = c;
+    if (id === reseau.moi){
+      const brut = tr - d.ts;
+      if (reseau.decalMoi == null || brut < reseau.decalMoi) reseau.decalMoi = brut; else reseau.decalMoi += Math.min(5, brut - reseau.decalMoi) * 0.02;
+      reseau.srvMoi = { ts: d.ts, x, z, cap, v, lat, d: dd, tour, tf };
+      continue;
+    }
+    recevoirCourse({ type: "pos", id, ts: d.ts, x, y, z, cap, tg, rl, br, v, lat, d: dd, tour, m, tf, hp });
+  }
+}
+/* Notre voiture : on la pilote tout de suite chez nous (pas d'attente), et
+   elle est ramenée en douceur vers la position que calcule le serveur (qui,
+   lui, connaît les chocs). Gros écart : on la replace d'un coup. */
+function reconcilier(dt){
+  const s = reseau.srvMoi, J = jeu.joueur;
+  if (!s || !J || jeu.phase !== "course" || !piste) return;
+  const age = Math.max(0, Math.min(0.6, (performance.now() - s.ts - (reseau.decalMoi || 0)) / 1000 + 0.04 + (reseau.rtt || 0) / 2000));
+  const cible = s.d + (s.v || 0) * age;
+  const errD = cible - J.distance, errLat = (s.lat || 0) - (J.lat || 0);
+  const L = piste.longueur, p = auPoint(piste, ((J.s % L) + L) % L);
+  if (Math.abs(errD) > 25 || Math.abs(errLat) > 8){
+    const q = auPoint(piste, ((cible % L) + L) % L);
+    J.x = q.x + q.nx * s.lat; J.z = q.z + q.nz * s.lat; J.cap = s.cap; J.capVit = s.cap; J.v = s.v;
+    return;
+  }
+  const k = Math.min(1, dt * 2.5);
+  J.x += (p.tx * errD + p.nx * errLat) * k;
+  J.z += (p.tz * errD + p.nz * errLat) * k;
+  // le serveur nous a ralentis (un choc) : on suit sa vitesse
+  if (Math.abs(s.v - J.v) > 2) J.v += (s.v - J.v) * Math.min(1, dt * 4);
+  if (s.tf != null && J.tempsFinal != null && J.tempsFinal !== s.tf){ J.tempsFinal = s.tf; if (jeu.phase === "fini") allerClassement(); }
+}
 async function multiCreer(essais = 0){
+  if (adresseServeur()){ await serveurOuvrir({ t: "creer", nom: monNomMulti(), v: MULTI_VERSION }); return; }
   if (!window.RTCPeerConnection || !window.WebSocket){ multiStatut("Ton navigateur ne permet pas le multijoueur."); return; }
   multiStatut("Création du groupe…");
   multiReinit();
@@ -5810,6 +5919,7 @@ async function multiCreer(essais = 0){
 async function multiRejoindre(){
   const code = (document.getElementById("mu-code").value || "").trim().toUpperCase();
   if (code.length < 5){ multiStatut("Entre le code de 5 lettres du groupe."); return; }
+  if (adresseServeur()){ await serveurOuvrir({ t: "rejoindre", code, nom: monNomMulti(), v: MULTI_VERSION }); return; }
   if (!window.RTCPeerConnection || !window.WebSocket){ multiStatut("Ton navigateur ne permet pas le multijoueur."); return; }
   multiStatut("Connexion au groupe " + code + "…");
   multiReinit();
@@ -5871,6 +5981,7 @@ function groupeFerme(){
   if (!enRace){ multiReinit(); afficherEntree(); }
 }
 function envoyerTous(msg, sauf){
+  if (reseau.serveur){ serveurEnvoyer(msg); return; }
   if (reseau.hote){
     let relais = false;
     for (const [id, c] of reseau.conns){
@@ -6049,6 +6160,16 @@ function etatVoiture(v, id){
 }
 function multiEnvoyer(){
   const t = performance.now();
+  if (reseau.serveur){
+    // mode serveur : on envoie nos touches (20 fois par seconde, ou tout de suite si elles changent)
+    if (jeu.phase === "course" && jeu.joueur && jeu.joueur.tempsFinal == null){
+      const e = { t: "in", g: cmd.gaz ? 1 : 0, f: cmd.frein ? 1 : 0, d: Math.round((cmd.dir || 0) * 100) / 100, e: jeu.joueur.retour > 0 ? 1 : 0 };
+      const cle = e.g + "," + e.f + "," + e.d + "," + e.e;
+      if (cle !== reseau.derEntree || t - reseau.tEnvoi > 50){ reseau.derEntree = cle; reseau.tEnvoi = t; serveurEnvoyer(e); }
+      reconcilier(1 / 60);
+    }
+    return;
+  }
   const relais = reseau.hote ? [...reseau.conns.values()].some(c => c.relais) : !!(reseau.conn && reseau.conn.relais);
   // en relais, la cadence baisse un peu avec beaucoup de joueurs (limite du serveur gratuit)
   if (t - reseau.tEnvoi < (relais ? (reseau.joueurs.length > 6 ? 200 : 150) : 50)) return;
@@ -6073,6 +6194,7 @@ function kaimaxusEnFond(dt){
 function multiFin(){ envoyerTous({ type: "fin", id: reseau.moi, tf: jeu.joueur.tempsFinal, m: jeu.joueur.meilleur }); }
 function multiLancer(){
   if (!reseau.hote) return;
+  if (reseau.serveur){ serveurEnvoyer({ t: "lancer" }); return; }
   // grille tirée au sort à chaque course (Kaimaxus compris), pas dans l'ordre d'arrivée dans le groupe
   const n = reseau.joueurs.length + (reseau.kaimaxus ? 1 : 0);
   const places = Array.from({ length: n }, (_, k) => k);
@@ -6098,7 +6220,8 @@ function demarrerMulti(d){
   jeu.multi = { grille, moi: reseau.moi, maPlace: moi.place, maCouleur: moi.coul, monNom: moi.nom,
                kaimaxus: !!d.kaimaxus, placeKai: d.placeKai ?? grille.length };
   // Kaimaxus roule chez l'hôte ; chez les invités, c'est une voiture distante
-  jeu.adversaires = d.kaimaxus && reseau.hote ? ["Kaimaxus"] : [];
+  jeu.adversaires = d.kaimaxus && reseau.hote && !reseau.serveur ? ["Kaimaxus"] : [];
+  reseau.srvMoi = null; reseau.decalMoi = null; reseau.derEntree = "";
   jeu.partieCourse = 1; jeu.circuit = i;
   initSon(); cacherTout(); preparerCourse(i);
 }
@@ -6120,7 +6243,7 @@ function afficherSalon(){
   const echap = t => String(t).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
   document.getElementById("mu-joueurs").innerHTML = reseau.joueurs.map((j, k) =>
     `<div class="carte" style="cursor:default;padding:9px 13px"><span class="mu-pastille" style="background:${coulCss(MULTI_COULEURS[j.coul % MULTI_COULEURS.length])}"></span>` +
-    `<div><div class="nom" style="font-size:14px">${echap(j.nom)}${j.id === reseau.moi ? " (toi)" : ""}</div><div class="det">BMW M3${j.hote ? "" : j.lien === "relais" ? " · connexion par le relais" : " · connexion directe"}</div></div>` +
+    `<div><div class="nom" style="font-size:14px">${echap(j.nom)}${j.id === reseau.moi ? " (toi)" : ""}</div><div class="det">BMW M3${j.hote || j.lien === "serveur" ? "" : j.lien === "relais" ? " · connexion par le relais" : " · connexion directe"}</div></div>` +
     `<div class="droite">${j.hote ? "👑 hôte" : ""}</div></div>`).join("");
   const liste = coursesMulti(), sel = document.getElementById("mu-course");
   if (reseau.hote){
@@ -6145,9 +6268,15 @@ document.getElementById("mu-creer").onclick = multiCreer;
 document.getElementById("mu-rejoindre").onclick = multiRejoindre;
 document.getElementById("mu-code").addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") multiRejoindre(); });
 document.getElementById("mu-nom").addEventListener("keydown", e => e.stopPropagation());
-document.getElementById("mu-course").onchange = e => { reseau.circuit = e.target.value; diffuserSalon(); };
+document.getElementById("mu-course").onchange = e => {
+  if (reseau.serveur){ serveurEnvoyer({ t: "choix", circuit: e.target.value }); return; }
+  reseau.circuit = e.target.value; diffuserSalon();
+};
 document.getElementById("mu-lancer").onclick = multiLancer;
-document.getElementById("mu-kai").onchange = e => { reseau.kaimaxus = e.target.checked; diffuserSalon(); };
+document.getElementById("mu-kai").onchange = e => {
+  if (reseau.serveur){ serveurEnvoyer({ t: "choix", kaimaxus: e.target.checked }); return; }
+  reseau.kaimaxus = e.target.checked; diffuserSalon();
+};
 document.getElementById("mu-quitter").onclick = () => { multiReinit(); multiStatut(""); afficherEntree(); };
 document.getElementById("mu-retour").onclick = () => { rafraichirMenu(); montrer("ecran-accueil"); };
 
