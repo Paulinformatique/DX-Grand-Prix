@@ -5796,7 +5796,7 @@ function multiReinit(){
   if (reseau.conn) try { reseau.conn.ferme = true; reseau.conn.dc && reseau.conn.dc.close(); reseau.conn.pc.close(); } catch (e) {}
   try { if (reseau.peer) reseau.peer.destroy(); } catch (e) {}
   clearTimeout(reseau.minuteur);
-  Object.assign(reseau, { rtt: 0, peer: null, hote: false, code: "", conns: new Map(), enAttente: new Map(), conn: null, joueurs: [], circuit: null, moi: null, enCourse: false });
+  Object.assign(reseau, { rtt: 0, rttMin: null, decalMoi: null, histo: [], corr: null, srvMoi: null, peer: null, hote: false, code: "", conns: new Map(), enAttente: new Map(), conn: null, joueurs: [], circuit: null, moi: null, enCourse: false });
   jeu.multi = null;
 }
 const messageErreurReseau = e => e && e.message === "signal" ? "Impossible de joindre le serveur du multijoueur (connexion internet ?)." : "Erreur réseau.";
@@ -5878,7 +5878,8 @@ function serveurRecoit(d){
   if (d.t === "refus"){ multiStatut(d.raison || "Refusé."); multiReinit(); afficherEntree(); return; }
   if (d.t === "refus-course"){ multiStatut(d.raison || ""); return; }
   if (d.t === "depart"){ demarrerMulti(d); return; }
-  if (d.t === "pong"){ const r = performance.now() - d.t0; reseau.rtt = reseau.rtt ? reseau.rtt * 0.7 + r * 0.3 : r; return; }
+  if (d.t === "pong"){ const r = performance.now() - d.t0; reseau.rtt = reseau.rtt ? reseau.rtt * 0.7 + r * 0.3 : r;
+    reseau.rttMin = reseau.rttMin == null || r < reseau.rttMin ? r : reseau.rttMin + (r - reseau.rttMin) * 0.05; return; }
   if (d.t === "parti"){ recevoirCourse({ type: "parti", id: d.id }); return; }
   if (d.t === "e"){ serveurEtat(d); return; }
 }
@@ -5909,39 +5910,55 @@ function serveurEtat(d){
 /* Notre voiture : on la pilote tout de suite chez nous (pas d'attente), et
    elle est ramenée en douceur vers la position que calcule le serveur (qui,
    lui, connaît les chocs). Gros écart : on la replace d'un coup. */
+/* Notre voiture : on la pilote tout de suite chez nous, sans attendre le
+   serveur. Pour savoir si elle a dérivé de celle du serveur (un choc qu'on
+   n'a pas vu pareil, Kaimaxus…), on compare chaque état reçu à NOTRE voiture
+   au même instant (on garde ses 3 dernières secondes) : l'écart mesuré ainsi
+   ne dépend plus du temps de trajet d'internet. On le corrige en douceur —
+   position, vitesse ET cap (sinon, après un choc, nos deux voitures ne
+   regardaient plus dans la même direction et ça partait en vrille). */
 function reconcilier(dt){
-  const s = reseau.srvMoi, J = jeu.joueur;
-  if (!s || !J || jeu.phase !== "course" || !piste) return;
-  /* plus de nouvelles du serveur depuis un moment (internet ou serveur qui
-     coince) : on roule librement plutôt que de se faire retenir en arrière */
-  if (performance.now() - s.tr > 300){ reseau.sansSrv = true; return; }
-  // ou bien ses nouvelles arrivent avec beaucoup de retard (connexion engorgée) : pareil, on ne se recale pas sur du vieux
-  if ((performance.now() - s.ts - (reseau.decalMoi || 0)) > 500){ reseau.sansSrv = true; return; }
-  const age = Math.max(0, Math.min(0.6, (performance.now() - s.ts - (reseau.decalMoi || 0)) / 1000 + 0.04 + (reseau.rtt || 0) / 2000));
-  const cible = s.d + (s.v || 0) * age;
-  let errD = cible - J.distance, errLat = (s.lat || 0) - (J.lat || 0);
-  const L = piste.longueur, p = auPoint(piste, ((J.s % L) + L) % L);
-  // juste après une coupure, on rejoint le serveur plus vite, sans téléporter (sauf écart énorme)
-  if (reseau.sansSrv){ reseau.sansSrv = false; reseau.repriseT = performance.now(); }
-  const reprise = performance.now() - (reseau.repriseT || -1e9) < 1500;
-  if (Math.abs(errD) > 60 || Math.abs(errLat) > 25){
-    const q = auPoint(piste, ((cible % L) + L) % L);
-    J.x = q.x + q.nx * s.lat; J.z = q.z + q.nz * s.lat; J.cap = s.cap; J.capVit = s.cap; J.v = s.v;
-    return;
+  const s = reseau.srvMoi, J = jeu.joueur, now = performance.now();
+  if (!J || jeu.phase !== "course" || !piste){ reseau.histo = []; reseau.corr = null; return; }
+  const H = reseau.histo || (reseau.histo = []);
+  if (s && s.tf != null && J.tempsFinal != null && J.tempsFinal !== s.tf){ J.tempsFinal = s.tf; if (jeu.phase === "fini") allerClassement(); }
+  const fraiche = s && now - s.tr < 300 && (now - s.ts - (reseau.decalMoi || 0)) < 500;
+  if (!fraiche) reseau.sansSrv = true;
+  // un nouvel état : on mesure l'écart avec notre voiture au même moment
+  if (fraiche && s !== reseau.srvVu && reseau.decalMoi != null){
+    reseau.srvVu = s;
+    const tm = s.ts + reseau.decalMoi - (reseau.rttMin ?? reseau.rtt ?? 100);
+    let h = null;
+    for (let i = H.length - 1; i > 0; i--){
+      if (H[i - 1].t <= tm && H[i].t >= tm){
+        const a = H[i - 1], b = H[i], u = (tm - a.t) / Math.max(1e-3, b.t - a.t), m = (x, y) => x + (y - x) * u;
+        h = { d: m(a.d, b.d), lat: m(a.lat, b.lat), cap: a.cap + Math.atan2(Math.sin(b.cap - a.cap), Math.cos(b.cap - a.cap)) * u, v: m(a.v, b.v) };
+        break;
+      }
+    }
+    if (h){
+      const zone = (e, z) => Math.abs(e) < z ? 0 : e;
+      reseau.corr = { d: zone(s.d - h.d, 0.4), lat: zone((s.lat || 0) - h.lat, 0.12),
+                      cap: zone(Math.atan2(Math.sin(s.cap - h.cap), Math.cos(s.cap - h.cap)), 0.01), v: zone(s.v - h.v, 1.0) };
+      if (reseau.sansSrv){ reseau.sansSrv = false; reseau.repriseT = now; }
+    }
   }
-  /* de côté, on suit vite le serveur : c'est là que les chocs entre joueurs
-     se jouent (sinon on se voit à travers l'autre pendant qu'il nous pousse) */
-  /* Petits écarts : ce n'est que l'incertitude sur le temps de trajet des
-     messages, on n'y touche pas (sinon la voiture est sans cesse retenue :
-     les mini-retours en arrière). Au-delà, on corrige seulement l'excédent. */
-  const zone = (e, z) => Math.sign(e) * Math.max(0, Math.abs(e) - z);
-  errD = zone(errD, 1.5); errLat = zone(errLat, 0.25);
-  const k = Math.min(1, dt * (reprise || Math.abs(errD) > 15 ? 8 : 3)), kL = Math.min(1, dt * 12);
-  J.x += p.tx * errD * k + p.nx * errLat * kL;
-  J.z += p.tz * errD * k + p.nz * errLat * kL;
-  // le serveur nous a ralentis (un choc) : on suit sa vitesse
-  if (Math.abs(s.v - J.v) > 2) J.v += (s.v - J.v) * Math.min(1, dt * 4);
-  if (s.tf != null && J.tempsFinal != null && J.tempsFinal !== s.tf){ J.tempsFinal = s.tf; if (jeu.phase === "fini") allerClassement(); }
+  const c = reseau.corr;
+  if (c && (c.d || c.lat || c.cap || c.v)){
+    // gros écart (coupure) : d'un coup ; sinon un peu à chaque image
+    const gros = Math.abs(c.d) > 40 || Math.abs(c.lat) > 15;
+    const f = gros ? 1 : Math.min(1, dt * (now - (reseau.repriseT || -1e9) < 1500 ? 10 : 6));
+    const dD = c.d * f, dL = c.lat * f, dC = c.cap * f, dV = c.v * f;
+    const L = piste.longueur, p = auPoint(piste, ((J.s % L) + L) % L);
+    J.x += p.tx * dD + p.nx * dL; J.z += p.tz * dD + p.nz * dL;
+    J.cap += dC; J.capVit += dC; J.v = Math.max(0, J.v + dV);
+    J.distance += dD; J.lat += dL; J.s += dD;
+    c.d -= dD; c.lat -= dL; c.cap -= dC; c.v -= dV;
+    // le passé de notre voiture est décalé d'autant : la prochaine mesure ne recompte pas ce qui est déjà corrigé
+    for (const e of H){ e.d += dD; e.lat += dL; e.cap += dC; e.v += dV; }
+  }
+  H.push({ t: now, d: J.distance, lat: J.lat || 0, cap: J.cap, v: J.v });
+  while (H.length && now - H[0].t > 3000) H.shift();
 }
 async function multiCreer(essais = 0){
   if (adresseServeur()){ await serveurOuvrir({ t: "creer", nom: monNomMulti(), v: MULTI_VERSION }); return; }
@@ -6279,6 +6296,7 @@ function multiLancer(){
   envoyerTous(msg); demarrerMulti(msg);
 }
 function demarrerMulti(d){
+  Object.assign(reseau, { histo: [], corr: null, srvMoi: null, srvVu: null });
   const i = CIRCUITS.findIndex(c => c.nom === d.circuit && !c.essai);
   if (i < 0){ multiStatut("Course inconnue : « " + d.circuit + " »."); return; }
   const grille = (d.grille || []).map(j => Object.assign({}, j, { coul: MULTI_COULEURS[j.coul % MULTI_COULEURS.length] }));
