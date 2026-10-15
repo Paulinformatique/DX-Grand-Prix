@@ -5650,7 +5650,7 @@ function rafraichirJoueur(){
 const MULTI_VERSION = 5;
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
-const SERVEUR_URL = "";
+const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
 function adresseServeur(){
   try { const q = new URLSearchParams(location.search).get("serveur"); if (q) return q; } catch (e) {}
   return SERVEUR_URL;
