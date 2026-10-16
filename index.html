@@ -2959,7 +2959,9 @@ function majJoueur(v, dt){
   // Dérive latérale après un coup sur le côté : la voiture glisse, puis la
   // glissade s'amortit en une seconde environ
   if (v.deriveX || v.deriveZ){
-    v.x += v.deriveX * dt; v.z += v.deriveZ * dt;
+    // en multijoueur la glissade démarre en douceur (0,15 s) au lieu d'un coup sec
+    const r = jeu.multi ? Math.min(1, Math.max(0.2, (0.6 - (v.deriveT || 0)) / 0.15)) : 1;
+    v.x += v.deriveX * dt * r; v.z += v.deriveZ * dt * r;
     const amort = Math.exp(-dt * 2.2);
     v.deriveX *= amort; v.deriveZ *= amort;
     if (Math.hypot(v.deriveX, v.deriveZ) < 0.05) v.deriveX = v.deriveZ = 0;
@@ -3690,8 +3692,9 @@ function collisions(dt){
              coup, puis encore 14 % en 0,35 s (l'accélérateur en reprend une
              partie pendant ce temps). */
           if (Math.abs(avant) <= DEMI_LONG * 0.5 && !faute && !(a.repliT > 0) && !(b.repliT > 0)){
-            recule.v *= 0.92;
-            changerVitesse(recule, -recule.v * 0.14, 0.35);
+            const deuxJ = a.joueur && b.joueur;        // deux joueurs (multijoueur) : contact plus doux
+            recule.v *= deuxJ ? 0.96 : 0.92;
+            changerVitesse(recule, -recule.v * (deuxJ ? 0.07 : 0.14), 0.35);
             recule.repliT = 1.0;
           }
         }
@@ -3723,8 +3726,9 @@ function collisions(dt){
           for (const c of [a, b]) if (!c.joueur) c.trouble = Math.max(c.trouble || 0, 0.4);
         }
         if (Math.abs(avant) <= DEMI_LONG * 0.5 && a.contactT <= 0 && !(a.repliT > 0 || b.repliT > 0)){
-          pousserLat(a, -sens * 2.6 * (2*mB/total));
-          pousserLat(b,  sens * 2.6 * (2*mA/total));
+          const rebond = a.joueur && b.joueur ? 1.3 : 2.6;
+          pousserLat(a, -sens * rebond * (2*mB/total));
+          pousserLat(b,  sens * rebond * (2*mA/total));
           for (const c of [a, b]) if (!c.joueur) c.trouble = Math.max(c.trouble || 0, 0.9);
           a.contactT = b.contactT = 0.25;
         }
@@ -3869,7 +3873,8 @@ function chocDistant(m, o){
      solo), appliquées à NOTRE voiture ; l'autre reçoit sa part par message.
      Sa position n'étant jamais parfaite, on ne nous déplace que de quelques
      centimètres par image (pas de recul brutal). */
-  const borne = (x, a) => srv ? x : Math.max(-a, Math.min(a, x));
+  // avec le serveur : on se sépare vite mais pas d'un coup (la moitié de l'enfoncement par image), sinon ça cogne sec
+  const borne = (x, a) => srv ? x * 0.5 : Math.max(-a, Math.min(a, x));
   const mM = m.R ? m.R.masse : 1, mO = o.R ? o.R.masse : 1, total = mM + mO;
   const tape = (force) => {             // nous tapons l'autre par l'arrière : « percuter », comme en solo
     if (m.contactT > 0 || m.v <= o.v - 0.5) return;
@@ -3895,7 +3900,7 @@ function chocDistant(m, o){
     if (vers > 1.2) envoyerChoc(m, o, Math.min(9, 2 + vers * 1.3), 0, 0);
     // côte à côte : celui qui est le plus en arrière dans la course recule (8 % sur le coup, puis 14 % en 0,35 s)
     if (Math.abs(avant) <= DEMI_LONG * 0.5 && m.distance < o.distance && !(m.repliT > 0)){
-      m.v *= 0.92; changerVitesse(m, -m.v * 0.14, 0.35); m.repliT = 1.0;
+      m.v *= 0.96; changerVitesse(m, -m.v * 0.07, 0.35); m.repliT = 1.0;
     }
     if (Math.abs(avant) > DEMI_LONG * 0.5){
       // notre avant dans son flanc : c'est nous qui percutons
@@ -3903,7 +3908,7 @@ function chocDistant(m, o){
       else ecarterLat(m, borne(-sens * penC * (srv ? 1 : 0.8), 0.08), ca, sa);
     } else {
       ecarterLat(m, borne(-sens * penC * (srv ? 1 : 0.5), 0.08), ca, sa);
-      if (!(m.contactT > 0) && !(m.repliT > 0.9)){ pousserLat(m, -sens * 2.6 * (2 * mO / total)); m.contactT = 0.25; }
+      if (!(m.contactT > 0) && !(m.repliT > 0.9)){ pousserLat(m, -sens * 1.3 * (2 * mO / total)); m.contactT = 0.25; }
     }
     const f = Math.min(1, penC / 1.2) * 0.35; if (f > (m.choc || 0)) m.choc = f;
   }
@@ -6177,14 +6182,21 @@ function recevoirCourse(d){
    recule jamais et ne téléporte pas (sauf écart énorme). */
 function ageMessage(v, b){
   if (b.ts == null || v.decal == null) return Math.min(3, (performance.now() - b.tr) / 1000 + 0.05);
-  return Math.max(0, Math.min(3, (performance.now() - b.ts - v.decal) / 1000 + 0.04));
+  /* Avec le serveur, on la montre où elle est chez SON joueur, pas où le
+     serveur l'avait : elle a de l'avance sur le serveur (le temps que ses
+     touches y arrivent) et ses nouvelles mettent du temps à nous parvenir.
+     On ajoute donc un aller-retour, sinon chacun voyait l'autre 2 à 3 m plus
+     en arrière que lui ne se voyait (et les chocs n'avaient pas lieu au même endroit). */
+  const avance = reseau.serveur && reseau.rttMin != null ? Math.min(0.25, reseau.rttMin / 1000) : 0.04;
+  v.avanceLong = avance - 0.04;          // (de côté, on ne prolonge pas autant : ça déborde)
+  return Math.max(0, Math.min(3, (performance.now() - b.ts - v.decal) / 1000 + avance));
 }
 function cibleDistante(v, b){
   const L = piste.longueur, mod = d => ((d % L) + L) % L;
   const h = ageMessage(v, b), vv = Math.max(0, b.v || 0);
   const p0 = auPoint(piste, mod(b.d || 0));
   // de côté aussi on prolonge (quand on le pousse ou qu'il donne un coup de volant), un quart de seconde au plus
-  return { d: (b.d || 0) + vv * h, lat: (b.lat || 0) + (v.vLatEst || 0) * Math.min(h, 0.25), derive: Math.atan2(Math.sin((b.cap || 0) - p0.cap), Math.cos((b.cap || 0) - p0.cap)) };
+  return { d: (b.d || 0) + vv * h, lat: (b.lat || 0) + (v.vLatEst || 0) * Math.min(Math.max(0, h - (v.avanceLong || 0)), 0.25), derive: Math.atan2(Math.sin((b.cap || 0) - p0.cap), Math.cos((b.cap || 0) - p0.cap)) };
 }
 function majDistant(v, dt){
   // parti : sa voiture disparaît et il passe en fin de classement
