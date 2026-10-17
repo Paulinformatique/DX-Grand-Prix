@@ -358,6 +358,7 @@
     <button class="lien" data-ctrl="pc">PC · clavier</button>
     <button class="lien" data-ctrl="mobile">Mobile · écran tactile</button>
   </div>
+  <div class="liste" id="joueur-tchat" style="width:min(100%,520px)"></div>
   <div class="liste" id="joueur-stats" style="width:min(100%,520px)"></div>
   <div class="rangee">
     <button class="lien" id="btn-exporter">Exporter ma sauvegarde</button>
@@ -396,6 +397,12 @@
     <div class="carte" style="cursor:default" id="mu-course-aff"></div>
     <label class="aide" id="mu-kai-choix" style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer">
       <input type="checkbox" id="mu-kai" checked style="width:18px;height:18px;accent-color:#f2b632"> Kaimaxus en piste (le champion, dans sa Koenigsegg)</label>
+    <div id="mu-tchat">
+      <div id="mu-tchat-msgs"></div>
+      <div style="display:flex;gap:8px"><input id="mu-tchat-champ" class="mu-champ" maxlength="300" autocomplete="off" placeholder="Écrire au groupe…" style="flex:1;min-width:0">
+        <button class="lien" id="mu-tchat-envoyer" style="padding:8px 10px">Envoyer</button></div>
+      <button class="lien" id="mu-tchat-inviter" style="align-self:flex-start;padding:4px 0">💬 Inviter des amis</button>
+    </div>
     <button class="action" id="mu-lancer">Lancer la course</button>
     <button class="lien" id="mu-quitter">Quitter le groupe</button>
   </div>
@@ -429,6 +436,7 @@
   <div id="fin-deblocage" style="display:none;border:2px solid var(--or);border-radius:8px;padding:12px 18px;
        background:rgba(242,182,50,.10);color:#f6d27a;font-weight:700;line-height:1.7;text-align:center"></div>
   <div class="rangee">
+    <button class="lien" id="btn-partager">📤 Partager</button>
     <button class="lien" id="btn-rejouer">Rejouer</button>
     <button class="action" id="btn-menu">Menu</button>
   </div>
@@ -5871,7 +5879,8 @@ function serveurEnvoyer(o){
 function serveurRecoit(d){
   reseau.vuHote = performance.now();
   if (d.t === "attente"){ multiStatut("Connecté ! Le serveur prépare le jeu (il vient de se réveiller)…"); return; }
-  if (d.t === "bienvenue"){ multiStatut(""); reseau.moi = d.id; reseau.code = d.code; reseau.hote = !!d.hote; return; }
+  if (d.t === "salon-msg"){ if (window.chatSalonRecu) chatSalonRecu(d); return; }
+  if (d.t === "bienvenue"){ if (window.chatSalonVider) chatSalonVider(); multiStatut(""); reseau.moi = d.id; reseau.code = d.code; reseau.hote = !!d.hote; return; }
   if (d.t === "salon"){
     if (d.v !== MULTI_VERSION){ multiStatut("Le serveur n'a pas la même version du jeu : recharge la page."); multiReinit(); afficherEntree(); return; }
     reseau.joueurs = d.joueurs || []; reseau.circuit = d.circuit; reseau.kaimaxus = !!d.kaimaxus; reseau.code = d.code;
@@ -7833,5 +7842,692 @@ function boucle(maintenant){
 
 requestAnimationFrame(boucle);
 </script>
+<style id="tchat-style">
+  /* ─────────────── Chat (amis, messages, groupes) ─────────────── */
+  #tx-bouton{position:fixed;right:16px;bottom:16px;z-index:40;font:inherit;font-size:15px;font-weight:700;color:#0b0f16;
+    background:var(--or);border:0;border-radius:999px;padding:11px 18px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.45);
+    display:flex;align-items:center;gap:8px}
+  #tx-bouton:hover{background:#ffc94d}
+  #tx-bouton.cache{display:none}
+  .tx-badge{background:#e8494f;color:#fff;border-radius:999px;font-size:11.5px;min-width:20px;height:20px;padding:0 6px;
+    display:inline-flex;align-items:center;justify-content:center}
+  .tx-badge[hidden]{display:none}
+  #tx-panneau{position:fixed;top:0;right:0;bottom:0;width:min(100%,400px);z-index:45;background:#0f151f;
+    border-left:1px solid var(--trait);display:flex;flex-direction:column;box-shadow:-12px 0 40px rgba(0,0,0,.5);
+    -webkit-user-select:text;user-select:text}
+  #tx-panneau.cache{display:none}
+  .tx-tete{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;border-bottom:1px solid var(--trait)}
+  .tx-tete h3{font-size:16px;letter-spacing:.06em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tx-tete small{display:block;font-size:11.5px;color:var(--gris);font-weight:400;letter-spacing:.03em}
+  .tx-icone{font:inherit;font-size:18px;background:none;border:0;color:#b9c4d2;cursor:pointer;padding:4px 8px;border-radius:6px}
+  .tx-icone:hover{background:#1a2331;color:#fff}
+  .tx-onglets{display:flex;border-bottom:1px solid var(--trait)}
+  .tx-onglets button{flex:1;font:inherit;font-size:13px;letter-spacing:.12em;text-transform:uppercase;background:none;border:0;
+    color:var(--gris);padding:11px 0;cursor:pointer;border-bottom:2px solid transparent}
+  .tx-onglets button[aria-selected="true"]{color:#fff;border-bottom-color:var(--or)}
+  .tx-corps{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .tx-ligne{display:flex;align-items:center;gap:10px;background:#141b26;border:1px solid var(--trait);border-radius:8px;
+    padding:10px 12px;cursor:pointer;text-align:left;color:inherit;font:inherit;width:100%}
+  .tx-ligne:hover{border-color:#3d4c63}
+  .tx-ligne .tx-nom{font-weight:700;font-size:14.5px}
+  .tx-ligne .tx-sous{font-size:12px;color:var(--gris);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tx-ligne .tx-txt{flex:1;min-width:0}
+  .tx-point{width:10px;height:10px;border-radius:50%;background:#45505f;flex:none}
+  .tx-point.on{background:#2fbf71;box-shadow:0 0 0 3px rgba(47,191,113,.2)}
+  .tx-avatar{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+    font-weight:800;color:#0b0f16;font-size:15px;position:relative}
+  .tx-avatar .tx-point{position:absolute;right:-1px;bottom:-1px;border:2px solid #141b26;width:12px;height:12px}
+  .tx-titre{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#7d8899;margin:8px 2px 0}
+  .tx-champ{font:inherit;font-size:15px;background:#141b26;color:#e8edf5;border:1px solid #26303f;border-radius:8px;padding:10px 12px;width:100%}
+  .tx-champ:focus{outline:none;border-color:var(--or)}
+  .tx-btn{font:inherit;font-size:13px;font-weight:700;background:var(--or);color:#0b0f16;border:0;border-radius:7px;padding:9px 14px;cursor:pointer;white-space:nowrap}
+  .tx-btn:hover{background:#ffc94d}
+  .tx-btn.gris{background:#232d3b;color:#d5dde8}
+  .tx-btn.gris:hover{background:#2c3848}
+  .tx-btn.rouge{background:#3a1d22;color:#ff8f94}
+  .tx-rang{display:flex;gap:8px;align-items:center}
+  .tx-vide{color:var(--gris);font-size:13px;text-align:center;line-height:1.6;padding:24px 8px}
+  .tx-erreur{color:#ff8f94;font-size:13px;min-height:18px}
+  .tx-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:4px}
+  .tx-bulle{max-width:82%;padding:8px 12px;border-radius:14px;font-size:14.5px;line-height:1.35;word-wrap:break-word;
+    background:#1c2532;align-self:flex-start;border-bottom-left-radius:4px}
+  .tx-bulle.moi{background:#3a2f12;align-self:flex-end;border-bottom-left-radius:14px;border-bottom-right-radius:4px;color:#ffe6a6}
+  .tx-bulle .tx-de{font-size:11.5px;font-weight:700;color:var(--or);margin-bottom:2px}
+  .tx-bulle .tx-h{font-size:10.5px;color:#7d8899;margin-top:3px;text-align:right}
+  .tx-bulle.inv{border:1px solid var(--or)}
+  .tx-jour{align-self:center;font-size:11px;color:#7d8899;margin:8px 0 2px}
+  .tx-saisie{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--trait);padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  .tx-saisie input{flex:1}
+  .tx-menu{position:absolute;right:12px;top:54px;background:#182130;border:1px solid #2c3848;border-radius:8px;padding:6px;
+    display:flex;flex-direction:column;z-index:2;min-width:210px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .tx-menu button{font:inherit;font-size:14px;text-align:left;background:none;border:0;color:#e8edf5;padding:9px 12px;border-radius:6px;cursor:pointer}
+  .tx-menu button:hover{background:#223044}
+  .tx-menu button.rouge{color:#ff8f94}
+  #tx-toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:50;background:#182130;border:1px solid var(--or);
+    border-radius:10px;padding:10px 16px;font-size:14px;max-width:min(92vw,420px);cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  #tx-toast.cache{display:none}
+  .tx-code{font-family:ui-monospace,Consolas,monospace;font-size:15px;background:#141b26;border:1px dashed #3d4c63;border-radius:8px;
+    padding:12px;word-break:break-all;color:#ffe6a6}
+  /* chat du salon multijoueur */
+  #mu-tchat{display:flex;flex-direction:column;gap:6px;width:100%}
+  #mu-tchat-msgs{max-height:150px;min-height:44px;overflow-y:auto;background:#101722;border:1px solid var(--trait);border-radius:7px;
+    padding:8px 10px;font-size:13.5px;line-height:1.45;display:flex;flex-direction:column;gap:2px;-webkit-user-select:text;user-select:text}
+  #mu-tchat-msgs b{font-weight:700}
+  #mu-tchat-msgs .vide{color:#6f7b8c;font-size:12px}
+  .tx-img{display:block;max-width:100%;border-radius:8px;margin-top:4px;cursor:zoom-in}
+  #tx-zoom{position:fixed;inset:0;z-index:60;background:rgba(5,8,12,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+  #tx-zoom img{max-width:100%;max-height:100%;border-radius:10px}
+  .tx-apercu{width:100%;border-radius:8px;border:1px solid var(--trait)}
+  #joueur-tchat{align-items:stretch}
+  .tx-carte-id{background:#141b26;border:1px solid var(--trait);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+  .tx-carte-id .tx-id{font-size:22px}
+  .tx-carte-id .tx-sous{font-size:12px;color:var(--gris)}
+  .tx-id{font-size:28px;font-weight:800;letter-spacing:.12em;color:var(--or);font-family:ui-monospace,Consolas,monospace}
+  .tx-profil-tete{display:flex;align-items:center;gap:14px;padding:6px 2px}
+  .tx-profil-tete .tx-avatar{width:58px;height:58px;font-size:26px}
+  .tx-profil-tete .tx-avatar .tx-point{width:16px;height:16px}
+  .tx-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tx-stat{background:#141b26;border:1px solid var(--trait);border-radius:8px;padding:10px 12px}
+  .tx-stat span{display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#7d8899}
+  .tx-stat b{display:block;font-size:22px;font-weight:800;margin-top:2px}
+  .tx-stat small{font-size:13px;color:var(--gris);font-weight:600}
+  .tx-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .tx-chip{font-size:12px;background:#1c2532;border:1px solid var(--trait);border-radius:999px;padding:4px 10px;color:#c9d2de}
+  .tx-cliquable{cursor:pointer}
+  .tx-cliquable:hover{text-decoration:underline}
+  @media (max-width:520px){ #tx-bouton{right:10px;bottom:10px;padding:10px 14px} }
+</style>
+<button id="tx-bouton" type="button" class="cache" aria-label="Ouvrir le chat">💬 Chat <b class="tx-badge" id="tx-badge" hidden></b></button>
+<div id="tx-toast" class="cache" role="status"></div>
+<aside id="tx-panneau" class="cache" aria-label="Chat"></aside>
+<script id="tchat-module">
+/* ═══════════════════════════ CHAT ═══════════════════════════
+   Chaque joueur a un ID à 8 chiffres (créé tout seul, gardé sur l'appareil
+   avec un code secret) ; son nom est celui du jeu (Joueur → Prénom), ou
+   « Joueur 12 » s'il n'en a pas. Amis par ID, messages privés et groupes
+   (gardés par le serveur pour ceux qui ne sont pas là), qui est en ligne,
+   invitation dans son groupe multijoueur, partage du classement.
+   Passe par le serveur du multijoueur, sur une connexion à part. */
+(() => {
+  const CLE_STOCK = "dx-chat-compte";
+  const $ = id => document.getElementById(id);
+  const el = (tag, props = {}, ...enfants) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)){
+      if (k === "class") e.className = v; else if (k === "style") e.style.cssText = v;
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v !== undefined && v !== null && v !== false) e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const x of enfants.flat(2)) if (x != null && x !== false) e.append(x.nodeType ? x : document.createTextNode(String(x)));
+    return e;
+  };
+  const lireCompte = () => { try { const c = JSON.parse(localStorage.getItem(CLE_STOCK) || "null"); return c && c.cle ? c : null; } catch (e) { return null; } };
+  const ecrireCompte = c => { try { if (c) localStorage.setItem(CLE_STOCK, JSON.stringify(c)); else localStorage.removeItem(CLE_STOCK); } catch (e) {} };
+  const nouvelleCle = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a, x => "abcdefghijkmnpqrstuvwxyz23456789"[x % 32]).join(""); };
+  const COULEURS = ["#f2b632", "#4ea1ff", "#2fbf71", "#e8494f", "#b07cff", "#ff8a3d", "#26c6da", "#f06292"];
+  const couleurDe = p => { let h = 0; for (const ch of String(p)) h = (h * 31 + ch.charCodeAt(0)) | 0; return COULEURS[Math.abs(h) % COULEURS.length]; };
+  const joliId = id => id ? "#" + String(id).slice(0, 4) + " " + String(id).slice(4) : "…";
+  const heure = t => { const d = new Date(t); return d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0"); };
+  const jour = t => { const d = new Date(t), a = new Date(); const hier = new Date(a - 864e5);
+    if (d.toDateString() === a.toDateString()) return "Aujourd'hui"; if (d.toDateString() === hier.toDateString()) return "Hier";
+    return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); };
+  const ilYa = t => { if (!t) return "hors ligne"; const s = (Date.now() - t) / 1000;
+    if (s < 60) return "vu à l'instant"; if (s < 3600) return "vu il y a " + Math.floor(s / 60) + " min";
+    if (s < 86400) return "vu il y a " + Math.floor(s / 3600) + " h"; return "vu il y a " + Math.floor(s / 86400) + " j"; };
+  // le nom du joueur, celui de l'écran Joueur (vide : le serveur donne « Joueur 12 »)
+  const nomJeu = () => { try { return (carriere.prenom || "").trim().slice(0, 16); } catch (e) { return ""; } };
+
+  // mes stats du jeu, montrées sur mon profil
+  function statsJeu(){
+    try {
+      const ordre = ordreCourses(), n = ordre.length;
+      const ouvertes = ordre.filter((_, r) => courseOuverte(r, 1)).length;
+      const p2 = partie2Ouverte() ? ordre.filter((_, r) => courseOuverte(r, 2)).length : null;
+      return { courses: ouvertes, coursesTotal: n, p2, voitures: carriere.possedees.length, voituresTotal: VOITURES.length,
+               voiture: (VOITURES[carriere.voiture] || {}).nom || "", liste: carriere.possedees.map(i => (VOITURES[i] || {}).nom).filter(Boolean),
+               jouees: carriere.stats.courses, podiums: carriere.stats.podiums, victoires: carriere.stats.victoires };
+    } catch (e) { return null; }
+  }
+  let statsEnvoyees = "";
+  function envoyerStats(){ const st = statsJeu(); if (!st) return; const j = JSON.stringify(st); if (j !== statsEnvoyees && S.connecte){ statsEnvoyees = j; envoi({ t: "c-stats", stats: st }); } }
+  setInterval(envoyerStats, 5000);
+
+  // ─── état ───
+  const S = { ws: null, connecte: false, compte: lireCompte(), etat: null, vue: "liste", onglet: "discussions", conv: null,
+              histos: {}, erreur: "", menu: false, essais: 0, ouvert: false, nomEnvoye: null };
+  window.TCHAT = S;
+  S.file = [];          // messages écrits pendant que le serveur se réveille : partent dès qu'on est connecté
+
+  /* La dernière liste d'amis et les dernières discussions sont gardées sur
+     l'appareil : le chat s'ouvre tout de suite, même si le serveur dort encore. */
+  const CLE_CACHE = "dx-chat-cache";
+  try {
+    const c = JSON.parse(localStorage.getItem(CLE_CACHE) || "null");
+    if (c && S.compte && c.id === S.compte.id && c.etat){
+      S.etat = c.etat; S.histos = c.histos || {};
+      for (const a of S.etat.amis) a.enLigne = false;      // on ne sait pas encore qui est là
+    }
+  } catch (e) {}
+  let minCache = null;
+  function sauverCache(){
+    clearTimeout(minCache);
+    minCache = setTimeout(() => {
+      if (!S.etat) return;
+      const histos = {};
+      for (const [k, l] of Object.entries(S.histos)) histos[k] = l.slice(-40).map(m => { const x = Object.assign({}, m); if (x.img){ delete x.img; x.imgPerdue = true; } return x; });
+      try { localStorage.setItem(CLE_CACHE, JSON.stringify({ id: S.etat.id, etat: S.etat, histos })); } catch (e) {}
+    }, 800);
+  }
+
+  // dès l'ouverture du jeu, on réveille le serveur (l'offre gratuite de Render le met en veille)
+  try { const u = adresseServeur(); if (u) fetch(u.replace(/^ws/, "http"), { mode: "no-cors" }).catch(() => {}); } catch (e) {}
+
+  // ─── connexion (le compte se crée tout seul la première fois) ───
+  function adresse(){ try { return adresseServeur(); } catch (e) { return null; } }
+  function assurerCompte(){
+    if (!S.compte){ S.compte = { cle: nouvelleCle(), nouveau: true }; ecrireCompte(S.compte); }
+    connecter();
+  }
+  function connecter(){
+    if (!S.compte || (S.ws && S.ws.readyState <= 1)) return;
+    const url = adresse(); if (!url) return;
+    let ws; try { ws = new WebSocket(url); } catch (e) { return; }
+    S.ws = ws;
+    ws.onopen = () => {
+      S.essais = 0; S.nomEnvoye = nomJeu();
+      const n = S.compte.nouveau;
+      envoi({ t: "c-entrer", id: S.compte.id, cle: S.compte.cle, nom: S.nomEnvoye, nouveau: n === "login" ? false : n ? true : "auto" });
+    };
+    ws.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch (_) { return; } recu(d); };
+    ws.onclose = () => {
+      if (S.ws !== ws) return;
+      S.ws = null; S.connecte = false; rendre(); joueurTchat();
+      if (S.compte) setTimeout(connecter, Math.min(60000, 3000 * 2 ** S.essais++));
+    };
+  }
+  const envoi = o => { if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify(o)); };
+  const enLigneServeur = () => S.connecte && S.ws && S.ws.readyState === 1;
+  // un message : tout de suite si on est connecté, sinon il attend (⏳) et part dès la connexion
+  function envoyerMessage(conv, texte, img){
+    if (enLigneServeur()) envoi(img ? { t: "c-msg", conv, texte, img } : { t: "c-msg", conv, texte });
+    else { S.file.push({ conv, texte, img, t: Date.now() }); assurerCompte(); rendre(true); }
+  }
+  function viderFile(){
+    const f = S.file; S.file = [];
+    for (const x of f) envoi(x.img ? { t: "c-msg", conv: x.conv, texte: x.texte, img: x.img } : { t: "c-msg", conv: x.conv, texte: x.texte });
+  }
+  setInterval(() => envoi({ t: "ping", t0: 0 }), 25000);
+  // le joueur change de prénom dans le jeu : son nom suit dans le chat
+  setInterval(() => { if (S.connecte && nomJeu() !== S.nomEnvoye){ S.nomEnvoye = nomJeu(); envoi({ t: "c-nom", nom: S.nomEnvoye }); } }, 2000);
+
+  function recu(d){
+    if (d.t === "c-etat"){
+      const premier = !S.connecte;
+      S.etat = d; S.connecte = true; S.ancien = null;
+      if (premier){ viderFile(); statsEnvoyees = ""; envoyerStats(); if (S.vue === "conv" && S.conv) envoi({ t: "c-histo", conv: S.conv }); }
+      sauverCache();
+      if (S.compte.nouveau || S.compte.id !== d.id){ S.compte = { id: d.id, cle: S.compte.cle }; ecrireCompte(S.compte); }
+      if (premier && (S.vue === "attente" || S.vue === "connexion")) S.vue = S.partage ? "partager" : "liste";
+      rendre(); badge(); joueurTchat(); return;
+    }
+    if (d.t === "c-refus"){
+      if (!S.connecte){
+        const ws = S.ws; S.ws = null; try { ws.close(); } catch (e) {}
+        if (S.compte && S.compte.nouveau === "login"){
+          // mauvais ID ou code sur « J'ai déjà un compte » : on revient au compte d'avant
+          S.compte = S.ancien || null; ecrireCompte(S.compte); S.erreur = d.raison; S.vue = "connexion";
+          if (S.compte) setTimeout(connecter, 300);
+        } else { S.compte = null; ecrireCompte(null); S.erreur = d.raison; }
+        rendre(); return;
+      }
+      S.erreur = d.raison; rendre(); setTimeout(() => { if (S.erreur === d.raison){ S.erreur = ""; rendre(); } }, 4000); return;
+    }
+    if (d.t === "c-info"){ toast(d.texte, () => ouvrir("amis")); return; }
+    if (d.t === "c-presence"){
+      if (!S.etat) return;
+      const a = S.etat.amis.find(x => x.id === d.id); if (a){ a.enLigne = d.enLigne; a.vu = d.vu; }
+      rendre(); return;
+    }
+    if (d.t === "c-msg"){
+      const h = S.histos[d.conv]; if (h && !h.some(m => m.id === d.m.id)) h.push(d.m);
+      if (S.etat){ S.etat.derniers[d.conv] = d.m; }
+      sauverCache();
+      const moi = d.m.de === (S.etat && S.etat.id);
+      const vu = S.ouvert && S.vue === "conv" && S.conv === d.conv && document.visibilityState === "visible";
+      if (vu) envoi({ t: "c-lu", conv: d.conv, id: d.m.id });
+      else if (!moi && S.etat){
+        S.etat.nonLus[d.conv] = (S.etat.nonLus[d.conv] || 0) + 1;
+        const ou = d.conv.startsWith("g:") ? " (" + nomConv(d.conv) + ")" : "";
+        toast((d.m.inv ? "🏁 " + d.m.nom + " t'invite dans son groupe multijoueur" : d.m.nom + ou + " : " + (d.m.img ? "📷 " : "") + (d.m.texte || "Photo")), () => ouvrirConv(d.conv));
+      }
+      badge(); rendre(); return;
+    }
+    if (d.t === "c-histo"){ S.histos[d.conv] = d.msgs; sauverCache(); rendre(true); return; }
+    if (d.t === "c-profil"){ S.profil = d; S.vue = "profil"; S.menu = false; montrerPanneau(); rendre(); return; }
+    if (d.t === "c-ouvrir"){
+      if (S.partage && S.partage.versNouveau){ envoyerPartage(d.conv); return; }
+      ouvrirConv(d.conv); return;
+    }
+  }
+
+  // ─── badge, toast, bouton ───
+  function totalNonLus(){ return S.etat ? Object.values(S.etat.nonLus).reduce((a, b) => a + b, 0) + S.etat.demandes.length : 0; }
+  function badge(){
+    const n = totalNonLus(), b = $("tx-badge");
+    b.textContent = n > 99 ? "99+" : n; b.hidden = !n;
+    document.title = n ? "(" + n + ") DX GRAND PRIX" : "DX GRAND PRIX";
+  }
+  let minToast = null;
+  function toast(texte, clic){
+    if (enCourse()) return;          // pas pendant qu'on conduit
+    const t = $("tx-toast"); t.textContent = texte; t.classList.remove("cache");
+    t.onclick = () => { t.classList.add("cache"); if (clic) clic(); };
+    clearTimeout(minToast); minToast = setTimeout(() => t.classList.add("cache"), 5000);
+  }
+  function toastLocal(t){ const x = $("tx-toast"); x.textContent = t; x.classList.remove("cache"); x.onclick = () => x.classList.add("cache");
+    clearTimeout(minToast); minToast = setTimeout(() => x.classList.add("cache"), 2500); }
+  const enCourse = () => { try { return ["course", "compte", "arrivee", "pause"].includes(jeu.phase); } catch (e) { return false; } };
+  setInterval(() => {
+    const cacher = enCourse();
+    $("tx-bouton").classList.toggle("cache", cacher);
+    if (cacher && S.ouvert) fermer();
+  }, 400);
+
+  // ─── ouverture ───
+  function montrerPanneau(){ S.ouvert = true; $("tx-panneau").classList.remove("cache"); }
+  function ouvrir(onglet){
+    montrerPanneau();
+    if (onglet){ S.onglet = onglet; S.vue = "liste"; }
+    if (!S.etat && S.vue !== "connexion") S.vue = "attente";
+    assurerCompte(); rendre();
+  }
+  function fermer(){ S.ouvert = false; S.menu = false; $("tx-panneau").classList.add("cache"); }
+  function ouvrirConv(conv){
+    montrerPanneau();
+    S.vue = "conv"; S.conv = conv; S.menu = false;
+    envoi({ t: "c-histo", conv });
+    if (S.etat && S.etat.nonLus[conv]){ delete S.etat.nonLus[conv]; badge(); }
+    rendre(true);
+  }
+  $("tx-bouton").onclick = () => S.ouvert ? fermer() : ouvrir();
+  // les touches tapées dans le chat ne pilotent pas la voiture
+  for (const ev of ["keydown", "keyup"]) $("tx-panneau").addEventListener(ev, e => e.stopPropagation());
+
+  const ami = id => S.etat && S.etat.amis.find(a => a.id === id);
+  const nomConv = conv => {
+    if (!conv) return "";
+    if (conv.startsWith("p:")){ const a = ami(conv.slice(2)); return a ? a.nom : "Joueur " + joliId(conv.slice(2)); }
+    const g = S.etat && S.etat.groupes.find(x => "g:" + x.id === conv); return g ? g.nom : "Groupe";
+  };
+  // voir le profil d'un joueur (on revient ensuite là où on était)
+  function voirProfil(id){
+    if (!enLigneServeur()){ toastLocal("Connexion au serveur… réessaie dans un instant"); assurerCompte(); return; }
+    S.retourProfil = { vue: S.vue, conv: S.conv }; envoi({ t: "c-profil", id });
+  }
+  const dansUnGroupeMulti = () => { try { return !!(reseau.serveur && reseau.code && reseau.moi); } catch (e) { return false; } };
+
+  // ─── rendu ───
+  function rendre(enBas){
+    const P = $("tx-panneau"); if (!S.ouvert) return;
+    const brouillon = P.querySelector("[data-garder]"), texte = brouillon ? brouillon.value : "", focus = brouillon && document.activeElement === brouillon;
+    const vieux = P.querySelector(".tx-msgs"), basAvant = !vieux || vieux.scrollHeight - vieux.scrollTop - vieux.clientHeight < 60;
+    const vues = { connexion: vueConnexion, conv: vueConv, "nouveau-groupe": vueNouveauGroupe, reglages: vueReglages, partager: vuePartager, profil: vueProfil };
+    P.replaceChildren(...[].concat((vues[S.vue] || vueListe)()).flat(2).filter(Boolean));
+    const nb = P.querySelector("[data-garder]");
+    if (nb && texte) nb.value = texte;
+    if (nb && focus) nb.focus();
+    const m = P.querySelector(".tx-msgs"); if (m && (enBas || basAvant)) m.scrollTop = m.scrollHeight;
+  }
+  const tete = (titre, sous, gauche, droite) => el("div", { class: "tx-tete" }, gauche || null,
+    el("h3", {}, titre, sous ? el("small", {}, sous) : null), droite || null, el("button", { class: "tx-icone", title: "Fermer", onclick: fermer }, "✕"));
+  const erreur = () => el("div", { class: "tx-erreur" }, S.erreur || "");
+  const avatar = (nom, enL) => el("div", { class: "tx-avatar", style: "background:" + couleurDe(nom) }, (nom || "?")[0].toUpperCase(), enL != null ? el("span", { class: "tx-point" + (enL ? " on" : "") }) : null);
+  const retourListe = () => el("button", { class: "tx-icone", title: "Retour", onclick: () => { S.vue = "liste"; S.menu = false; S.erreur = ""; rendre(); } }, "←");
+
+  // « J'ai déjà un compte » : retrouver son compte sur un autre appareil
+  function vueConnexion(){
+    const id = el("input", { class: "tx-champ", placeholder: "Ton ID (8 chiffres)", inputmode: "numeric", autocomplete: "off" });
+    const code = el("input", { class: "tx-champ", placeholder: "Ton code secret", autocomplete: "off" });
+    const valider = () => {
+      const i = id.value.replace(/[#\s]/g, "");
+      if (!/^\d{8}$/.test(i)){ S.erreur = "L'ID fait 8 chiffres (il est dans Joueur sur ton autre appareil)."; rendre(); return; }
+      if (code.value.trim().length < 16){ S.erreur = "Colle ton code secret (⚙ dans le chat, sur ton autre appareil)."; rendre(); return; }
+      S.erreur = ""; S.ancien = S.compte && !S.compte.nouveau ? S.compte : null;
+      const ws = S.ws; S.ws = null; S.connecte = false; S.etat = null; try { ws && ws.close(); } catch (e) {}
+      S.compte = { id: i, cle: code.value.trim().replace(/\s/g, ""), nouveau: "login" }; ecrireCompte(S.compte);
+      S.vue = "attente"; connecter(); rendre();
+    };
+    for (const i of [id, code]) i.addEventListener("keydown", e => { if (e.key === "Enter") valider(); });
+    return [tete("Retrouver mon compte", null, S.etat ? retourListe() : null),
+      el("div", { class: "tx-corps" },
+        el("p", { class: "tx-vide", style: "padding:6px 4px;text-align:left" }, "Sur ton autre appareil, l'ID est dans Joueur et le code secret dans ⚙ du chat."),
+        id, code, erreur(),
+        el("button", { class: "tx-btn", onclick: valider }, "Me connecter"),
+        S.etat ? null : el("button", { class: "tx-btn gris", onclick: () => { S.erreur = ""; S.vue = "attente"; assurerCompte(); rendre(); } }, "← Non, garder un nouveau compte"))];
+  }
+
+  function vueListe(){
+    if (!S.etat) return [tete("Le chat"), el("div", { class: "tx-corps" },
+      el("p", { class: "tx-vide" }, S.ws && S.ws.readyState === 1 ? "Connexion…" : "Connexion au serveur… (s'il dormait, ça peut prendre jusqu'à une minute)"), erreur(),
+      el("button", { class: "tx-btn gris", onclick: () => { S.vue = "connexion"; rendre(); } }, "J'ai déjà un compte (autre appareil)"))];
+    const E = S.etat;
+    const onglet = (id, txt, n) => el("button", { role: "tab", "aria-selected": S.onglet === id ? "true" : "false", onclick: () => { S.onglet = id; S.erreur = ""; rendre(); } },
+      txt, n ? el("b", { class: "tx-badge", style: "margin-left:6px" }, n) : null);
+    const nbConvs = Object.values(E.nonLus).reduce((a, b) => a + b, 0);
+    const corps = el("div", { class: "tx-corps" });
+    if (S.onglet === "discussions"){
+      const convs = [...E.amis.map(a => "p:" + a.id), ...E.groupes.map(g => "g:" + g.id)];
+      convs.sort((a, b) => ((E.derniers[b] || {}).t || 0) - ((E.derniers[a] || {}).t || 0));
+      corps.append(el("button", { class: "tx-btn gris", onclick: () => { S.vue = "nouveau-groupe"; rendre(); } }, "＋ Nouveau groupe"));
+      if (!convs.length) corps.append(el("p", { class: "tx-vide" }, "Pas encore de discussion.", el("br"), "Ajoute des amis avec leur ID dans l'onglet Amis !"));
+      for (const c of convs){
+        const dm = E.derniers[c], n = E.nonLus[c], grp = c.startsWith("g:");
+        const a = !grp && ami(c.slice(2)), g = grp && E.groupes.find(x => "g:" + x.id === c);
+        const moi = dm && dm.de === E.id;
+        corps.append(el("button", { class: "tx-ligne", onclick: () => ouvrirConv(c) },
+          grp ? el("div", { class: "tx-avatar", style: "background:#3d4c63;color:#fff" }, "👥") : avatar(a.nom, a.enLigne),
+          el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, nomConv(c)),
+            el("div", { class: "tx-sous" }, dm ? (dm.inv ? "🏁 invitation multijoueur" : (grp || moi ? (moi ? "Toi" : dm.nom) + " : " : "") + (dm.img || dm.photo ? "📷 " : "") + (dm.texte || "Photo"))
+                                              : grp ? g.membres.map(x => x.nom).join(", ") : (a.enLigne ? "en ligne" : ilYa(a.vu)))),
+          n ? el("b", { class: "tx-badge" }, n) : null));
+      }
+    } else {
+      const champ = el("input", { class: "tx-champ", placeholder: "ID de ton ami (8 chiffres)", inputmode: "numeric", maxlength: 12, autocomplete: "off", "data-garder": true });
+      const ajouter = () => { const i = champ.value.replace(/[#\s]/g, ""); if (!i) return;
+        if (!/^\d{8}$/.test(i)){ S.erreur = "Un ID fait 8 chiffres (ton ami le trouve dans Joueur)."; rendre(); return; }
+        envoi({ t: "c-ami-demander", id: i }); champ.value = ""; S.erreur = ""; toastLocal("Demande envoyée !"); };
+      champ.addEventListener("keydown", e => { if (e.key === "Enter") ajouter(); });
+      corps.append(el("div", { class: "tx-carte-id" }, el("div", { class: "tx-titre", style: "margin:0" }, "Mon ID"), el("div", { class: "tx-id" }, joliId(E.id)),
+        el("div", { class: "tx-sous" }, "Donne-le à tes potes pour qu'ils t'ajoutent")),
+        el("div", { class: "tx-rang" }, champ,
+          el("button", { class: "tx-btn gris", title: "Voir son profil", onclick: () => { const i = champ.value.replace(/[#\s]/g, "");
+            if (!/^\d{8}$/.test(i)){ S.erreur = "Un ID fait 8 chiffres."; rendre(); return; } voirProfil(i); } }, "👤"),
+          el("button", { class: "tx-btn", onclick: ajouter }, "Ajouter")), erreur());
+      if (E.demandes.length){
+        corps.append(el("div", { class: "tx-titre" }, "Demandes reçues"));
+        for (const x of E.demandes) corps.append(el("div", { class: "tx-ligne", onclick: () => voirProfil(x.id) }, avatar(x.nom),
+          el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, x.nom), el("div", { class: "tx-sous" }, joliId(x.id) + " · veut être ton ami")),
+          el("button", { class: "tx-btn", onclick: e => { e.stopPropagation(); envoi({ t: "c-ami-accepter", id: x.id }); } }, "Accepter"),
+          el("button", { class: "tx-icone", title: "Refuser", onclick: e => { e.stopPropagation(); envoi({ t: "c-ami-retirer", id: x.id }); } }, "✕")));
+      }
+      const multi = dansUnGroupeMulti();
+      const tri = [...E.amis].sort((a, b) => (b.enLigne - a.enLigne) || a.nom.localeCompare(b.nom));
+      corps.append(el("div", { class: "tx-titre" }, "Amis · " + E.amis.filter(a => a.enLigne).length + " en ligne"));
+      if (!tri.length) corps.append(el("p", { class: "tx-vide" }, "Aucun ami pour l'instant. Demande son ID à ton pote (il est dans Joueur) et ajoute-le !"));
+      for (const a of tri) corps.append(el("div", { class: "tx-ligne", onclick: () => voirProfil(a.id) }, avatar(a.nom, a.enLigne),
+        el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, a.nom), el("div", { class: "tx-sous" }, (a.enLigne ? "🟢 en ligne" : ilYa(a.vu)) + " · " + joliId(a.id))),
+        multi ? el("button", { class: "tx-btn gris", title: "Inviter dans mon groupe multijoueur", onclick: e => { e.stopPropagation(); inviter("p:" + a.id); } }, "🏁 Inviter") : null));
+      if (E.envoyees.length){
+        corps.append(el("div", { class: "tx-titre" }, "Demandes envoyées"));
+        for (const x of E.envoyees) corps.append(el("div", { class: "tx-ligne", style: "cursor:default" }, avatar(x.nom),
+          el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, x.nom), el("div", { class: "tx-sous" }, joliId(x.id) + " · en attente…")),
+          el("button", { class: "tx-btn gris", onclick: () => envoi({ t: "c-ami-retirer", id: x.id }) }, "Annuler")));
+      }
+      if (E.bloques.length){
+        corps.append(el("div", { class: "tx-titre" }, "Bloqués"));
+        for (const x of E.bloques) corps.append(el("div", { class: "tx-ligne", style: "cursor:default" }, avatar(x.nom),
+          el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, x.nom), el("div", { class: "tx-sous" }, joliId(x.id))),
+          el("button", { class: "tx-btn gris", onclick: () => envoi({ t: "c-debloquer", id: x.id }) }, "Débloquer")));
+      }
+    }
+    return [tete(E.nom, (S.connecte ? "🟢 en ligne" : "reconnexion…") + " · " + joliId(E.id), null,
+                 el("button", { class: "tx-icone", title: "Mon compte", onclick: () => { S.vue = "reglages"; rendre(); } }, "⚙")),
+      el("div", { class: "tx-onglets", role: "tablist" }, onglet("discussions", "Discussions", nbConvs), onglet("amis", "Amis", E.demandes.length)),
+      corps];
+  }
+
+  function inviter(conv){
+    if (!dansUnGroupeMulti()){ S.erreur = "Crée ou rejoins d'abord un groupe multijoueur."; rendre(); return; }
+    envoi({ t: "c-inviter", conv, code: reseau.code });
+    toastLocal("Invitation envoyée !");
+  }
+  function rejoindre(code){
+    if (enCourse()){ toastLocal("Termine ta course d'abord !"); return; }
+    try {
+      if (reseau.code === code && reseau.moi){ fermer(); $("btn-multi").click(); return; }
+      fermer();
+      const nom = $("mu-nom"); if (!nom.value && S.etat) nom.value = S.etat.nom;
+      $("btn-multi").click();
+      $("mu-code").value = code;
+      multiRejoindre();
+    } catch (e) { toastLocal("Impossible de rejoindre : " + e.message); }
+  }
+
+  function vueConv(){
+    const E = S.etat; if (!E) return vueListe();
+    const conv = S.conv, grp = conv.startsWith("g:");
+    const g = grp && E.groupes.find(x => "g:" + x.id === conv);
+    if (grp && !g){ S.vue = "liste"; return vueListe(); }
+    const a = !grp && ami(conv.slice(2));
+    const sous = grp ? g.membres.length + " membres · " + g.membres.filter(x => x.id === E.id || (ami(x.id) || {}).enLigne).length + " en ligne"
+                     : a ? (a.enLigne ? "🟢 en ligne" : ilYa(a.vu)) : "n'est plus ton ami";
+    const plus = el("button", { class: "tx-icone", title: "Options", onclick: () => { S.menu = !S.menu; rendre(); } }, "⋯");
+    const msgs = el("div", { class: "tx-msgs" });
+    const h = S.histos[conv];
+    if (!h) msgs.append(el("p", { class: "tx-vide" }, enLigneServeur() ? "Chargement…" : "Connexion au serveur… tu peux déjà écrire, ton message partira tout seul."));
+    else if (!h.length) msgs.append(el("p", { class: "tx-vide" }, grp ? "Dites bonjour au groupe !" : "Écris le premier message à " + nomConv(conv) + " !"));
+    else {
+      let j = null;
+      for (const m of h){
+        const jm = jour(m.t); if (jm !== j){ j = jm; msgs.append(el("div", { class: "tx-jour" }, jm)); }
+        const moi = m.de === E.id;
+        msgs.append(el("div", { class: "tx-bulle" + (moi ? " moi" : "") + (m.inv ? " inv" : "") },
+          grp && !moi ? el("div", { class: "tx-de tx-cliquable", onclick: () => voirProfil(m.de) }, m.nom) : null,
+          m.texte || null,
+          m.img ? el("img", { class: "tx-img", src: m.img, alt: "image partagée", loading: "lazy", onclick: () => zoom(m.img) }) : null,
+          m.imgPerdue ? el("div", { class: "tx-h", style: "text-align:left" }, "📷 image trop ancienne") : null,
+          m.inv && !moi ? el("div", { style: "margin-top:6px" }, el("button", { class: "tx-btn", onclick: () => rejoindre(m.inv) }, "Rejoindre le groupe " + m.inv)) : null,
+          el("div", { class: "tx-h" }, heure(m.t))));
+      }
+      const der = h[h.length - 1]; S.lu = S.lu || {};
+      if (der && der.id > (S.lu[conv] || 0) && enLigneServeur()){ S.lu[conv] = der.id; envoi({ t: "c-lu", conv, id: der.id }); }
+    }
+    const champ = el("input", { class: "tx-champ", placeholder: "Message", maxlength: 300, autocomplete: "off", "data-garder": true, enterkeyhint: "send" });
+    // les messages qui attendent le serveur
+    for (const x of S.file.filter(x => x.conv === conv)){
+      if (msgs.querySelector(".tx-vide")) msgs.replaceChildren();
+      msgs.append(el("div", { class: "tx-bulle moi", style: "opacity:.7" }, x.texte || null,
+        x.img ? el("img", { class: "tx-img", src: x.img, alt: "image" }) : null, el("div", { class: "tx-h" }, "⏳ envoi…")));
+    }
+    const envoyerMsg = () => { const t = champ.value.trim(); if (!t) return; champ.value = ""; envoyerMessage(conv, t); const n = $("tx-panneau").querySelector("[data-garder]"); if (n) n.focus(); };
+    champ.addEventListener("keydown", e => { if (e.key === "Enter") envoyerMsg(); });
+    const peutEcrire = grp || !!a, idP = conv.slice(2);
+    const fermerMenu = () => { S.menu = false; };
+    const menu = S.menu ? el("div", { class: "tx-menu" },
+      dansUnGroupeMulti() ? el("button", { onclick: () => { fermerMenu(); inviter(conv); rendre(); } }, "🏁 Inviter dans mon groupe multi") : null,
+      grp ? g.membres.filter(x => x.id !== E.id).map(x => el("button", { onclick: () => { fermerMenu(); voirProfil(x.id); } }, "👤 Profil de " + x.nom))
+          : el("button", { onclick: () => { fermerMenu(); voirProfil(idP); } }, "👤 Voir le profil"),
+      grp ? [
+        ...E.amis.filter(x => !g.membres.some(m => m.id === x.id)).slice(0, 8).map(x =>
+          el("button", { onclick: () => { envoi({ t: "c-groupe-ajouter", id: g.id, ami: x.id }); fermerMenu(); rendre(); } }, "＋ Ajouter " + x.nom)),
+        el("button", { class: "rouge", onclick: () => { envoi({ t: "c-groupe-quitter", id: g.id }); S.vue = "liste"; fermerMenu(); rendre(); } }, "Quitter le groupe")
+      ] : [
+        a ? el("button", { class: "rouge", onclick: () => { envoi({ t: "c-ami-retirer", id: idP }); S.vue = "liste"; fermerMenu(); rendre(); } }, "Retirer de mes amis") : null,
+        el("button", { class: "rouge", onclick: () => { envoi({ t: "c-bloquer", id: idP }); S.vue = "liste"; fermerMenu(); rendre(); } }, "Bloquer " + nomConv(conv))
+      ]) : null;
+    const titre = grp ? nomConv(conv) : el("span", { class: "tx-cliquable", title: "Voir le profil", onclick: () => voirProfil(idP) }, nomConv(conv));
+    return [tete(titre, sous, retourListe(), plus), menu,
+      el("div", { style: "flex:1;display:flex;flex-direction:column;min-height:0;position:relative" }, msgs),
+      S.erreur ? el("div", { class: "tx-erreur", style: "padding:0 12px" }, S.erreur) : null,
+      peutEcrire ? el("div", { class: "tx-saisie" },
+        dansUnGroupeMulti() ? el("button", { class: "tx-icone", title: "Inviter dans mon groupe multijoueur", onclick: () => inviter(conv) }, "🏁") : null,
+        champ, el("button", { class: "tx-btn", onclick: envoyerMsg }, "Envoyer"))
+        : el("p", { class: "tx-vide" }, "Vous n'êtes plus amis.")];
+  }
+
+  function vueNouveauGroupe(){
+    const E = S.etat; if (!E) return vueListe();
+    const choisis = S.choix || (S.choix = new Set());
+    const nom = el("input", { class: "tx-champ", placeholder: "Nom du groupe", maxlength: 30, autocomplete: "off", "data-garder": true });
+    const corps = el("div", { class: "tx-corps" }, nom, el("div", { class: "tx-titre" }, "Choisis tes amis"));
+    if (!E.amis.length) corps.append(el("p", { class: "tx-vide" }, "Ajoute d'abord des amis."));
+    for (const a of E.amis){
+      const coche = el("input", { type: "checkbox", style: "width:18px;height:18px;accent-color:#f2b632", checked: choisis.has(a.id) });
+      coche.onchange = () => { coche.checked ? choisis.add(a.id) : choisis.delete(a.id); };
+      corps.append(el("label", { class: "tx-ligne" }, coche, avatar(a.nom, a.enLigne), el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, a.nom))));
+    }
+    corps.append(erreur(), el("button", { class: "tx-btn", onclick: () => {
+      if (!choisis.size){ S.erreur = "Choisis au moins un ami."; rendre(); return; }
+      if (S.partage) S.partage.versNouveau = true;
+      envoi({ t: "c-groupe-creer", nom: nom.value.trim() || "Groupe", membres: [...choisis] }); S.choix = null; S.erreur = "";
+    } }, "Créer le groupe"));
+    return [tete("Nouveau groupe", null, el("button", { class: "tx-icone", onclick: () => { S.choix = null; S.vue = S.partage ? "partager" : "liste"; rendre(); } }, "←")), corps];
+  }
+
+  function vueReglages(){
+    const c = S.compte || {}, E = S.etat || {};
+    return [tete("Mon compte", null, retourListe()),
+      el("div", { class: "tx-corps" },
+        el("div", { class: "tx-titre" }, "Nom"), el("div", { class: "tx-nom", style: "font-size:18px;font-weight:800" }, E.nom || ""),
+        el("p", { class: "aide", style: "text-align:left;margin:0" }, "C'est ton prénom dans Joueur. Change-le là-bas, il change aussi dans le chat."),
+        el("div", { class: "tx-titre" }, "Mon ID"), el("div", { class: "tx-id" }, joliId(E.id)),
+        el("button", { class: "tx-btn gris", onclick: () => voirProfil(E.id) }, "👤 Voir mon profil (ce que voient les autres)"),
+        el("div", { class: "tx-titre" }, "Code secret"), el("div", { class: "tx-code" }, c.cle || ""),
+        el("p", { class: "aide", style: "text-align:left" }, "Garde-le pour toi ! Avec ton ID, il sert à retrouver ton compte sur un autre appareil (« J'ai déjà un compte »)."),
+        el("button", { class: "tx-btn gris", onclick: () => { try { navigator.clipboard.writeText(c.cle); toastLocal("Code copié"); } catch (e) {} } }, "Copier le code secret"),
+        el("button", { class: "tx-btn gris", style: "margin-top:12px", onclick: () => { S.erreur = ""; S.vue = "connexion"; rendre(); } }, "J'ai déjà un compte (autre appareil)"))];
+  }
+
+  /* ─── profil d'un joueur ─── */
+  function vueProfil(){
+    const P = S.profil, E = S.etat; if (!P || !E) return vueListe();
+    const st = P.stats;
+    const retour = el("button", { class: "tx-icone", title: "Retour", onclick: () => { const r = S.retourProfil || {}; S.vue = r.vue && r.vue !== "profil" ? r.vue : "liste"; S.conv = r.conv || S.conv; rendre(); } }, "←");
+    const etat = P.moi ? "C'est toi" : P.ami ? (P.enLigne ? "🟢 en ligne" : ilYa(P.vu)) : P.demande ? "demande d'ami envoyée" : "pas encore ami";
+    const stat = (titre, val, sur) => el("div", { class: "tx-stat" }, el("span", {}, titre), el("b", {}, val, sur != null ? el("small", {}, " / " + sur) : null));
+    const corps = el("div", { class: "tx-corps" },
+      el("div", { class: "tx-profil-tete" }, avatar(P.nom, P.ami || P.moi ? !!P.enLigne : null),
+        el("div", {}, el("div", { style: "font-size:20px;font-weight:800" }, P.nom), el("div", { class: "tx-sous", style: "font-size:13px;color:var(--gris)" }, joliId(P.id) + " · " + etat))));
+    if (!st) corps.append(el("p", { class: "tx-vide" }, "Ce joueur n'a pas encore joué depuis l'arrivée des profils : ses stats apparaîtront à sa prochaine connexion."));
+    else {
+      corps.append(el("div", { class: "tx-stats" },
+        stat("Courses ouvertes", st.courses, st.coursesTotal),
+        stat("Voitures", st.voitures, st.voituresTotal),
+        st.p2 != null ? stat("DX Part 2", st.p2, st.coursesTotal) : null,
+        stat("Courses jouées", st.jouees), stat("Podiums", st.podiums), stat("Victoires", st.victoires)));
+      if (st.voiture) corps.append(el("div", { class: "tx-titre" }, "Voiture actuelle"), el("div", { class: "tx-nom", style: "font-size:16px;font-weight:700" }, st.voiture));
+      if (st.liste && st.liste.length) corps.append(el("div", { class: "tx-titre" }, "Son garage"), el("div", { class: "tx-chips" }, st.liste.map(n => el("span", { class: "tx-chip" }, n))));
+      if (st.maj) corps.append(el("p", { class: "aide", style: "text-align:left" }, "Mis à jour " + ilYa(st.maj).replace("vu ", "")));
+    }
+    if (!P.moi){
+      if (P.ami) corps.append(el("button", { class: "tx-btn", onclick: () => ouvrirConv("p:" + P.id) }, "💬 Écrire à " + P.nom));
+      else if (P.demande) corps.append(el("button", { class: "tx-btn gris", disabled: true }, "Demande envoyée"));
+      else corps.append(el("button", { class: "tx-btn", onclick: () => { envoi({ t: "c-ami-demander", id: P.id }); P.demande = true; toastLocal("Demande envoyée !"); rendre(); } }, "＋ Ajouter en ami"));
+    }
+    return [tete("Profil", null, retour), corps];
+  }
+
+  /* ─── image en grand ─── */
+  function zoom(src){ const z = el("div", { id: "tx-zoom", onclick: () => z.remove() }, el("img", { src, alt: "image" })); document.body.append(z); }
+
+  /* ─── partager une image (le classement) ─── */
+  function vuePartager(){
+    const E = S.etat, P = S.partage;
+    if (!P){ S.vue = "liste"; return vueListe(); }
+    if (!E) return vueListe();
+    const corps = el("div", { class: "tx-corps" }, el("img", { class: "tx-apercu", src: P.img, alt: "aperçu" }),
+      el("div", { class: "tx-titre" }, "Envoyer à…"));
+    const convs = [...E.groupes.map(g => "g:" + g.id), ...E.amis.map(a => "p:" + a.id)];
+    if (!convs.length) corps.append(el("p", { class: "tx-vide" }, "Ajoute d'abord des amis (onglet Amis, avec leur ID) pour leur envoyer ton classement."));
+    for (const c of convs){
+      const grp = c.startsWith("g:"), a = !grp && ami(c.slice(2));
+      corps.append(el("div", { class: "tx-ligne", style: "cursor:default" },
+        grp ? el("div", { class: "tx-avatar", style: "background:#3d4c63;color:#fff" }, "👥") : avatar(a.nom, a.enLigne),
+        el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, nomConv(c)), el("div", { class: "tx-sous" }, grp ? "groupe" : (a.enLigne ? "en ligne" : ilYa(a.vu)))),
+        el("button", { class: "tx-btn", onclick: () => envoyerPartage(c) }, "Envoyer")));
+    }
+    if (E.amis.length) corps.append(el("button", { class: "tx-btn gris", onclick: () => { S.vue = "nouveau-groupe"; rendre(); } }, "＋ Créer un groupe et l'y envoyer"));
+    corps.append(erreur());
+    return [tete("Partager", "ton classement", el("button", { class: "tx-icone", onclick: () => { S.partage = null; S.vue = "liste"; rendre(); } }, "←")), corps];
+  }
+  function envoyerPartage(conv){
+    const P = S.partage; if (!P) return;
+    envoyerMessage(conv, P.texte, P.img);
+    S.partage = null; toastLocal(enLigneServeur() ? "Classement envoyé à " + nomConv(conv) + " !" : "Le classement partira dès que le serveur est prêt ⏳");
+    ouvrirConv(conv);
+  }
+  window.TCHAT_partager = (img, texte) => {
+    S.partage = { img, texte };
+    montrerPanneau(); S.vue = "partager"; assurerCompte(); rendre();
+  };
+  // le classement de fin de course, dessiné en image
+  function imageClassement(){
+    const lignes = [...document.querySelectorAll("#fin-table tr")].map(tr => ({ moi: tr.classList.contains("moi"), c: [...tr.children].map(td => td.textContent.trim()) }));
+    const W = 760, H = 150 + lignes.length * 34 + 56, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d"), police = '"Bahnschrift","DIN Alternate",Inter,system-ui,sans-serif';
+    const fond = g.createLinearGradient(0, 0, W, H); fond.addColorStop(0, "#0b0f16"); fond.addColorStop(.6, "#151d29"); fond.addColorStop(1, "#0b0f16");
+    g.fillStyle = fond; g.fillRect(0, 0, W, H);
+    g.fillStyle = "#f2b632"; g.fillRect(0, 0, W, 6);
+    g.textBaseline = "middle";
+    g.fillStyle = "#8a96a8"; g.font = "600 15px " + police; g.fillText(($("fin-circuit").textContent || "").toUpperCase(), 34, 42);
+    g.fillStyle = "#eef2f7"; g.font = "italic 900 40px " + police; g.fillText($("fin-titre").textContent || "ARRIVÉE", 32, 84);
+    g.fillStyle = "#7d8899"; g.font = "600 12px " + police;
+    g.fillText("PILOTE", 92, 128); g.textAlign = "right"; g.fillText("TEMPS FINAL", 580, 128); g.fillText("MEILLEUR TOUR", W - 34, 128); g.textAlign = "left";
+    lignes.forEach((l, i) => {
+      const y = 150 + i * 34 + 17;
+      if (l.moi){ g.fillStyle = "rgba(242,182,50,.14)"; g.fillRect(20, y - 16, W - 40, 32); g.fillStyle = "#f2b632"; g.fillRect(20, y - 16, 4, 32); }
+      else if (i % 2){ g.fillStyle = "rgba(255,255,255,.025)"; g.fillRect(20, y - 16, W - 40, 32); }
+      const [pos, nom, tps, mt] = l.c;
+      g.font = "800 16px " + police; g.fillStyle = i < 3 ? ["#f2b632", "#c9d2de", "#d38b4c"][i] : "#7d8899"; g.fillText(pos || String(i + 1), 36, y);
+      g.font = (l.moi ? "800 " : "600 ") + "16px " + police; g.fillStyle = l.moi ? "#f2b632" : "#e8edf5"; g.fillText((nom || "").slice(0, 30), 92, y);
+      g.font = "500 15px " + police; g.fillStyle = l.moi ? "#ffe6a6" : "#9fb0c4"; g.textAlign = "right";
+      g.fillText(tps || "", 580, y); g.fillText(mt || "", W - 34, y); g.textAlign = "left";
+    });
+    g.fillStyle = "#f2b632"; g.font = "italic 900 18px " + police; g.fillText("DX GRAND PRIX", 34, H - 28);
+    g.fillStyle = "#7d8899"; g.font = "500 13px " + police; g.textAlign = "right";
+    g.fillText(new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }), W - 34, H - 28); g.textAlign = "left";
+    let url = cv.toDataURL("image/jpeg", .85);
+    if (url.length > 240000) url = cv.toDataURL("image/jpeg", .6);
+    return url;
+  }
+  const bPartager = $("btn-partager");
+  if (bPartager) bPartager.onclick = () => {
+    try { TCHAT_partager(imageClassement(), "🏁 " + ($("fin-circuit").textContent || "Course") + " — " + ($("fin-titre").textContent || "")); }
+    catch (e) { toastLocal("Impossible de créer l'image : " + e.message); }
+  };
+
+  /* ─── mon ID, dans l'écran Joueur ─── */
+  function joueurTchat(){
+    const z = $("joueur-tchat"); if (!z) return;
+    const E = S.etat;
+    const id = E ? joliId(E.id) : (S.compte && S.compte.id ? joliId(S.compte.id) : "…");
+    z.replaceChildren(el("div", { class: "carte", style: "cursor:default;flex-direction:column;align-items:flex-start;gap:4px" },
+      el("div", { class: "det", style: "margin:0;letter-spacing:.2em" }, "MON ID"),
+      el("div", { class: "tx-id" }, id),
+      el("div", { class: "det" }, E ? "Donne cet ID à tes potes : ils t'ajoutent en ami dans le 💬 Chat et vous pouvez vous écrire."
+                                    : "Connexion au serveur… (ton ID arrive)"),
+      el("div", { class: "rangee", style: "justify-content:flex-start" },
+        E ? el("button", { class: "lien", style: "padding-left:0", onclick: () => { try { navigator.clipboard.writeText(E.id); toastLocal("ID copié : " + joliId(E.id)); } catch (e) {} } }, "Copier mon ID") : null,
+        el("button", { class: "lien", style: E ? "" : "padding-left:0", onclick: () => ouvrir("amis") }, "💬 Ajouter des amis"))));
+  }
+  { const bj = $("btn-joueur"); if (bj) bj.addEventListener("click", () => { assurerCompte(); setTimeout(joueurTchat, 0); }); }
+
+  /* ─── chat du salon multijoueur ─── */
+  const salonMsgs = () => $("mu-tchat-msgs");
+  window.chatSalonVider = () => { const m = salonMsgs(); if (m) m.replaceChildren(el("div", { class: "vide" }, "Discute avec le groupe en attendant le départ.")); };
+  window.chatSalonRecu = d => {
+    const m = salonMsgs(); if (!m) return;
+    const v = m.querySelector(".vide"); if (v) v.remove();
+    let coul = "#f2b632"; try { const c = MULTI_COULEURS[d.coul]; if (c) coul = "rgb(" + c.map(x => Math.round(x * 255)).join(",") + ")"; } catch (e) {}
+    m.append(el("div", {}, el("b", { style: "color:" + coul }, d.nom), " : ", d.texte));
+    while (m.children.length > 60) m.firstChild.remove();
+    m.scrollTop = m.scrollHeight;
+  };
+  const champSalon = $("mu-tchat-champ");
+  if (champSalon){
+    const go = () => { const t = champSalon.value.trim(); if (!t) return; try { serveurEnvoyer({ t: "salon-msg", texte: t }); } catch (e) {} champSalon.value = ""; };
+    champSalon.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") go(); });
+    champSalon.addEventListener("keyup", e => e.stopPropagation());
+    $("mu-tchat-envoyer").onclick = go;
+    $("mu-tchat-inviter").onclick = () => ouvrir("amis");
+    chatSalonVider();
+  }
+
+  // au démarrage : si on a déjà un compte, on se connecte (pour voir ses messages et apparaître en ligne)
+  if (S.compte) setTimeout(connecter, 1500);
+  joueurTchat();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible"){ if (S.compte && !S.ws) connecter(); if (S.ouvert && S.vue === "conv") rendre(); } });
+})();
+</script>
+
 </body>
 </html>
