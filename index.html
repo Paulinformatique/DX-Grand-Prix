@@ -8321,7 +8321,7 @@ requestAnimationFrame(boucle);
   let statutEnvoye = "";
   setInterval(() => {
     if (!S.connecte) { statutEnvoye = ""; return; }
-    let st = {}; try { if (reseau.serveur && reseau.code && reseau.moi && !reseau.spectateur) st = { code: reseau.code, idJeu: reseau.moi }; } catch (e) {}
+    let st = {}; try { if (reseau.serveur && reseau.code && reseau.moi && !reseau.spectateur) st = { code: reseau.code, idJeu: reseau.moi, c: jeu.multi && ["compte", "course", "arrivee"].includes(jeu.phase) ? 1 : 0 }; } catch (e) {}
     const j = JSON.stringify(st); if (j !== statutEnvoye){ statutEnvoye = j; envoi(Object.assign({ t: "c-statut" }, st)); }
   }, 3000);
   let statsEnvoyees = "";
@@ -8404,6 +8404,7 @@ requestAnimationFrame(boucle);
       sauverCache();
       if (S.compte.nouveau || S.compte.id !== d.id){ S.compte = { id: d.id, cle: S.compte.cle }; ecrireCompte(S.compte); }
       if (premier && (S.vue === "attente" || S.vue === "connexion")) S.vue = S.partage ? "partager" : "liste";
+      if (S.ouvert && S.vue === "profil" && S.profil && !S.profil.moi) envoi({ t: "c-profil", id: S.profil.id });     // profil ouvert : à jour (en course ?)
       rendre(); badge(); joueurTchat(); return;
     }
     if (d.t === "c-refus"){
