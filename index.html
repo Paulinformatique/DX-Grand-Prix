@@ -4866,9 +4866,10 @@ function majCourse(dt){
   // Seule l'arrivée du joueur met fin à la course : les adversaires
   // continuent de rouler, sinon leur distance gèle et le classement ment.
   // éliminé : on regarde la course, on suit la tête (←/→ pour changer de voiture)
-  if (jeu.multi && jeu.multi.elimMoi){
+  // (spectateur venu du chat : on reste sur la voiture de l'ami, même arrivée)
+  if (jeu.multi && jeu.multi.spectateur){
     const c = jeu.joueur;
-    if (!c || c.parti || c.elimine || c.tempsFinal != null || jeu.voitures.indexOf(c) < 0) suivreTete();
+    if (jeu.multi.elimMoi ? (!c || c.parti || c.elimine || c.tempsFinal != null || jeu.voitures.indexOf(c) < 0) : (!c || c.parti)) suivreTete();
     // tout le monde a fini : on passe au classement sans attendre
     if (!jeu.voitures.some(v => !v.parti && !v.elimine && v.tempsFinal == null)){
       jeu.multi.finVue = (jeu.multi.finVue || 0) + dt;
@@ -6564,15 +6565,18 @@ addEventListener("keydown", e => {
   const k = (L.indexOf(jeu.joueur) + (e.key === "ArrowRight" ? 1 : -1) + L.length) % L.length;
   jeu.joueur = L[k]; bandeau("👁 Tu suis " + L[k].nom, 1500); e.preventDefault(); e.stopImmediatePropagation();
 }, true);
-// fin de la course regardée après élimination : notre voiture revient pour le classement
+// fin de la course regardée (éliminé ou spectateur) : on passe au classement
 function finElimine(){
-  const J = jeu.multi && jeu.multi.elimMoi; if (!J || jeu.phase !== "course") return;
-  jeu.voitures.push(J); jeu.joueur = J; jeu.multi.spectateur = false; moteurSonore(false);
+  if (!jeu.multi || !jeu.multi.spectateur || jeu.phase !== "course") return;
+  const J = jeu.multi.elimMoi;
+  if (J){ jeu.voitures.push(J); jeu.joueur = J; jeu.multi.spectateur = false; }
+  moteurSonore(false);
   jeu.resultat = { place: 0, tri: [], recordTour: false, recordCourse: false, deblocages: [] };
   const def = CIRCUITS[jeu.circuit];
-  document.getElementById("fin-circuit").textContent = def.nom + " · " + def.pays + " · ÉLIMINATION";
-  document.getElementById("fin-gain").innerHTML = "MULTIJOUEUR &nbsp;·&nbsp; " + jeu.voitures.length + " joueurs";
+  document.getElementById("fin-circuit").textContent = def.nom + " · " + def.pays + (jeu.multi.mode === "elimination" ? " · ÉLIMINATION" : "");
+  document.getElementById("fin-gain").innerHTML = "MULTIJOUEUR &nbsp;·&nbsp; " + jeu.voitures.length + " voitures";
   jeu.phase = "fini"; allerClassement();
+  if (!J) document.getElementById("fin-titre").textContent = "👁 SPECTATEUR";
 }
 function multiFin(){ envoyerTous({ type: "fin", id: reseau.moi, tf: jeu.joueur.tempsFinal, m: jeu.joueur.meilleur }); }
 function multiLancer(){
