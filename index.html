@@ -407,7 +407,7 @@
       <select id="mu-voitures" class="mu-champ" style="flex:1">
         <option value="m3">Tous en BMW M3</option>
         <option value="garage">Chacun sa voiture (de son garage)</option>
-        <option value="hasard">Voitures au hasard</option>
+        <option value="hasard">Voitures au hasard (même pas débloquées)</option>
       </select></label>
     <label class="aide" style="display:none;align-items:center;gap:8px;margin:0" id="mu-mavoiture-choix">Ta voiture
       <select id="mu-mavoiture" class="mu-champ" style="flex:1"></select></label>
@@ -2874,8 +2874,8 @@ function preparerCourse(indexCircuit){
     if (jeu.multi){
       a.kaimaxus = true;
       // sa Koenigsegg, bridée juste au-dessus des M3 : sinon il serait imbattable en ligne droite
-      const plafondM3 = vitesseMaxGrille() * BRIDE_KAIMAXUS_MULTI;
-      a.plafondMulti = plafondM3;
+      // (sauf en « chacun sa voiture » : là il roule à fond, comme tout le monde dans sa meilleure voiture)
+      if (jeu.multi.voitures !== "garage") a.plafondMulti = vitesseMaxGrille() * BRIDE_KAIMAXUS_MULTI;
     }
     const auto = VOITURES[a.modele];
     /* Même mécanique que le joueur : le niveau ne joue que sur le pilotage
@@ -2951,7 +2951,8 @@ function preparerCourse(indexCircuit){
     }
     if (jeu.multi.kaimaxus && (!reseau.hote || reseau.serveur)){
       const vk = PILOTES.find(p => p.nom === "Kaimaxus").voiture, VK = VOITURES[vk];
-      const k = creerConcurrent({ nom: "Kaimaxus", coul: VK.couleur || MODELES[VK.modele].couleur }, false, def, jeu.multi.placeKai);
+      const coulK = jeu.multi.mode === "equipes" && jeu.multi.equipeKai != null ? MULTI_COULEURS[jeu.multi.equipeKai % 4] : (VK.couleur || MODELES[VK.modele].couleur);
+      const k = creerConcurrent({ nom: "Kaimaxus", coul: coulK }, false, def, jeu.multi.placeKai);
       Object.assign(k, { distant: true, idDistant: "kaimaxus", kaimaxus: true, modele: vk, R: reglages(VK.stats), ligneIdx: 0, tampon: [] });
       k.vmax = k.R.vmax;
       jeu.voitures.push(k);
@@ -3546,7 +3547,7 @@ function majIA(v, dt){
   const tourPrecedent = v.tour;
   v.tour = Math.floor(v.s / piste.longueur);
   // temps final : noté au passage de la ligne, au dernier tour
-  if (v.tempsFinal == null && !v.joueur && v.tour >= CIRCUITS[jeu.circuit].tours) v.tempsFinal = jeu.chrono;
+  if (v.tempsFinal == null && !v.joueur && v.tour >= toursCourse()) v.tempsFinal = jeu.chrono;
   // (pas pour le joueur en pilote automatique après l'arrivée : ses tours
   // sont déjà comptés, et un faux « tour » écrasait son meilleur temps)
   if (v.tour > tourPrecedent && tourPrecedent >= 0 && !v.joueur){
@@ -3895,12 +3896,16 @@ function chocDistant(m, o){
       const sg = Math.sign(avant) || 1;          // +1 : il est devant nous
       ecarterLong(m, -sg * penL * 0.3);
       o.affD = (o.affD ?? o.distance) + sg * penL * 0.7;
+      // et il ne continue pas à s'enfoncer dans nous : sa vitesse affichée s'aligne sur la nôtre
+      if (sg < 0) o.affV = Math.min(o.affV ?? m.v, m.v); else o.affV = Math.max(o.affV ?? m.v, m.v);
       if (sg > 0 && m.v > o.v && !(m.contactT > 0)){ const ec = m.v - o.v; m.v -= ec * 0.4; m.contactT = 0.3; m.sonne = 0.35; }
       const f = Math.min(1, penL / 1.6); if (f > (m.choc || 0)) m.choc = f;
     } else {
       const sens = Math.sign(cote) || 1;
       ecarterLat(m, -sens * penC * 0.3, ca, sa);
-      o.affLat = (o.affLat ?? o.lat) + (Math.sign((o.affLat ?? o.lat) - (m.lat || 0)) || 1) * penC * 0.7;
+      const cotK = Math.sign((o.affLat ?? o.lat) - (m.lat || 0)) || 1;
+      o.affLat = (o.affLat ?? o.lat) + cotK * penC * 0.7;
+      if ((o.affLatV || 0) * cotK < 0) o.affLatV = 0;          // il ne revient pas se jeter dans nous à l'image suivante
       const f = Math.min(1, penC / 1.2) * 0.35; if (f > (m.choc || 0)) m.choc = f;
     }
     return;
@@ -4521,8 +4526,8 @@ function dessinerHUD(){
     ctx2.fillText(v.flecheSens > 0 ? "▲" : "▼", 118*E, 54*E);
     ctx2.restore();
   }
-  const tourAffiche = Math.max(1, Math.min(v.tour + 1, def.tours));
-  ctx2.fillText("TOUR " + tourAffiche + " / " + def.tours, 14*E, 76*E);
+  const nTours = toursCourse(), tourAffiche = Math.max(1, Math.min(v.tour + 1, nTours));
+  ctx2.fillText("TOUR " + tourAffiche + " / " + nTours, 14*E, 76*E);
 
   // ---- bouton pause, juste à gauche des chronos ----
   const bp = document.getElementById("btn-pause");
@@ -4805,6 +4810,9 @@ function classer(){
   return tri;
 }
 
+/* Nombre de tours de la course : celui du circuit, ou celui imposé en
+   multijoueur (élimination : autant de tours que de voitures moins une). */
+function toursCourse(){ return (jeu.multi && jeu.multi.tours) || CIRCUITS[jeu.circuit].tours || 1; }
 function majCourse(dt){
   const def = CIRCUITS[jeu.circuit];
   kaimaxusEnFond(dt);
@@ -4857,7 +4865,12 @@ function majCourse(dt){
 
   // Seule l'arrivée du joueur met fin à la course : les adversaires
   // continuent de rouler, sinon leur distance gèle et le classement ment.
-  if (jeu.joueur.tour >= def.tours){
+  // éliminé : on regarde la course, on suit la tête (←/→ pour changer de voiture)
+  if (jeu.multi && jeu.multi.elimMoi){
+    const c = jeu.joueur;
+    if (!c || c.parti || c.elimine || c.tempsFinal != null || jeu.voitures.indexOf(c) < 0) suivreTete();
+  }
+  else if (jeu.joueur.tour >= toursCourse()){
     terminer();
     return;
   }
@@ -4971,7 +4984,7 @@ function lancerHighlights(){
   jeu.hl = { liste: choisis, k: 0, t: choisis[0].t - 4 };
   // temps estimés de ceux qui roulent encore, figés avant que le replay ne
   // déplace les voitures (sinon le classement pouvait se mélanger)
-  const total = CIRCUITS[jeu.circuit].tours * piste.longueur;
+  const total = toursCourse() * piste.longueur;
   for (const v of jeu.voitures) if (v.tempsFinal == null) v.tempsEstime = jeu.chrono + Math.max(0, total - v.distance) / Math.max(v.v, 15);
   jeu.phase = "highlights";
   document.getElementById("btn-suivant").style.display = "";        // « Suivant » dès le début
@@ -5037,7 +5050,7 @@ function allerClassement(){
   document.getElementById("btn-suivant").style.display = "none";
   jeu.phase = "fini";
   const { recordTour, recordCourse } = jeu.resultat;
-  const def = CIRCUITS[jeu.circuit], total = def.tours * piste.longueur;
+  const def = CIRCUITS[jeu.circuit], total = toursCourse() * piste.longueur;
   /* Trié par temps final réel (ou estimé pour ceux qui roulent encore) :
      l'ordre au moment où le joueur passait la ligne pouvait différer de
      l'ordre d'arrivée de ceux qui étaient derrière lui. */
@@ -5127,7 +5140,7 @@ function dessinerArrivee(W, H){
 function resumeCourse(tri, place){
   const moi = jeu.joueur, V = jeu.voitures, F = jeu.faits || { aspiPrise: {}, aspiDonnee: {}, pousses: [], poussePar: [] };
   const nomDe = v => v.joueur ? "__joueur" : v.nom;
-  const faits = [], dernierTour = (CIRCUITS[jeu.circuit].tours || 1) - 1;
+  const faits = [], dernierTour = toursCourse() - 1;
   const quand = tour => tour >= dernierTour ? " dans le dernier tour" : tour <= 0 ? " dans le premier tour" : "";
   for (const p of F.pousses) faits.push(`JOUEUR a poussé ${p.nom} ${p.mur ? "contre le mur" : "dans l'herbe"}${quand(p.tour)}`);
   for (const p of F.poussePar) faits.push(`${p.nom} a poussé JOUEUR hors de la piste${quand(p.tour)}`);
@@ -5876,7 +5889,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 6;
+const MULTI_VERSION = 7;
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -6078,7 +6091,7 @@ function serveurRecoit(d){
   if (d.t === "salon"){
     if (d.v !== MULTI_VERSION){ multiStatut("Le serveur n'a pas la même version du jeu : recharge la page."); multiReinit(); afficherEntree(); return; }
     reseau.joueurs = d.joueurs || []; reseau.circuit = d.circuit; reseau.kaimaxus = !!d.kaimaxus; reseau.code = d.code;
-    reseau.mode = d.mode || "course"; reseau.voitures = d.voitures || "m3"; reseau.champ = d.champ || null;
+    reseau.mode = d.mode || "course"; reseau.voitures = d.voitures || "m3"; reseau.champ = d.champ || null; reseau.equipeKai = d.equipeKai | 0;
     if (jeu.multi && jeu.phase === "fini") majBoutonRevanche();
     reseau.hote = !!(reseau.joueurs[0] && reseau.joueurs[0].id === reseau.moi);
     reseau.enCourse = !!d.enCourse;
@@ -6091,7 +6104,7 @@ function serveurRecoit(d){
   if (d.t === "pong"){ const r = performance.now() - d.t0; reseau.rtt = reseau.rtt ? reseau.rtt * 0.7 + r * 0.3 : r;
     reseau.rttMin = reseau.rttMin == null || r < reseau.rttMin ? r : reseau.rttMin + (r - reseau.rttMin) * 0.05; return; }
   if (d.t === "parti"){ recevoirCourse({ type: "parti", id: d.id }); return; }
-  if (d.t === "resultat"){ afficherResultatMulti(d); return; }
+  if (d.t === "resultat"){ reseau.dernier = d; finElimine(); afficherResultatMulti(d); return; }
   if (d.t === "e"){ serveurEtat(d); return; }
 }
 // l'état de la course envoyé par le serveur
@@ -6101,6 +6114,7 @@ function serveurEtat(d){
   const tr = performance.now();
   for (const c of d.c){
     const [id, x, y, z, cap, tg, rl, br, v, lat, dd, tour, m, tf, hp, , nP, dX, dZ, el] = c;
+    if (id === reseau.moi && jeu.multi.elimMoi) continue;           // éliminés : notre voiture n'existe plus
     // élimination : ce joueur (ou nous) vient d'être éliminé
     if (el){ const vx = jeu.voitures.find(o => id === reseau.moi ? o === jeu.joueur : (o.distant && o.idDistant === id));
       if (vx && !vx.elimine){ vx.elimine = true; if (id === reseau.moi) eliminationMoi(); else { vx.parti = true; bandeau("❌ " + vx.nom + " est éliminé"); } }
@@ -6118,6 +6132,10 @@ function serveurEtat(d){
       const brut = tr - d.ts;
       if (reseau.decalMoi == null || brut < reseau.decalMoi) reseau.decalMoi = brut; else reseau.decalMoi += Math.min(5, brut - reseau.decalMoi) * 0.02;
       reseau.srvMoi = { ts: d.ts, tr, x, z, cap, v, lat, d: dd, tour, tf };
+      // élimination : plus que nous en course, le serveur nous donne la victoire tout de suite
+      if (tf != null && J && J.tempsFinal == null && jeu.phase === "course" && jeu.multi.mode === "elimination" && J.tour < toursCourse()){
+        terminer(); J.tempsFinal = tf; bandeau("🏆 Tu es le dernier en course : VICTOIRE !", 4000);
+      }
       continue;
     }
     recevoirCourse({ type: "pos", id, ts: d.ts, x, y, z, cap, tg, rl, br, v, lat, d: dd, tour, m, tf, hp });
@@ -6515,15 +6533,39 @@ function bandeau(texte, duree = 3000){
     document.body.appendChild(b); }
   b.textContent = texte; b.style.display = ""; clearTimeout(b.min); b.min = setTimeout(() => b.style.display = "none", duree);
 }
-// nous sommes éliminés : on va au classement (il se complète à l'arrivée des autres)
+// nous sommes éliminés : on devient spectateur de la course, le classement vient à la fin
 function eliminationMoi(){
-  const J = jeu.joueur; if (!J || jeu.phase !== "course") return;
-  bandeau("❌ Tu es éliminé !", 2500); moteurSonore(false);
+  const J = jeu.joueur; if (!J || jeu.phase !== "course" || jeu.multi.elimMoi) return;
+  J.elimine = true; J.parti = true; J.v = 0;
+  jeu.multi.elimMoi = J; jeu.multi.spectateur = true;           // plus rien à envoyer, le chrono vient du serveur
+  jeu.voitures = jeu.voitures.filter(v => v !== J);
+  try { const m = document.getElementById("menu-pause"); if (m) m.style.display = "none"; } catch (e) {}
+  suivreTete();
+  bandeau("❌ Tu es éliminé ! Tu regardes la course" + (matchMedia("(pointer:fine)").matches ? " · ←/→ pour changer de voiture" : ""), 4500);
+}
+// on suit la voiture en tête parmi celles encore en course
+function suivreTete(){
+  const enCourse = jeu.voitures.filter(v => !v.parti && !v.elimine && v.tempsFinal == null);
+  const L = (enCourse.length ? enCourse : jeu.voitures.filter(v => !v.parti && !v.elimine)).sort((a, b) => b.distance - a.distance);
+  if (L[0] && L[0] !== jeu.joueur){ jeu.joueur = L[0]; if (jeu.multi && jeu.multi.elimMoi) bandeau("👁 Tu suis " + L[0].nom, 2000); }
+}
+// éliminé (ou spectateur) : ←/→ pour regarder une autre voiture
+addEventListener("keydown", e => {
+  if (!jeu.multi || !jeu.multi.spectateur || jeu.phase !== "course" || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+  const L = jeu.voitures.filter(v => !v.parti && !v.elimine).sort((a, b) => b.distance - a.distance);
+  if (L.length < 2) return;
+  const k = (L.indexOf(jeu.joueur) + (e.key === "ArrowRight" ? 1 : -1) + L.length) % L.length;
+  jeu.joueur = L[k]; bandeau("👁 Tu suis " + L[k].nom, 1500); e.preventDefault(); e.stopImmediatePropagation();
+}, true);
+// fin de la course regardée après élimination : notre voiture revient pour le classement
+function finElimine(){
+  const J = jeu.multi && jeu.multi.elimMoi; if (!J || jeu.phase !== "course") return;
+  jeu.voitures.push(J); jeu.joueur = J; jeu.multi.spectateur = false; moteurSonore(false);
   jeu.resultat = { place: 0, tri: [], recordTour: false, recordCourse: false, deblocages: [] };
   const def = CIRCUITS[jeu.circuit];
   document.getElementById("fin-circuit").textContent = def.nom + " · " + def.pays + " · ÉLIMINATION";
   document.getElementById("fin-gain").innerHTML = "MULTIJOUEUR &nbsp;·&nbsp; " + jeu.voitures.length + " joueurs";
-  setTimeout(() => { if (jeu.multi && jeu.phase === "course"){ jeu.phase = "fini"; allerClassement(); } }, 1500);
+  jeu.phase = "fini"; allerClassement();
 }
 function multiFin(){ envoyerTous({ type: "fin", id: reseau.moi, tf: jeu.joueur.tempsFinal, m: jeu.joueur.meilleur }); }
 function multiLancer(){
@@ -6555,11 +6597,12 @@ function demarrerMulti(d){
   jeu.pauseMulti = false;
   jeu.multi = { grille, moi: reseau.moi, maPlace: moi.place, maCouleur: moi.coul, monNom: moi.nom,
                kaimaxus: !!d.kaimaxus, placeKai: d.placeKai ?? grille.length, maVoiture: VOITURES[moi.voiture] ? moi.voiture : 0,
-               mode: d.mode || "course", champ: d.champ || null };
+               mode: d.mode || "course", champ: d.champ || null, tours: d.tours | 0, equipeKai: d.equipeKai, voitures: d.voitures || "m3" };
   reseau.dernier = null; document.getElementById("fin-multi").style.display = "none";
   { const txt = { championnat: d.champ ? "🏆 Championnat · course " + (d.champ.n + 1) + " / " + d.champ.total : "", equipes: "👥 Course par équipes",
-                  elimination: "❌ Élimination : le dernier saute à chaque tour" }[d.mode];
-    if (txt) setTimeout(() => bandeau(txt, 4000), 600); }
+                  elimination: "❌ Élimination · " + (d.tours || CIRCUITS[i].tours) + " tours : le dernier saute à chaque tour" }[d.mode];
+    if (txt) setTimeout(() => bandeau(txt, 4000), 600);
+    if (d.voitures === "hasard" && !d.spectateur && VOITURES[moi.voiture]) setTimeout(() => bandeau("🎲 Pour cette course : " + VOITURES[moi.voiture].nom, 4000), txt ? 4800 : 600); }
   // Kaimaxus roule chez l'hôte ; chez les invités, c'est une voiture distante
   jeu.adversaires = d.kaimaxus && reseau.hote && !reseau.serveur ? ["Kaimaxus"] : [];
   reseau.srvMoi = null; reseau.decalMoi = null; reseau.derEntree = "";
@@ -6653,8 +6696,20 @@ function afficherSalon(){
       : `<span class="mu-pastille" style="background:${coulCss(c)}"></span>`;
     return `<div class="carte" style="cursor:default;padding:9px 13px">${pastille}` +
       `<div><div class="nom" style="font-size:14px">${echap(j.nom)}${j.id === reseau.moi ? " (toi)" : ""}</div><div class="det">${echap(voitureTxt(j))}${equipes ? " · équipe " + NOMS_EQUIPES[(j.equipe || 0) % 4] : ""}${j.hote || j.lien === "serveur" ? "" : j.lien === "relais" ? " · connexion par le relais" : " · connexion directe"}</div></div>` +
-      `<div class="droite">${j.hote ? "👑 hôte" : ""}</div></div>`; }).join("");
+      `<div class="droite">${j.hote ? "👑 hôte" : ""}${reseau.hote && reseau.voitures === "garage" && j.id !== reseau.moi
+        ? `<select class="mu-champ" data-voiture-de="${echap(j.id)}" style="max-width:150px;font-size:12px;padding:4px"><option value="-1"${j.impose ? "" : " selected"}>Au choix du joueur</option>` +
+          VOITURES.map((V, i) => `<option value="${i}"${j.impose && (j.voiture | 0) === i ? " selected" : ""}>${echap(V.nom)}</option>`).join("") + `</select>`
+        : j.impose && reseau.voitures === "garage" ? " · 🎯 choisie par l'hôte" : ""}</div></div>`; }).join("") +
+    // Kaimaxus a aussi son équipe (l'hôte la change en touchant sa couleur)
+    (equipes && reseau.kaimaxus ? (() => { const c = MULTI_COULEURS[(reseau.equipeKai || 0) % 4];
+      return `<div class="carte" style="cursor:default;padding:9px 13px">` + (reseau.hote
+        ? `<button class="mu-pastille" data-equipe="kaimaxus" title="Changer d'équipe" style="background:${coulCss(c)};cursor:pointer;width:24px;height:24px;padding:0"></button>`
+        : `<span class="mu-pastille" style="background:${coulCss(c)}"></span>`) +
+        `<div><div class="nom" style="font-size:14px">Kaimaxus</div><div class="det">Koenigsegg · équipe ${NOMS_EQUIPES[(reseau.equipeKai || 0) % 4]}</div></div><div class="droite">🤖</div></div>`; })() : "");
+  // chacun sa voiture : l'hôte peut imposer la voiture d'un joueur (même pas débloquée, juste pour la course)
+  for (const sl of document.querySelectorAll("#mu-joueurs [data-voiture-de]")) sl.onchange = () => serveurEnvoyer({ t: "voiture", id: sl.dataset.voitureDe, voiture: +sl.value });
   for (const b of document.querySelectorAll("#mu-joueurs [data-equipe]")) b.onclick = () => {
+    if (b.dataset.equipe === "kaimaxus"){ serveurEnvoyer({ t: "equipe", id: "kaimaxus", equipe: ((reseau.equipeKai || 0) + 1) % 4 }); return; }
     const j = reseau.joueurs.find(x => x.id === b.dataset.equipe); if (j) serveurEnvoyer({ t: "equipe", id: j.id, equipe: ((j.equipe || 0) + 1) % 4 }); };
   document.getElementById("mu-equipes-aide").style.display = equipes && reseau.hote ? "" : "none";
   // mode et voitures : l'hôte choisit, les autres voient
@@ -6665,9 +6720,14 @@ function afficherSalon(){
   document.getElementById("mu-mavoiture-choix").style.display = reseau.voitures === "garage" ? "flex" : "none";
   if (reseau.voitures === "garage"){
     const miennes = carriere.possedees.filter(i => VOITURES[i]);
-    if (selV.options.length !== miennes.length) selV.innerHTML = miennes.map(i => `<option value="${i}">${echap(VOITURES[i].nom)}</option>`).join("");
+    // voiture imposée par l'hôte : affichée (même si je ne l'ai pas), et je ne peux pas la changer
+    const impose = moiJ && moiJ.impose, liste = impose && !miennes.includes(moiJ.voiture | 0) ? [...miennes, moiJ.voiture | 0] : miennes;
+    const cle = liste.join(",");
+    if (selV.dataset.cle !== cle){ selV.dataset.cle = cle; selV.innerHTML = liste.map(i => `<option value="${i}">${echap(VOITURES[i].nom)}</option>`).join(""); }
+    selV.disabled = !!impose; selV.title = impose ? "Choisie par l'hôte" : "";
     // ma voiture du jeu par défaut, et pas une que je n'ai pas
-    if (moiJ && !miennes.includes(moiJ.voiture || 0) || (moiJ && !reseau.voitureEnvoyee)){
+    if (impose){ selV.value = moiJ.voiture | 0; }
+    else if (moiJ && !miennes.includes(moiJ.voiture || 0) || (moiJ && !reseau.voitureEnvoyee)){
       reseau.voitureEnvoyee = true; const v = miennes.includes(carriere.voiture) ? carriere.voiture : miennes[0] || 0;
       serveurEnvoyer({ t: "voiture", voiture: v }); selV.value = v;
     } else if (moiJ) selV.value = moiJ.voiture || 0;
