@@ -4869,6 +4869,11 @@ function majCourse(dt){
   if (jeu.multi && jeu.multi.elimMoi){
     const c = jeu.joueur;
     if (!c || c.parti || c.elimine || c.tempsFinal != null || jeu.voitures.indexOf(c) < 0) suivreTete();
+    // tout le monde a fini : on passe au classement sans attendre
+    if (!jeu.voitures.some(v => !v.parti && !v.elimine && v.tempsFinal == null)){
+      jeu.multi.finVue = (jeu.multi.finVue || 0) + dt;
+      if (jeu.multi.finVue > 2.5) finElimine();
+    }
   }
   else if (jeu.joueur.tour >= toursCourse()){
     terminer();
@@ -6134,7 +6139,9 @@ function serveurEtat(d){
       reseau.srvMoi = { ts: d.ts, tr, x, z, cap, v, lat, d: dd, tour, tf };
       // élimination : plus que nous en course, le serveur nous donne la victoire tout de suite
       if (tf != null && J && J.tempsFinal == null && jeu.phase === "course" && jeu.multi.mode === "elimination" && J.tour < toursCourse()){
-        terminer(); J.tempsFinal = tf; bandeau("🏆 Tu es le dernier en course : VICTOIRE !", 4000);
+        // (ou un autre vient de gagner au dernier tour : la course est finie pour nous aussi)
+        const gagne = !jeu.voitures.some(o => o !== J && o.tempsFinal != null && o.tempsFinal < tf);
+        terminer(); J.tempsFinal = tf; bandeau(gagne ? "🏆 Tu es le dernier en course : VICTOIRE !" : "🏁 Course finie !", 4000);
       }
       continue;
     }
