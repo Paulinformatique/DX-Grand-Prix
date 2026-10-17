@@ -215,6 +215,7 @@
 <!-- ================= MENU PRINCIPAL ================= -->
 <div class="ecran" id="ecran-accueil">
   <div class="acc-signature">Fait par Paul G</div>
+  <button id="btn-musique" type="button" title="Musique du menu" style="position:fixed;top:40px;right:16px;z-index:11;font:inherit;font-size:13px;color:#9aa6b8;background:none;border:1px solid #2c3746;border-radius:999px;padding:5px 12px;cursor:pointer">♪ Musique</button>
   <div class="acc-grille">
     <div class="acc-gauche">
       <div class="acc-feux" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
@@ -4117,6 +4118,72 @@ function majSon(v){
   if (secousse > M.chocAvant + 0.25) sonChoc(Math.min(1, secousse));
   M.chocAvant = secousse;
 }
+
+/* ───── Musique d'ambiance des menus (sans paroles, synthétisée) ─────
+   Une boucle douce façon synthwave : nappes d'accords (La m – Fa – Do –
+   Sol), une basse, un arpège et une petite batterie feutrée. Elle se lance
+   au premier clic (les navigateurs l'exigent), s'efface pendant les courses
+   et se coupe avec le bouton ♪ (le choix est retenu). */
+const musique = { on: (() => { try { return localStorage.getItem("dx-musique") !== "0"; } catch (e) { return true; } })(), sortie: null, prochaine: 0, pas: 0, minuteur: null };
+const ACCORDS = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];     // La m, Fa, Do, Sol (notes MIDI)
+const freqMidi = n => 440 * Math.pow(2, (n - 69) / 12);
+function noteMusique(t, f, duree, type, vol, coupe){
+  const o = audio.createOscillator(), g = audio.createGain(), filtre = audio.createBiquadFilter();
+  o.type = type; o.frequency.value = f; filtre.type = "lowpass"; filtre.frequency.value = coupe || 1800;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.08, duree / 3));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  o.connect(filtre).connect(g).connect(musique.sortie); o.start(t); o.stop(t + duree + 0.05);
+}
+function percuMusique(t, grosse){
+  if (grosse){
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.18);
+    g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(g).connect(musique.sortie); o.start(t); o.stop(t + 0.25);
+  } else if (moteur && moteur.bruit){
+    const sb = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+    sb.buffer = moteur.bruit; f.type = "highpass"; f.frequency.value = 7000;
+    g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    sb.connect(f).connect(g).connect(musique.sortie); sb.start(t, Math.random()); sb.stop(t + 0.07);
+  }
+}
+function planifierMusique(){
+  if (!audio || !musique.sortie) return;
+  const croche = 60 / 96 / 2;                       // 96 battements par minute
+  while (musique.prochaine < audio.currentTime + 0.3){
+    const t = musique.prochaine, k = musique.pas, mesure = Math.floor(k / 8) % 4, acc = ACCORDS[mesure], dansMesure = k % 8;
+    if (dansMesure === 0){
+      for (const n of acc){ noteMusique(t, freqMidi(n), croche * 8, "sawtooth", 0.035, 1100); noteMusique(t, freqMidi(n) * 1.004, croche * 8, "sawtooth", 0.025, 1100); }
+      noteMusique(t, freqMidi(acc[0] - 24), croche * 3.5, "triangle", 0.22, 600);
+    }
+    if (dansMesure === 4) noteMusique(t, freqMidi(acc[0] - 24), croche * 3.5, "triangle", 0.18, 600);
+    // arpège
+    const motif = [0, 1, 2, 1, 2, 0, 1, 2], n = acc[motif[dansMesure]] + 12 + (dansMesure === 7 ? 12 : 0);
+    noteMusique(t, freqMidi(n), croche * 0.9, "triangle", 0.05, 3000);
+    if (dansMesure % 4 === 0) percuMusique(t, true);
+    percuMusique(t, false);
+    musique.prochaine += croche; musique.pas++;
+  }
+}
+function majMusique(){
+  const voulu = musique.on && sonActif && ["menu", "fini"].includes(jeu.phase);
+  const bm = document.getElementById("btn-musique"); if (bm) bm.style.display = ["menu", "fini"].includes(jeu.phase) ? "" : "none";
+  if (!audio){ return; }
+  if (!musique.sortie){
+    musique.sortie = audio.createGain(); musique.sortie.gain.value = 0; musique.sortie.connect(audio.destination);
+    musique.prochaine = audio.currentTime + 0.1;
+    musique.minuteur = setInterval(() => { if (musique.sortie.gain.value > 0.001 || voulu) planifierMusique(); else musique.prochaine = audio.currentTime + 0.1; }, 100);
+  }
+  musique.sortie.gain.setTargetAtTime(voulu ? 0.32 : 0, audio.currentTime, voulu ? 0.8 : 0.3);
+  const b = document.getElementById("btn-musique"); if (b){ b.textContent = musique.on ? "♪ Musique" : "♪ Musique coupée"; b.style.display = ["menu", "fini"].includes(jeu.phase) ? "" : "none"; }
+}
+setInterval(majMusique, 500);
+// le premier clic ou la première touche lance le son (règle des navigateurs)
+for (const ev of ["pointerdown", "keydown"]) addEventListener(ev, () => { initSon(); if (audio && audio.state === "suspended") audio.resume(); majMusique(); }, { once: false, passive: true });
+document.getElementById("btn-musique").onclick = () => {
+  musique.on = !musique.on; try { localStorage.setItem("dx-musique", musique.on ? "1" : "0"); } catch (e) {}
+  majMusique();
+};
 
 /* Séquence des feux, comme en Formule 1 : un feu de plus toutes les 0,6 s,
    puis extinction générale au départ. */
@@ -8333,7 +8400,7 @@ requestAnimationFrame(boucle);
     if (d.t === "c-etat"){
       const premier = !S.connecte;
       S.etat = d; S.connecte = true; S.ancien = null;
-      if (premier){ viderFile(); for (const r of S.fileRecords.splice(0)) envoi(r); statsEnvoyees = ""; envoyerStats(); if (S.vue === "conv" && S.conv) envoi({ t: "c-histo", conv: S.conv }); }
+      if (premier){ viderFile(); for (const r of S.fileRecords.splice(0)) envoi(r); importerAnciensTemps(); statsEnvoyees = ""; envoyerStats(); if (S.vue === "conv" && S.conv) envoi({ t: "c-histo", conv: S.conv }); }
       sauverCache();
       if (S.compte.nouveau || S.compte.id !== d.id){ S.compte = { id: d.id, cle: S.compte.cle }; ecrireCompte(S.compte); }
       if (premier && (S.vue === "attente" || S.vue === "connexion")) S.vue = S.partage ? "partager" : "liste";
@@ -8666,6 +8733,21 @@ requestAnimationFrame(boucle);
     S.dernierRecord = r;
     if (enLigneServeur()) envoi(m); else { S.fileRecords.push(m); assurerCompte(); }
   };
+  /* Les temps faits avant le classement mondial (meilleur temps de course de
+     chaque circuit, gardé dans la sauvegarde) : envoyés une fois. On ne sait
+     pas avec quelle voiture : ils comptent dans « Toutes les voitures ». */
+  function importerAnciensTemps(){
+    try {
+      const cle = "dx-anciens-temps", id = S.etat && S.etat.id; if (!id) return;
+      if (localStorage.getItem(cle) === id) return;
+      const rc = carriere.recordsCourse || {}, rt = carriere.records || {};
+      for (const [course, tf] of Object.entries(rc)) if (tf > 20){
+        const tour = rt[course] && rt[course] < tf ? rt[course] : null;
+        envoi({ t: "c-record", course, voiture: 99, tf, tour, ancien: true });
+      }
+      localStorage.setItem(cle, id);
+    } catch (e) {}
+  }
   function rangFinCourse(d){
     const z = $("fin-records"); if (!z || !S.dernierRecord || d.course !== S.dernierRecord.course) return;
     const v = (VOITURES[d.voiture] || {}).nom || "";
@@ -8696,7 +8778,7 @@ requestAnimationFrame(boucle);
     else {
       const ligne = x => el("div", { class: "tx-ligne", style: "cursor:pointer;padding:8px 10px;" + (x.id === (S.etat || {}).id ? "border-color:var(--or);background:#1a2331" : ""), onclick: () => voirProfil(x.id) },
         el("b", { style: "min-width:30px;color:" + (x.rang <= 3 ? ["#f2b632", "#c9d2de", "#d38b4c"][x.rang - 1] : "#7d8899") }, x.rang),
-        el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, x.nom, x.ami ? " 🤝" : ""), el("div", { class: "tx-sous" }, C.voiture < 0 ? (VOITURES[x.voiture] || {}).nom || "" : (x.tour != null ? "meilleur tour " + fmt(x.tour) : ""))),
+        el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, x.nom, x.ami ? " 🤝" : ""), el("div", { class: "tx-sous" }, C.voiture < 0 ? (x.voiture === 99 ? "ancien temps (voiture inconnue)" : (VOITURES[x.voiture] || {}).nom || "") : (x.tour != null ? "meilleur tour " + fmt(x.tour) : ""))),
         el("b", { style: "font-variant-numeric:tabular-nums" }, fmt(x.tf)));
       corps.append(el("div", { class: "tx-titre" }, M.total + " pilote" + (M.total > 1 ? "s" : "") + " classé" + (M.total > 1 ? "s" : "")));
       for (const x of M.top) corps.append(ligne(x));
@@ -8854,7 +8936,8 @@ requestAnimationFrame(boucle);
   }
 
   // au démarrage : si on a déjà un compte, on se connecte (pour voir ses messages et apparaître en ligne)
-  if (S.compte) setTimeout(connecter, 1500);
+  // au démarrage : chacun a son compte (créé tout seul) et se connecte, pour ses messages, son profil et ses temps
+  setTimeout(assurerCompte, 1500);
   joueurTchat();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible"){ if (S.compte && !S.ws) connecter(); if (S.ouvert && S.vue === "conv") rendre(); } });
 })();
