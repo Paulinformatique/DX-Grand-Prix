@@ -2699,6 +2699,27 @@ const PILOTES = [
 ];
 
 const MOI = { nom:"Vous", coul:[0.92,0.71,0.20] };
+/* Couleurs : chaque voiture du garage peut être repeinte. Deux voitures de
+   la même couleur sur la grille, jamais : le pilote qui a la même voiture
+   que toi roule en blanc, et celui dont tu prends la couleur récupère la
+   couleur d'origine de ta voiture. */
+const BLANC_DOUBLE = [0.95, 0.95, 0.96];
+const COULEURS_GARAGE = [
+  ["Blanc", [0.94,0.94,0.95]], ["Gris", [0.5,0.52,0.55]], ["Noir", [0.06,0.06,0.07]], ["Rouge", [0.78,0.04,0.05]],
+  ["Orange", [0.96,0.46,0.06]], ["Jaune", [0.98,0.8,0.08]], ["Vert", [0.12,0.55,0.2]], ["Vert fluo", [0.55,1.0,0.32]],
+  ["Turquoise", [0.1,0.74,0.72]], ["Bleu", [0.04,0.3,0.82]], ["Bleu nuit", [0.07,0.13,0.32]], ["Violet", [0.5,0.24,0.76]],
+  ["Rose", [0.98,0.6,0.78]], ["Or", [0.86,0.76,0.48]]];
+const couleurOrigine = i => VOITURES[i].couleur || MODELES[VOITURES[i].modele].couleur;
+const maCouleurVoiture = (i = carriere.voiture) => (carriere.couleurs && carriere.couleurs[i]) || couleurOrigine(i);
+const ecartCouleur = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+function couleurPilote(p){
+  const base = p.couleur || couleurOrigine(p.voiture);
+  const moi = maCouleurVoiture(), orig = couleurOrigine(carriere.voiture), proche = (a, b) => ecartCouleur(a, b) < 0.25;
+  if (p.voiture === carriere.voiture)                    // il a la même voiture que toi : la sienne est blanche
+    return !proche(moi, BLANC_DOUBLE) ? BLANC_DOUBLE : !proche(orig, moi) ? orig : [0.42, 0.44, 0.47];
+  if (proche(base, moi) && !proche(moi, orig)) return orig;  // tu as pris sa couleur : il prend celle d'origine de ta voiture
+  return base;
+}
 // La voiture que le joueur conduit en course : la sienne, ou la BMW M3 en multijoueur
 // en multijoueur : la voiture choisie pour la course (la M3, la sienne ou une au hasard) ;
 // sur le serveur, celle du joueur qu'on est en train de faire rouler
@@ -2821,11 +2842,11 @@ function preparerCourse(indexCircuit){
      sans rapport avec leur vitesse. */
   // en DX Maker, seulement les adversaires cochés ; en carrière, tout le monde
   const plateau = (jeu.adversaires ? PILOTES.filter(p => jeu.adversaires.includes(p.nom)) : PILOTES).map(p => {
-    const modele = jeu.multi ? p.voiture : (p.voiture === carriere.voiture) ? 0 : p.voiture;   // en multi, Kaimaxus garde sa Koenigsegg
+    const modele = p.voiture;              // chacun garde sa voiture, même si tu as la même (elle est juste blanche)
     /* L'étalement se fait à l'intérieur de chaque groupe de voitures et
        reste centré sur celle du joueur : sinon tous les adversaires
        mieux motorisés seraient plus rapides que lui quoi qu'il achète. */
-    const memeModele = PILOTES.filter(q => (q.voiture === carriere.voiture ? 0 : q.voiture) === modele);
+    const memeModele = PILOTES.filter(q => q.voiture === modele);
     const taille = Math.max(1, memeModele.length);
     const ecart = 1 + (memeModele.indexOf(p) - (taille-1)/2) * 0.030;
     const st = VOITURES[modele].stats;
@@ -2870,7 +2891,7 @@ function preparerCourse(indexCircuit){
     const a = creerConcurrent(p, false, def, emplacement);
     a.modele = modele;
     // couleur propre au pilote s'il en a une (et s'il roule dans sa voiture)
-    a.coul = (p.couleur && modele === p.voiture) ? p.couleur : (VOITURES[modele].couleur || MODELES[VOITURES[modele].modele].couleur);
+    a.coul = jeu.multi ? (p.couleur || couleurOrigine(modele)) : couleurPilote(p);
     if (jeu.multi){
       a.kaimaxus = true;
       // sa Koenigsegg, bridée juste au-dessus des M3 : sinon il serait imbattable en ligne droite
@@ -2962,7 +2983,7 @@ function preparerCourse(indexCircuit){
   MOI.nom = jeu.multi ? jeu.multi.monNom : ((carriere.prenom || "").trim() || "Vous");
   const moi = creerConcurrent(MOI, true, def, GRILLE_JOUEUR);
   moi.vmax = mien.R.vmax;
-  moi.coul = mien.couleur || MODELES[mien.modele].couleur;
+  moi.coul = jeu.multi ? (mien.couleur || MODELES[mien.modele].couleur) : maCouleurVoiture(carriere.voiture);
   moi.tour = -1;
   moi.modele = voitureEnPiste();
   if (jeu.multi) moi.coul = jeu.multi.maCouleur;
@@ -5757,8 +5778,8 @@ function berries(n){
    fond devient noir. Rien si le navigateur refuse (le garage reste utilisable). */
 const photos = {};
 function photoVoiture(i, silhouette){
-  const a = VOITURES[i], coul = a.couleur || MODELES[a.modele].couleur;
-  const cle = i + (silhouette ? "-s" : "-c");
+  const a = VOITURES[i], coul = carriere.possedees.includes(i) ? maCouleurVoiture(i) : couleurOrigine(i);
+  const cle = i + (silhouette ? "-s" : "-c" + coul.join(","));
   if (cle in photos) return photos[cle];
   let url = null;
   try {
@@ -5828,7 +5849,17 @@ function rafraichirGarage(){
     `<div class="nom" style="text-align:center;font-size:22px;font-weight:800;letter-spacing:.06em">${e === "verrou" ? "???" : a.nom}</div>` +
     (e === "verrou" ? "" : `<div class="det" style="text-align:center">${a.desc}</div>` +
       `<div class="grille-stats">${CRITERES.map(([c, lib]) => `<div><span>${lib}</span>${jauge(a.stats[c], 100)}<b>${a.stats[c]}</b></div>`).join("")}</div>`) +
+    (e === "possede" ? `<div class="det" style="text-align:center;margin-top:10px">COULEUR</div><div id="garage-couleurs" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:6px">` +
+      `<button class="lien" data-coul="-1" style="padding:4px 10px;font-size:12px">D'origine</button>` +
+      COULEURS_GARAGE.map(([nom, c], k) => { const css = `rgb(${c.map(v => Math.round(v * 255)).join(",")})`, sel = ecartCouleur(c, maCouleurVoiture(garageSel)) < 0.02;
+        return `<button data-coul="${k}" title="${nom}" aria-label="${nom}" style="width:28px;height:28px;border-radius:50%;padding:0;cursor:pointer;background:${css};border:${sel ? "3px solid #f2b632" : "2px solid rgba(255,255,255,.35)"}"></button>`; }).join("") +
+      `</div><div class="det" style="text-align:center;font-size:11px;margin-top:4px">Si un pilote a déjà cette couleur, il prend la couleur d'origine de ta voiture. Celui qui a la même voiture que toi roule en blanc.</div>` : "") +
     `<div style="text-align:center;margin-top:10px">${action}</div>`;
+  for (const b of document.querySelectorAll("#garage-couleurs [data-coul]")) b.onclick = () => {
+    const k = +b.dataset.coul; carriere.couleurs = carriere.couleurs || {};
+    if (k < 0) delete carriere.couleurs[garageSel]; else carriere.couleurs[garageSel] = COULEURS_GARAGE[k][1].slice();
+    sauver(); bip(660, 0.08); rafraichirGarage(); try { rafraichirMenu(); } catch (e) {}
+  };
   const btn = document.getElementById("garage-action");
   if (btn) btn.onclick = () => {
     if (e === "achat"){
@@ -6845,12 +6876,10 @@ function rafraichirPaddock(){
   const h = historiqueComplet().map(x => Object.assign(x, { bmw: x.bmw || [] })).filter(x => filtrePaddock === "tout" || (filtrePaddock === "2") === estPart2(x.c));
   const css = c => `rgb(${c.map(v => Math.round(v * 255)).join(",")})`;
   const fiches = PILOTES.map(p => {
-    const modele = p.voiture === carriere.voiture ? 0 : p.voiture;
-    const coul = (p.couleur && modele === p.voiture) ? p.couleur : (VOITURES[modele].couleur || MODELES[VOITURES[modele].modele].couleur);
-    return { nom: p.nom, cle: p.nom, ecurie: VOITURES[modele].nom + (modele !== p.voiture ? ` · tu as sa ${VOITURES[p.voiture].nom}, ses courses ne comptent pas` : ""), coul };
+    return { nom: p.nom, cle: p.nom, ecurie: VOITURES[p.voiture].nom + (p.voiture === carriere.voiture ? " (blanche : tu as la même)" : ""), coul: couleurPilote(p) };
   });
   const mien = VOITURES[carriere.voiture];
-  fiches.push({ nom: (carriere.prenom || "").trim() || "Toi", cle: "__joueur", ecurie: mien.nom, coul: mien.couleur || MODELES[mien.modele].couleur, moi: true });
+  fiches.push({ nom: (carriere.prenom || "").trim() || "Toi", cle: "__joueur", ecurie: mien.nom, coul: maCouleurVoiture(), moi: true });
   for (const f of fiches) f.st = statsPaddock(f.cle, h);
   // classement du paddock : victoires, puis podiums, puis résultat moyen
   fiches.sort((a, b) => b.st.victoires - a.st.victoires || b.st.podiums - a.st.podiums
