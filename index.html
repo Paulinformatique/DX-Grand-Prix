@@ -5870,7 +5870,9 @@ function rafraichirGarage(){
     (e === "verrou" ? "" : `<div class="det" style="text-align:center">${a.desc}</div>` +
       `<div class="grille-stats">${CRITERES.map(([c, lib]) => `<div><span>${lib}</span>${jauge(a.stats[c], 100)}<b>${a.stats[c]}</b></div>`).join("")}</div>`) +
     (e === "possede" ? `<div class="det" style="text-align:center;margin-top:10px">COULEUR</div><div id="garage-couleurs" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:6px">` +
-      `<button class="lien" data-coul="-1" style="padding:4px 10px;font-size:12px">D'origine</button>` +
+      (() => { const o = couleurOrigine(garageSel), css = `rgb(${o.map(v => Math.round(v * 255)).join(",")})`, act = !(carriere.couleurs && carriere.couleurs[garageSel]);
+        return `<button data-coul="-1" title="Remettre la couleur d'origine" style="display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px 0 4px;border-radius:16px;cursor:pointer;font:700 12px Bahnschrift,sans-serif;letter-spacing:.04em;color:#fff;background:rgba(255,255,255,.08);border:${act ? "2px solid #f2b632" : "1px solid rgba(255,255,255,.35)"}">` +
+          `<span style="width:22px;height:22px;border-radius:50%;background:${css};border:1px solid rgba(255,255,255,.4)"></span>↺ Couleur d'origine</button>`; })() +
       COULEURS_GARAGE.map(([nom, c], k) => { const css = `rgb(${c.map(v => Math.round(v * 255)).join(",")})`, sel = ecartCouleur(c, maCouleurVoiture(garageSel)) < 0.02;
         return `<button data-coul="${k}" title="${nom}" aria-label="${nom}" style="width:28px;height:28px;border-radius:50%;padding:0;cursor:pointer;background:${css};border:${sel ? "3px solid #f2b632" : "2px solid rgba(255,255,255,.35)"}"></button>`; }).join("") +
       `</div><div class="det" style="text-align:center;font-size:11px;margin-top:4px">Si un pilote a déjà cette couleur, il prend la couleur d'origine de ta voiture. Celui qui a la même voiture que toi roule en blanc.</div>` : "") +
