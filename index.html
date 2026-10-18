@@ -2712,9 +2712,15 @@ const COULEURS_GARAGE = [
 const couleurOrigine = i => VOITURES[i].couleur || MODELES[VOITURES[i].modele].couleur;
 const maCouleurVoiture = (i = carriere.voiture) => (carriere.couleurs && carriere.couleurs[i]) || couleurOrigine(i);
 const ecartCouleur = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+/* Deux couleurs « pareilles » à l'œil (écart pondéré comme la vue : on
+   distingue mieux le vert ; noir, vert foncé et bleu nuit restent différents) */
+function memeCouleur(a, b){
+  const r = (a[0] + b[0]) / 2, dr = (a[0] - b[0]) * 255, dg = (a[1] - b[1]) * 255, db = (a[2] - b[2]) * 255;
+  return Math.sqrt((2 + r) * dr * dr + 4 * dg * dg + (3 - r) * db * db) < 85;
+}
 function couleurPilote(p){
   const base = p.couleur || couleurOrigine(p.voiture);
-  const moi = maCouleurVoiture(), orig = couleurOrigine(carriere.voiture), proche = (a, b) => ecartCouleur(a, b) < 0.25;
+  const moi = maCouleurVoiture(), orig = couleurOrigine(carriere.voiture), proche = memeCouleur;
   if (p.voiture === carriere.voiture)                    // il a la même voiture que toi : la sienne est blanche
     return !proche(moi, BLANC_DOUBLE) ? BLANC_DOUBLE : !proche(orig, moi) ? orig : [0.42, 0.44, 0.47];
   if (proche(base, moi) && !proche(moi, orig)) return orig;  // tu as pris sa couleur : il prend celle d'origine de ta voiture
