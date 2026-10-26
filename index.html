@@ -4569,6 +4569,13 @@ function dessinerHUD(){
   }
   const nTours = toursCourse(), tourAffiche = Math.max(1, Math.min(v.tour + 1, nTours));
   ctx2.fillText("TOUR " + tourAffiche + " / " + nTours, 14*E, 76*E);
+  // multijoueur : le ping (aller-retour jusqu'au serveur), pour savoir d'où vient un retard
+  if (jeu.multi && reseau.serveur && reseau.rtt){
+    const p = Math.round(reseau.rtt);
+    ctx2.save(); ctx2.font = `700 ${12*E}px Bahnschrift, sans-serif`;
+    ctx2.fillStyle = p < 90 ? "#7be07b" : p < 160 ? "#f2b632" : "#ff5a4f";
+    ctx2.fillText("PING " + p + " ms", 14*E, 94*E); ctx2.restore();
+  }
 
   // ---- bouton pause, juste à gauche des chronos ----
   const bp = document.getElementById("btn-pause");
