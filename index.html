@@ -2386,12 +2386,12 @@ function construireDecor(piste){
   };
   if (trainSBS){
     let voie = null, a0 = 0, a1 = 0;
-    for (const seg of trainSBS) for (const ext of [130, 70, 30]){
+    for (const off of [24, 30, 38, 48, 60, 75]) for (const seg of trainSBS) for (const ext of [130, 70, 30]){
     if (voie) break;
     [a0, a1] = seg;
     const pa = P[a0 % nb], pb = P[a1 % nb], pmT = P[Math.floor((a0 + a1) / 2) % nb];
     const l0 = Math.hypot(pb.x - pa.x, pb.z - pa.z) || 1, ux = (pb.x - pa.x) / l0, uz = (pb.z - pa.z) / l0, nx0 = uz, nz0 = -ux;
-    for (const off of [30, 38, 48, 60, 75]) for (const sd of [-Math.sign(pmT.courbure) || 1, Math.sign(pmT.courbure) || -1]){
+    for (const sd of [-Math.sign(pmT.courbure) || 1, Math.sign(pmT.courbure) || -1]){
       if (voie) break;
       const Lv = l0 + 2 * ext, ox = pmT.x + nx0 * sd * (DEMI_PISTE + off) - ux * Lv / 2, oz = pmT.z + nz0 * sd * (DEMI_PISTE + off) - uz * Lv / 2;
       let ok = true;
@@ -2402,20 +2402,17 @@ function construireDecor(piste){
     }
     }
     if (voie){
-      // la hauteur du rail suit la piste la plus proche, un peu au-dessus : on le voit par-dessus les barrières
-      const hs = []; for (let d = 0; d <= voie.L + 10; d += 10) hs.push(solEn(voie.x + voie.dx * d, voie.z + voie.dz * d)[1] + 2.6);
-      for (let pass = 0; pass < 4; pass++) for (let k = 1; k + 1 < hs.length; k++) hs[k] = (hs[k - 1] + hs[k] * 2 + hs[k + 1]) / 4;
+      // les rails posés sur le sol tel qu'il est (il descend en s'éloignant de la piste)
+      const hs = []; for (let d = 0; d <= voie.L + 10; d += 10) hs.push(solEn(voie.x + voie.dx * d, voie.z + voie.dz * d)[0] + 0.35);
       voie.hs = hs; voie.y = hs[0];
       const hAt = d => { const f = Math.max(0, Math.min(hs.length - 1.001, d / 10)), i = Math.floor(f); return hs[i] + (hs[i + 1] - hs[i]) * (f - i); };
-      const ligne = []; for (let d = 0; d <= voie.L; d += 10) ligne.push([voie.x + voie.dx * d, hAt(d) - 0.25, voie.z + voie.dz * d]);
-      talus(ligne, 6, [0.66, 0.50, 0.36], [0.72, 0.53, 0.36]);
       for (let d = 0; d < voie.L; d += 2.2){
         const x = voie.x + voie.dx * d, z = voie.z + voie.dz * d;
         boite(paysage, x, hAt(d) + 0.1, z, 3.2, 0.22, 0.5, [0.36, 0.24, 0.14], voie.cap + Math.PI / 2);   // traverses
       }
       for (let d = 0; d < voie.L; d += 10){
         const dm = d + 5, x = voie.x + voie.dx * dm, z = voie.z + voie.dz * dm, y = hAt(dm);
-        boite(paysage, x, y - 0.1, z, 4.2, 0.35, 10.05, [0.60, 0.52, 0.44], voie.cap);                       // ballast
+        boite(paysage, x, y - 0.5, z, 4.2, 1.15, 10.05, [0.60, 0.52, 0.44], voie.cap);                       // ballast, enfoncé dans le sable
         for (const c of [-0.75, 0.75]) boite(paysage, x - voie.dz * c, y + 0.32, z + voie.dx * c, 0.15, 0.2, 10.05, [0.42, 0.40, 0.38], voie.cap);   // rails
       }
       for (let d = 0; d <= voie.L; d += 4) reserver(voie.x + voie.dx * d, voie.z + voie.dz * d, 9);
@@ -2550,8 +2547,8 @@ function construireDecor(piste){
         const i = (Math.floor(nb * frac) + k * 2) % nb, p = P[i];
         if (Math.abs(p.courbure) > 0.006) continue;
         for (const sd of [1, -1]){
-          const dec = sd * (DEMI_PISTE + ACCOTEMENT + 9), x = p.x + p.nx * dec, z = p.z + p.nz * dec;
-          const b0 = 0.30, nTx = -p.nx * sd, nTz = -p.nz * sd;                 // vers la piste
+          const b0 = 0.70, dec = sd * (DEMI_PISTE + ACCOTEMENT + 6 + 16 * Math.sin(b0)), x = p.x + p.nx * dec, z = p.z + p.nz * dec;
+          const  nTx = -p.nx * sd, nTz = -p.nz * sd;                 // vers la piste
           const fx = nTx * Math.cos(b0) - p.tx * Math.sin(b0), fz = nTz * Math.cos(b0) - p.tz * Math.sin(b0);
           const wx = fz, wz = -fx;                                              // le long du mur
           let ok = true;
@@ -2564,6 +2561,7 @@ function construireDecor(piste){
           enseigne("§g:GYRO", x + fx * 0.03, y + 0.6, z + fz * 0.03, -fx, -fz, 30, 7.5);
           for (let u = -18; u <= 18; u += 4) reserver(x + wx * u, z + wz * u, 4);
           for (let v = 3; v < 9; v += 3) for (let u = -16; u <= 16; u += 4) reserver(x + wx * u + fx * v, z + wz * u + fz * v, 2.5);   // rien devant
+          (sbr.murs = sbr.murs || []).push({ x, z, i });
           return { x, y, z, fx, fz };
         }
       }
@@ -2645,7 +2643,7 @@ function construireDecor(piste){
     }
     // l'arrivée façon course hippique : une arche en bois, la banderole, des fanions
     {
-      const p = P[Math.max(1, Math.round(35 / piste.pas)) % nb], E = DEMI_PISTE + ACCOTEMENT + 1.5, ang = p.cap + Math.PI / 2, bois = [0.45, 0.30, 0.17];
+      const p = P[Math.max(1, Math.round(35 / piste.pas)) % nb], E = DEMI_PISTE + ACCOTEMENT + 1.5, ang = p.cap, bois = [0.45, 0.30, 0.17];
       for (const sd of [1, -1]){
         const x = p.x + p.nx * sd * E, z = p.z + p.nz * sd * E;
         boite(paysage, x, p.y + 4.2, z, 0.9, 9.2, 0.9, bois, p.cap);
@@ -2683,7 +2681,7 @@ function construireDecor(piste){
         break;
       }
     }
-    sbr.mur = murTag(0.62); murTag(0.16);
+    sbr.mur = murTag(0.62) || murTag(0.16) || murTag(0.35) || murTag(0.85);      // un seul mur, bien en face des pilotes
     // panneaux « attention balle » avant la zone où elle roule, des deux côtés
     { const B = balleSBS(piste);
       if (B) for (const d of [220, 120]) for (const sg of [1, -1]){
@@ -4877,7 +4875,7 @@ function percuter(derriere, devant, mD, mV, total){
    touche : c'est comme taper une voiture arrêtée. Calculée à partir de la piste
    et du chrono de la course seulement, elle est au même endroit chez tout le
    monde (et sur le serveur). */
-const BALLE_R = 1.2;
+const BALLE_R = 1.5;
 function balleSBS(pst){
   pst = pst || piste;
   if (!pst || !pst.def || pst.def.nom !== "SteelBallSon") return null;
@@ -10028,8 +10026,8 @@ function dessinerPoussiere(decor){
       if (Math.hypot(q.x - cam.x, q.z - cam.z) < 3) continue;
       const nx = Math.cos(q.cap), nz = -Math.sin(q.cap);
       for (const roue of [-0.6, 0, 0.6]){                                   // les deux roues arrière et entre elles, même intensité
-        const px = q.x + nx * roue, pz = q.z + nz * roue, sz = 0.8 + age * 1.1;
-        taches.push([px, q.y + 0.2 + sz * 0.3 + age * 0.4, pz, sz, 0.32 * q.I * Math.sin(Math.PI * Math.min(1, 0.15 + age))]);
+        const ec = roue * age * 1.2, px = q.x + nx * (roue + ec), pz = q.z + nz * (roue + ec), sz = 0.8 + age * 1.7;
+        taches.push([px, q.y + 0.2 + sz * 0.3 + age * 2.6 + age * age * 1.5, pz, sz, 0.32 * q.I * Math.sin(Math.PI * Math.min(1, 0.15 + age))]);
       }
     }
   }
@@ -10056,17 +10054,17 @@ function dessinerAnimes(decor){
     const vit = 28, cycle = v.L + 160, s0 = (t * vit) % cycle - 40;   // ~100 km/h, il repart dès qu'il a disparu
     const hAt = d => { const f = Math.max(0, Math.min(v.hs.length - 1.001, d / 10)), i = Math.floor(f); return v.hs[i] + (v.hs[i + 1] - v.hs[i]) * (f - i); };
     const pos = d => [v.x + v.dx * d, hAt(d) + 0.0, v.z + v.dz * d];
-    const pieces = [[O.loco, 0], [O.wagon, -9.5], [O.wagon, -18.3], [O.wagon, -27.1]];
+    const K = 1.35, pieces = [[O.loco, 0], [O.wagon, -9.5 * K], [O.wagon, -18.3 * K], [O.wagon, -27.1 * K]];   // un peu plus grand : on le voit par-dessus les barrières
     for (const [obj, off] of pieces){
       const d = s0 + off; if (d < 0 || d > v.L) continue;
-      const q = pos(d); tracer(obj, m4Mul(m4Translation(q[0], q[1] + 0.45, q[2]), m4RotY(v.cap)), [1, 1, 1]);
+      const q = pos(d); tracer(obj, m4Mul(m4Mul(m4Translation(q[0], q[1] + 0.45, q[2]), m4RotY(v.cap)), m4Echelle(K, K, K)), [1, 1, 1]);
     }
     // la fumée : des boules grises qui montent et s'étirent vers l'arrière
     if (s0 > 0 && s0 < v.L) for (let j = 0; j < 10; j++){
-      const age = ((t * 2.4) + j / 10) % 1, d = s0 + 3.2 - age * 24, q = pos(d), sz = 1 + age * 3.6;
+      const age = ((t * 2.4) + j / 10) % 1, d = s0 + 3.2 * K - age * 24, q = pos(d), sz = 1 + age * 3.6;
       if (d < 0) continue;
       const g = 0.82 + age * 0.12;
-      tracer(O.cube, m4Mul(m4Mul(m4Translation(q[0], q[1] + 5.2 + age * 9, q[2]), m4RotY(age * 3 + j)), m4Echelle(sz, sz * 0.8, sz)), [g, g, g], 0.9);
+      tracer(O.cube, m4Mul(m4Mul(m4Translation(q[0], q[1] + 5.2 * K + age * 9, q[2]), m4RotY(age * 3 + j)), m4Echelle(sz, sz * 0.8, sz)), [g, g, g], 0.9);
     }
   }
   // cavaliers : deux groupes au galop sur le sentier, aller puis retour
