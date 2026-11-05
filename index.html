@@ -9823,7 +9823,7 @@ function dessinerPoussiere(decor){
       const age = (t - q.t) / 1.6; if (age >= 1 || q.I < 0.04) continue;     // dissipée en 1,6 s
       if (Math.hypot(q.x - cam.x, q.z - cam.z) < 3) continue;
       const nx = Math.cos(q.cap), nz = -Math.sin(q.cap);
-      for (const roue of [-0.6, 0.6]){
+      for (const roue of [-0.6, 0, 0.6]){                                   // les deux roues arrière et entre elles, même intensité
         const px = q.x + nx * roue, pz = q.z + nz * roue, sz = 0.8 + age * 1.1;
         taches.push([px, q.y + 0.2 + sz * 0.3 + age * 0.4, pz, sz, 0.32 * q.I * Math.sin(Math.PI * Math.min(1, 0.15 + age))]);
       }
