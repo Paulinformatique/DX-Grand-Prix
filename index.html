@@ -2337,7 +2337,7 @@ function construireDecor(piste){
   /* SteelBallSon : on choisit tôt la rue principale de la ville western et le
      canyon (deux lignes droites, hors de la grande), pour que le décor
      ordinaire ne s'y pose pas. */
-  let rueSBS = null, canyonSBS = null, sentierSBS = null;
+  let rueSBS = null, canyonSBS = null, sentierSBS = null, trainSBS = null;
   if (piste.def.nom === "SteelBallSon"){
     const runs = []; let d0 = -1;
     for (let i = 0; i < nb * 2; i++){
@@ -2358,6 +2358,70 @@ function construireDecor(piste){
       return null;
     };
     rueSBS = choisir(140, 230); canyonSBS = choisir(120, 260); sentierSBS = choisir(100, 300);
+    // le train : toutes les lignes droites encore libres, la grande en dernier (ses tribunes le cachent)
+    trainSBS = runs.slice(1).filter(([d, l]) => l * piste.pas >= 90 && !pris.some(([x, y]) => !(d + l + 10 < x || d > y + 10))).map(([d, l]) => [d, d + l]);
+    trainSBS.push([runs[0][0], runs[0][0] + runs[0][1]]);
+  }
+  /* Hauteur du sol à un endroit quelconque : la jupe qui descend de la piste
+     la plus proche jusqu'au sol du désert. */
+  const solEn = (x, z) => {
+    let bd = Infinity, bp = P[0];
+    for (const q of P){ const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd){ bd = d; bp = q; } }
+    const dec = Math.sqrt(bd), t2 = Math.max(0, Math.min(1, (dec - (DEMI_PISTE + ACCOTEMENT)) / (JUPE - DEMI_PISTE - ACCOTEMENT)));
+    return [(bp.y - 0.35) + (SOL - (bp.y - 0.35)) * t2, bp.y];
+  };
+  /* Un talus de terre le long d'une ligne de points [x, haut, z] : le dessus
+     plat, et deux pentes qui descendent jusqu'au sol (jamais en l'air). */
+  const quad2 = (a, b, c, d, coul) => { quad(paysage, a, b, c, d, coul); quad(paysage, d, c, b, a, coul); };
+  const talus = (L, larg, coulH, coulF) => {
+    for (let k = 0; k + 1 < L.length; k++){
+      const A = L[k], B = L[k + 1], dx = B[0] - A[0], dz = B[2] - A[2], n = Math.hypot(dx, dz) || 1, nx = dz / n, nz = -dx / n;
+      const gA = solEn(A[0], A[2])[0] - 0.5, gB = solEn(B[0], B[2])[0] - 0.5;
+      const pt = (Q, u, y) => [Q[0] + nx * u, y, Q[2] + nz * u], h = larg / 2;
+      const eA = h + Math.max(0, A[1] - gA) * 1.4, eB = h + Math.max(0, B[1] - gB) * 1.4;
+      quad2(pt(A, -h, A[1]), pt(B, -h, B[1]), pt(B, h, B[1]), pt(A, h, A[1]), coulH);
+      quad2(pt(A, -eA, gA), pt(B, -eB, gB), pt(B, -h, B[1]), pt(A, -h, A[1]), coulF);
+      quad2(pt(A, h, A[1]), pt(B, h, B[1]), pt(B, eB, gB), pt(A, eA, gA), coulF);
+    }
+  };
+  if (trainSBS){
+    let voie = null, a0 = 0, a1 = 0;
+    for (const seg of trainSBS) for (const ext of [130, 70, 30]){
+    if (voie) break;
+    [a0, a1] = seg;
+    const pa = P[a0 % nb], pb = P[a1 % nb], pmT = P[Math.floor((a0 + a1) / 2) % nb];
+    const l0 = Math.hypot(pb.x - pa.x, pb.z - pa.z) || 1, ux = (pb.x - pa.x) / l0, uz = (pb.z - pa.z) / l0, nx0 = uz, nz0 = -ux;
+    for (const off of [30, 38, 48, 60, 75]) for (const sd of [-Math.sign(pmT.courbure) || 1, Math.sign(pmT.courbure) || -1]){
+      if (voie) break;
+      const Lv = l0 + 2 * ext, ox = pmT.x + nx0 * sd * (DEMI_PISTE + off) - ux * Lv / 2, oz = pmT.z + nz0 * sd * (DEMI_PISTE + off) - uz * Lv / 2;
+      let ok = true;
+      for (let d = 0; d <= Lv && ok; d += 8) ok = libreD(ox + ux * d, oz + uz * d, 7);
+      // rien entre la piste et la voie : on doit voir passer le train
+      for (let i = a0; i <= a1 && ok; i += 3){ const q = P[i % nb]; for (let o = DEMI_PISTE + ACCOTEMENT + 5; o < DEMI_PISTE + off - 6 && ok; o += 6) ok = libreD(q.x + q.nx * sd * o, q.z + q.nz * sd * o, 2); }
+      if (ok) voie = { x: ox, z: oz, dx: ux, dz: uz, L: Lv, cap: Math.atan2(ux, uz), sd, off };
+    }
+    }
+    if (voie){
+      // la hauteur du rail suit la piste la plus proche, un peu au-dessus : on le voit par-dessus les barrières
+      const hs = []; for (let d = 0; d <= voie.L + 10; d += 10) hs.push(solEn(voie.x + voie.dx * d, voie.z + voie.dz * d)[1] + 2.6);
+      for (let pass = 0; pass < 4; pass++) for (let k = 1; k + 1 < hs.length; k++) hs[k] = (hs[k - 1] + hs[k] * 2 + hs[k + 1]) / 4;
+      voie.hs = hs; voie.y = hs[0];
+      const hAt = d => { const f = Math.max(0, Math.min(hs.length - 1.001, d / 10)), i = Math.floor(f); return hs[i] + (hs[i + 1] - hs[i]) * (f - i); };
+      const ligne = []; for (let d = 0; d <= voie.L; d += 10) ligne.push([voie.x + voie.dx * d, hAt(d) - 0.25, voie.z + voie.dz * d]);
+      talus(ligne, 6, [0.66, 0.50, 0.36], [0.72, 0.53, 0.36]);
+      for (let d = 0; d < voie.L; d += 2.2){
+        const x = voie.x + voie.dx * d, z = voie.z + voie.dz * d;
+        boite(paysage, x, hAt(d) + 0.1, z, 3.2, 0.22, 0.5, [0.36, 0.24, 0.14], voie.cap + Math.PI / 2);   // traverses
+      }
+      for (let d = 0; d < voie.L; d += 10){
+        const dm = d + 5, x = voie.x + voie.dx * dm, z = voie.z + voie.dz * dm, y = hAt(dm);
+        boite(paysage, x, y - 0.1, z, 4.2, 0.35, 10.05, [0.60, 0.52, 0.44], voie.cap);                       // ballast
+        for (const c of [-0.75, 0.75]) boite(paysage, x - voie.dz * c, y + 0.32, z + voie.dx * c, 0.15, 0.2, 10.05, [0.42, 0.40, 0.38], voie.cap);   // rails
+      }
+      for (let d = 0; d <= voie.L; d += 4) reserver(voie.x + voie.dx * d, voie.z + voie.dz * d, 9);
+      for (let i = a0; i <= a1; i += 2){ const q = P[i % nb]; for (let o = DEMI_PISTE + ACCOTEMENT + 3; o < DEMI_PISTE + voie.off - 4; o += 6){ reserver(q.x + q.nx * voie.sd * o, q.z + q.nz * voie.sd * o, 3); } }
+      objetsAnimes.trains.push(voie);
+    }
   }
   const dansSeg = (seg, i) => seg && ((i - seg[0]) % nb + nb) % nb <= seg[1] - seg[0] + 6;
 
@@ -2600,12 +2664,15 @@ function construireDecor(piste){
     // le sentier des cavaliers : une piste de terre parallèle à une ligne droite
     if (sentierSBS){
       const [a0, a1] = sentierSBS, pmS = P[Math.floor((a0 + a1) / 2) % nb];
-      for (const off of [26, 34, 44]){
+      for (const off of [24, 30, 38]){
         let ok = true; const sd = -Math.sign(pmS.courbure) || 1;
         for (let i = a0; i <= a1 && ok; i += 3){ const q = P[i % nb]; ok = libreD(q.x + q.nx * sd * (DEMI_PISTE + off), q.z + q.nz * sd * (DEMI_PISTE + off), 4); }
         if (!ok) continue;
         const pts2 = [];
-        for (let i = a0; i <= a1; i++){ const q = P[i % nb]; pts2.push([q.x + q.nx * sd * (DEMI_PISTE + off), SOLp2(q, DEMI_PISTE + off) + 0.05, q.z + q.nz * sd * (DEMI_PISTE + off)]); }
+        for (let i = a0; i <= a1; i++){ const q = P[i % nb]; pts2.push([q.x + q.nx * sd * (DEMI_PISTE + off), q.y + 2.2, q.z + q.nz * sd * (DEMI_PISTE + off)]); }
+        // une levée de terre : à plat sur le sol, la barrière les cachait
+        for (let k = 1; k + 1 < pts2.length; k++) pts2[k][1] = (pts2[k - 1][1] + pts2[k][1] * 2 + pts2[k + 1][1]) / 4;
+        talus(pts2.map(q => [q[0], q[1] - 0.03, q[2]]), 7.5, [0.70, 0.53, 0.37], [0.73, 0.55, 0.38]);
         for (let k = 0; k + 1 < pts2.length; k++){
           const A = pts2[k], B = pts2[k + 1], q = P[(a0 + k) % nb];
           const w = (pp, s2) => [pp[0] + q.nx * 2.2 * s2, pp[1], pp[2] + q.nz * 2.2 * s2];
@@ -2617,6 +2684,15 @@ function construireDecor(piste){
       }
     }
     sbr.mur = murTag(0.62); murTag(0.16);
+    // panneaux « attention balle » avant la zone où elle roule, des deux côtés
+    { const B = balleSBS(piste);
+      if (B) for (const d of [220, 120]) for (const sg of [1, -1]){
+        const p = auPoint(piste, B.s - d), e = sg * (DEMI_PISTE + BORDURE + 2.8), x = p.x + p.nx * e, z = p.z + p.nz * e;
+        if (!libre(x, z, -10)) continue;
+        for (const u of [-0.9, 0.9]) boite(paysage, x + p.tx * 0 + p.nx * u, p.y + 1.3, z + p.nz * u, 0.14, 2.6, 0.14, [0.34, 0.24, 0.15], p.cap);
+        enseigne("§w:" + (d === 220 ? "BALLE" : "100 m"), x, p.y + 2.6, z, p.tx, p.tz, 2.6, 1.95);
+      }
+    }
   }
 
   if (T.western){
@@ -3129,40 +3205,6 @@ function construireDecor(piste){
   };
   if (piste.def.pays === "Cap-Vert") ecranGeant("voz");
   if (piste.def.nom === "SteelBallSon") ecranGeant("sbr");
-
-  /* --- SteelBallSon : une voie ferrée parallèle à la grande ligne droite,
-     loin dans le désert, où passe un train à vapeur --- */
-  if (piste.def.nom === "SteelBallSon"){
-    const pm2 = P[(meilleurDeb + Math.floor(meilleurLong / 2)) % nb];
-    let voie = null;
-    for (const off of [55, 70, 90, 115, 145, 180]) for (const sd of [coteInt, -coteInt]){       // côté stands d'abord : les tribunes ne le cachent pas
-      if (voie) break;
-      const ox = pm2.x + pm2.nx * sd * (DEMI_PISTE + off), oz = pm2.z + pm2.nz * sd * (DEMI_PISTE + off);
-      const Lv = meilleurLong * piste.pas + 700;
-      let ok = true;
-      for (let d = -Lv / 2; d <= Lv / 2 && ok; d += 10) ok = libreD(ox + pm2.tx * d, oz + pm2.tz * d, 8);
-      if (ok) voie = { x: ox - pm2.tx * Lv / 2, z: oz - pm2.tz * Lv / 2, dx: pm2.tx, dz: pm2.tz, L: Lv, cap: Math.atan2(pm2.tx, pm2.tz) };
-    }
-    if (voie){
-      const tt = Math.min(1, ((DEMI_PISTE + 90) - (DEMI_PISTE + ACCOTEMENT)) / (JUPE - DEMI_PISTE - ACCOTEMENT));
-      voie.y = (pm2.y - 0.35) + (SOL - (pm2.y - 0.35)) * Math.min(1, tt) + 0.0;
-      voie.y = pm2.y - 0.35 + 3.0;                                   // sur un remblai, à hauteur de la piste
-      boite(paysage, voie.x + voie.dx * voie.L / 2, (voie.y + SOL) / 2 - 0.4, voie.z + voie.dz * voie.L / 2, 9, voie.y - SOL + 0.2, voie.L, [0.70, 0.52, 0.36], voie.cap);
-      boite(paysage, voie.x + voie.dx * voie.L / 2, (voie.y + SOL) / 2 - 1.2, voie.z + voie.dz * voie.L / 2, 15, voie.y - SOL - 1.4, voie.L, [0.66, 0.48, 0.32], voie.cap);
-      for (let d = 0; d < voie.L; d += 4) reserver(voie.x + voie.dx * d, voie.z + voie.dz * d, 6);
-      for (let d = 0; d < voie.L; d += 2.2){
-        const x = voie.x + voie.dx * d, z = voie.z + voie.dz * d;
-        boite(paysage, x, voie.y + 0.15, z, 3.2, 0.25, 0.5, [0.36, 0.24, 0.14], voie.cap + Math.PI / 2);   // traverses
-      }
-      for (const c of [-0.75, 0.75]){
-        const ex2 = -voie.dz * c, ez2 = voie.dx * c;
-        boite(paysage, voie.x + voie.dx * voie.L / 2 + ex2, voie.y + 0.4, voie.z + voie.dz * voie.L / 2 + ez2, 0.15, 0.2, voie.L, [0.42, 0.40, 0.38], voie.cap);   // rails
-      }
-      // un ballast clair sous la voie
-      boite(paysage, voie.x + voie.dx * voie.L / 2, voie.y - 0.1, voie.z + voie.dz * voie.L / 2, 4.4, 0.3, voie.L, [0.62, 0.52, 0.42], voie.cap);
-      objetsAnimes.trains.push(voie);
-    }
-  }
 
   /* --- montgolfières dans le ciel : SteelBallSon, et quelques circuits ensoleillés --- */
   {
@@ -4597,6 +4639,30 @@ function majIA(v, dt){
       vise = sep > 0 ? Math.min(vise, limite) : Math.max(vise, limite);
     }
   }
+  /* La balle d'acier (SteelBallSon) : seul, il la voit venir et passe du bon
+     côté ; dans un peloton, occupé à se battre, il ne la voit qu'une fois sur
+     deux — et peut se la prendre. */
+  const BL = balleSBS();
+  if (BL && jeu.phase !== "compte"){
+    const Lp = piste.longueur, dB = ((BL.s - v.s) % Lp + Lp) % Lp;
+    if (dB < 150){
+      const cle = Math.round((v.s + dB) / 10);
+      if (v.balleCle !== cle){
+        v.balleCle = cle;
+        const seul = !jeu.voitures.some(a => a !== v && Math.abs(a.distance - v.distance) < 22 && Math.abs(a.lat - v.lat) < 6);
+        v.evite = seul || Math.random() < 0.5;
+      }
+      if (v.evite){
+        const tA = dB / Math.max(v.v, 8), lb = latBalle(jeu.chrono + tA), vb = latBalle(jeu.chrono + tA + 0.1) - lb;
+        const marge = BALLE_R + 0.92 + 1.0;
+        if (Math.abs(vise - lb) < marge){
+          // du côté d'où elle vient (elle s'en va), sinon du côté où il y a la place
+          const g = lb - marge, d = lb + marge, okG = g >= -bornee, okD = d <= bornee;
+          vise = okG && okD ? (vb > 0 ? g : d) : okG ? g : d;
+        }
+      }
+    }
+  }
   v.latCible = Math.max(-bornee, Math.min(bornee, vise));
   // en manœuvre (dépassement, sillage, place laissée) : hors de sa ligne
   v.enManoeuvre = Math.abs(v.latCible - Math.max(-bornee, Math.min(bornee, viseLigne))) > 0.6 || v.esquive > 0;
@@ -4806,6 +4872,73 @@ function percuter(derriere, devant, mD, mV, total){
   }
 }
 
+/* SteelBallSon : la balle d'acier verte de Gyro roule sans fin d'un bord à
+   l'autre de la piste, lentement, au milieu de la grande ligne droite. On la
+   touche : c'est comme taper une voiture arrêtée. Calculée à partir de la piste
+   et du chrono de la course seulement, elle est au même endroit chez tout le
+   monde (et sur le serveur). */
+const BALLE_R = 1.2;
+function balleSBS(pst){
+  pst = pst || piste;
+  if (!pst || !pst.def || pst.def.nom !== "SteelBallSon") return null;
+  if (pst.balleSBS !== undefined) return pst.balleSBS;
+  const P = pst.pts, nb = pst.nb;
+  let deb = -1, mDeb = 0, mLong = 0;
+  for (let i = 0; i < nb * 2; i++){
+    if (Math.abs(P[i % nb].courbure) < 0.0028){ if (deb < 0) deb = i; if (i - deb > mLong){ mLong = i - deb; mDeb = deb; } }
+    else deb = -1;
+  }
+  return (pst.balleSBS = { s: ((mDeb + Math.floor(Math.min(mLong, nb - 1) * 0.55)) % nb) * pst.pas });
+}
+// d'un bord à l'autre (un peu sur les vibreurs), à moins de 11 km/h
+function latBalle(t){ return (DEMI_PISTE + 0.6) * Math.sin((t || 0) * 0.42); }
+function chocBalle(L){
+  const B = balleSBS(); if (!B || !(jeu.phase === "course" || jeu.phase === "arrivee")) return;
+  const r = BALLE_R, Lp = piste.longueur, lb = latBalle(jeu.chrono), vb = (latBalle(jeu.chrono + 0.05) - lb) / 0.05;
+  for (const c of L){
+    if (c.distant || c.cache || !heurtable(c)) continue;
+    let ds = ((c.s - B.s) % Lp + Lp) % Lp; if (ds > Lp / 2) ds -= Lp;
+    if (Math.abs(ds) > 5) continue;
+    // la balle vue depuis la voiture, et le point de la carrosserie le plus proche
+    const bx = -ds, bl = lb - c.lat;
+    const cx = Math.max(-2.15, Math.min(2.15, bx)), cl = Math.max(-0.92, Math.min(0.92, bl));
+    let nx = bx - cx, nl = bl - cl, d = Math.hypot(nx, nl);
+    if (d >= r) continue;
+    if (d < 1e-3){ nx = Math.sign(bx) || 1; nl = 0; d = 0; } else { nx /= d; nl /= d; }
+    const pen = r - d + 0.02;
+    // on la sort de la balle (dans le repère de la piste)
+    if (c.joueur){ const p = auPoint(piste, c.s); c.x -= (p.tx * nx + p.nx * nl) * pen; c.z -= (p.tz * nx + p.nz * nl) * pen; }
+    else { c.s -= nx * pen; c.lat -= nl * pen; }
+    const cote = -Math.sign(nl) || (c.lat > lb ? 1 : -1);        // on part du côté opposé à la balle
+    if (c.balleT > 0) continue;                                   // un seul coup par contact
+    c.balleT = 0.8;
+    if (nx > 0.55 && c.v > 3){
+      // de face : comme une voiture arrêtée en pleine ligne droite
+      const perte = c.v * 0.55;
+      c.v -= perte * 0.5; changerVitesse(c, -perte * 0.5, 0.5);
+      if (c.joueur){
+        const p = auPoint(piste, c.s);
+        c.deriveX = p.nx * cote * 7; c.deriveZ = p.nz * cote * 7; c.deriveT = 0.6;
+        c.cap += cote * 0.10; c.capVit = c.cap;
+        secousse = Math.max(secousse, 1.4); sonChoc(1.0);
+      } else {
+        c.vlat += cote * (3 + Math.random() * 3); c.lacetChoc = cote * 0.25; c.trouble = Math.max(c.trouble || 0, 1.6); c.sonne = 0.6;
+      }
+      c.choc = 1;
+    } else {
+      // la balle qui roule nous prend par le côté : elle nous pousse
+      const f = 3 + Math.abs(vb) * 1.2;
+      c.v *= 0.94;
+      if (c.joueur){
+        const p = auPoint(piste, c.s);
+        c.deriveX = p.nx * cote * f; c.deriveZ = p.nz * cote * f; c.deriveT = 0.5;
+        secousse = Math.max(secousse, 0.9); sonChoc(0.6);
+      } else { c.vlat += cote * f; c.trouble = Math.max(c.trouble || 0, 1.0); }
+      c.choc = Math.max(c.choc || 0, 0.4);
+    }
+  }
+}
+
 function collisions(dt){
   appliquerChangements(jeu.voitures, dt);
   for (const v of jeu.voitures) if (v.repliT > 0) v.repliT -= dt;
@@ -4962,7 +5095,8 @@ function collisions(dt){
     }
   }
 
-  for (const v of L) if (v.contactT > 0) v.contactT -= dt;
+  chocBalle(L);
+  for (const v of L){ if (v.contactT > 0) v.contactT -= dt; if (v.balleT > 0) v.balleT -= dt; }
 
   for (const v of L){
     if (v.choc <= 0) continue;
@@ -5361,6 +5495,31 @@ document.getElementById("btn-musique").onclick = () => {
 
 /* Séquence des feux, comme en Formule 1 : un feu de plus toutes les 0,6 s,
    puis extinction générale au départ. */
+function departPistolet(){ return !!(piste && piste.def && piste.def.nom === "SteelBallSon"); }
+function sonClic(){
+  if (!audio || !sonActif) return;
+  const t = audio.currentTime, sb = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+  sb.buffer = bruitBlanc(0.05); f.type = "highpass"; f.frequency.value = 2500;
+  g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+  sb.connect(f).connect(g).connect(audio.destination); sb.start(t);
+}
+// le coup de pistolet, et son écho dans le canyon
+function sonPistolet(){
+  if (!audio || !sonActif) return;
+  const t0 = audio.currentTime;
+  for (const [dt, vol, fq] of [[0, 1.0, 6000], [0.22, 0.28, 2200], [0.45, 0.10, 1400]]){
+    const t = t0 + dt, sb = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+    sb.buffer = bruitBlanc(0.7); f.type = "lowpass"; f.frequency.setValueAtTime(fq, t); f.frequency.exponentialRampToValueAtTime(250, t + 0.5);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    sb.connect(f).connect(g).connect(audio.destination); sb.start(t); sb.stop(t + 0.7);
+    if (dt === 0){
+      const o = audio.createOscillator(), g2 = audio.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.2);
+      g2.gain.setValueAtTime(0.8, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o.connect(g2).connect(audio.destination); o.start(t); o.stop(t + 0.3);
+    }
+  }
+}
 function feuxAllumes(){
   if (jeu.phase !== "compte") return 0;
   const t = 3.2 - jeu.compte;
@@ -5623,9 +5782,10 @@ function rendre(){
     gl.enable(gl.CULL_FACE);
   }
   dessinerSBR(decor.sbr);
+  dessinerBalleRoulante();
   dessinerAnimes(decor);
   // feux de départ : rouges, ils s'allument un à un puis s'éteignent d'un coup
-  const nFeux = feuxAllumes();
+  const nFeux = departPistolet() ? 0 : feuxAllumes();
   (decor.feux || []).forEach((f, i) => {
     const allume = i < nFeux;
     tracer(objFeu, m4Mul(m4Translation(f.x, f.y, f.z), m4RotY(f.cap)),
@@ -5802,7 +5962,27 @@ function dessinerHUD(){
   }
 
   // ---- compte à rebours ----
-  if (jeu.phase === "compte"){
+  if (jeu.phase === "compte" && departPistolet()){
+    /* Départ hippique : pas de feux, le starter charge son revolver (une
+       balle à chaque « feu »), puis « Prêts… », et le coup part. */
+    const n = feuxAllumes(), y = H * 0.2, w = 330*E, h = 92*E;
+    ctx2.fillStyle = "rgba(30,18,8,.82)"; ctx2.fillRect(W/2 - w/2, y - 40*E, w, h);
+    ctx2.strokeStyle = "#e9b730"; ctx2.lineWidth = 2*E; ctx2.strokeRect(W/2 - w/2, y - 40*E, w, h);
+    ctx2.textAlign = "center"; ctx2.fillStyle = "#e9b730";
+    ctx2.font = `800 ${12*E}px Georgia, serif`;
+    ctx2.fillText("DÉPART AU COUP DE PISTOLET", W/2, y - 24*E);
+    // le barillet : six chambres, une par feu, la sixième part avec le coup
+    const cx = W/2 - 105*E, cy = y + 8*E;
+    ctx2.fillStyle = "#4a4a4e"; ctx2.beginPath(); ctx2.arc(cx, cy, 24*E, 0, Math.PI*2); ctx2.fill();
+    for (let i = 0; i < 6; i++){
+      const a = -Math.PI/2 + i * Math.PI/3, plein = i < n;
+      ctx2.fillStyle = plein ? "#e9b730" : "#18181a";
+      ctx2.beginPath(); ctx2.arc(cx + Math.cos(a) * 14*E, cy + Math.sin(a) * 14*E, 5.5*E, 0, Math.PI*2); ctx2.fill();
+    }
+    ctx2.textAlign = "left"; ctx2.fillStyle = "#fff4dc";
+    ctx2.font = `800 ${26*E}px Georgia, serif`;
+    ctx2.fillText(n < 5 ? "À vos marques…" : "Prêts…", cx + 38*E, cy + 9*E);
+  } else if (jeu.phase === "compte"){
     // les cinq feux, aussi à l'écran : on ne voit pas toujours le portique
     const n = feuxAllumes(), gap = 46*E, x0 = W/2 - 2*gap, y = H*0.2;
     ctx2.fillStyle = "rgba(10,12,16,.78)";
@@ -5814,8 +5994,8 @@ function dessinerHUD(){
   } else if (jeu.phase === "course" && jeu.chrono < 1.0){
     ctx2.textAlign = "center";
     ctx2.fillStyle = "#ffffff";
-    ctx2.font = `800 ${90*E}px Bahnschrift, sans-serif`;
-    ctx2.fillText("PARTEZ", W/2, H/2);
+    if (departPistolet()){ ctx2.fillStyle = "#e9b730"; ctx2.font = `900 ${100*E}px Georgia, serif`; ctx2.fillText("PAN !", W/2, H/2); }
+    else { ctx2.font = `800 ${90*E}px Bahnschrift, sans-serif`; ctx2.fillText("PARTEZ", W/2, H/2); }
   }
 
   // ---- alerte hors piste ----
@@ -6073,14 +6253,14 @@ function majCourse(dt){
   if (jeu.phase === "compte"){
     const avant = feuxAllumes();
     jeu.compte -= dt;
-    if (feuxAllumes() > avant) bip(440, 0.15);
+    if (feuxAllumes() > avant){ if (departPistolet()) sonClic(); else bip(440, 0.15); }
     vueCourante = placerCamera(jeu.joueur, dt);
     /* Classement dès la grille : il ne se calculait qu'une fois la course
        lancée, et la position affichée pendant les feux était une valeur par
        défaut (la dernière place) avant de sauter à la vraie. */
     for (const v of jeu.voitures) v.distance = v.s;   // tous derrière la ligne, en négatif
     classer();
-    if (jeu.compte <= -0.6){ jeu.phase = "course"; bip(880, 0.5); }   // feux éteints : partez
+    if (jeu.compte <= -0.6){ jeu.phase = "course"; if (departPistolet()) sonPistolet(); else bip(880, 0.5); }   // feux éteints : partez
     return;
   }
   if (jeu.phase === "highlights"){ majHighlights(dt); return; }
@@ -7189,7 +7369,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 8;
+const MULTI_VERSION = 9;
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -9616,7 +9796,16 @@ function textureEnseigne(texte){
   c.width = style === "§b:" || style === "§g:" || style === "§h:" ? 1024 : 256; c.height = style === "§b:" || style === "§h:" ? 128 : style === "§g:" ? 256 : 192;
   const g = c.getContext("2d"), W = c.width, H = c.height;
   g.textAlign = "center"; g.textBaseline = "middle";
-  if (style === "§g:") dessinerTag(g, W, H, mot);
+  if (style === "§w:"){
+    // panneau western : planche jaune, la balle verte, le texte
+    g.fillStyle = "#e9b730"; g.fillRect(0, 0, W, H);
+    g.strokeStyle = "#2a1a0c"; g.lineWidth = 12; g.strokeRect(6, 6, W - 12, H - 12);
+    const gr = g.createRadialGradient(W / 2 - 14, 62, 6, W / 2, 74, 46); gr.addColorStop(0, "#c9ffb8"); gr.addColorStop(0.4, "#3fd24a"); gr.addColorStop(1, "#0f5a1c");
+    g.fillStyle = gr; g.beginPath(); g.arc(W / 2, 74, 44, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "#0b3b12"; g.lineWidth = 3; g.beginPath(); g.arc(W / 2, 74, 30, 0.4, 4.6); g.stroke();
+    g.fillStyle = "#2a1a0c"; g.font = "900 40px Georgia, serif"; g.fillText(mot, W / 2, 152);
+  }
+  else if (style === "§g:") dessinerTag(g, W, H, mot);
   else if (style === "§h:") dessinerHieroglyphes(g, W, H, mot);
   else if (style === "§b:"){
     g.fillStyle = "#0e1a2c"; g.fillRect(0, 0, W, H);
@@ -9691,6 +9880,21 @@ function dessinerSBR(sb){
       const M2 = m4Mul(m4Mul(m4Mul(c, m4RotY(t * (0.9 + k * 0.5) + k)), m4RotX(0.6 + k * 0.7 + 0.2 * Math.sin(t + k))), m4Echelle(rr, rr, rr));
       tracer(O.anneau, M2, [0.35 + 0.15 * k, 1.0, 0.45], 1.0);
     }
+  }
+  gl.enable(gl.CULL_FACE);
+}
+
+function dessinerBalleRoulante(){
+  const B = balleSBS(); if (!B) return;
+  const O = objetsSBR(), r = BALLE_R, lb = latBalle(jeu.chrono), p = auPoint(piste, B.s), t = performance.now() / 1000;
+  const c = m4Translation(p.x + p.nx * lb, p.y + r, p.z + p.nz * lb);
+  gl.disable(gl.CULL_FACE);
+  // elle roule vraiment : un tour pour 2πr parcourus
+  tracer(O.balle, m4Mul(m4Mul(c, m4Mul(m4RotY(p.cap), m4RotZ(-lb / r))), m4Echelle(r, r, r)), [1, 1, 1], 0.7);
+  for (let k = 0; k < 2; k++){
+    const rr = r * (1.3 + 0.2 * k + 0.08 * Math.sin(t * 3 + k));
+    const M2 = m4Mul(m4Mul(m4Mul(c, m4RotY(t * (1.1 + k * 0.6) + k)), m4RotX(0.5 + k * 0.9 + 0.2 * Math.sin(t + k))), m4Echelle(rr, rr, rr));
+    tracer(O.anneau, M2, [0.35 + 0.2 * k, 1.0, 0.45], 1.0);
   }
   gl.enable(gl.CULL_FACE);
 }
@@ -9850,7 +10054,8 @@ function dessinerAnimes(decor){
   gl.disable(gl.CULL_FACE);
   for (const v of A.trains){
     const vit = 28, cycle = v.L + 160, s0 = (t * vit) % cycle - 40;   // ~100 km/h, il repart dès qu'il a disparu
-    const pos = d => [v.x + v.dx * d, v.y, v.z + v.dz * d];
+    const hAt = d => { const f = Math.max(0, Math.min(v.hs.length - 1.001, d / 10)), i = Math.floor(f); return v.hs[i] + (v.hs[i + 1] - v.hs[i]) * (f - i); };
+    const pos = d => [v.x + v.dx * d, hAt(d) + 0.0, v.z + v.dz * d];
     const pieces = [[O.loco, 0], [O.wagon, -9.5], [O.wagon, -18.3], [O.wagon, -27.1]];
     for (const [obj, off] of pieces){
       const d = s0 + off; if (d < 0 || d > v.L) continue;
@@ -9873,9 +10078,9 @@ function dessinerAnimes(decor){
     for (let g = 0; g < 2; g++){
       const cyc = (t * 13 + g * S.long * 0.9) % (2 * S.long), retour = cyc > S.long, d0 = retour ? 2 * S.long - cyc : cyc;
       for (let r = 0; r < 3; r++){
-        const d = d0 + (retour ? 1 : -1) * r * 5, q = ou(d), lat = (r - 1) * 1.8, cap = q[3] + (retour ? Math.PI : 0);
+        const d = d0 + (retour ? 1 : -1) * r * 6.5, q = ou(d), lat = (r - 1) * 1.8, cap = q[3] + (retour ? Math.PI : 0);
         const bond = Math.abs(Math.sin(t * 9 + r * 1.3 + g)) * 0.45;
-        const M = m4Mul(m4Mul(m4Translation(q[0] + Math.cos(cap) * lat, q[1] + bond, q[2] - Math.sin(cap) * lat), m4RotY(cap)), m4RotX(Math.sin(t * 9 + r) * 0.06));
+        const M = m4Mul(m4Mul(m4Mul(m4Translation(q[0] + Math.cos(cap) * lat * 1.4, q[1] + bond, q[2] - Math.sin(cap) * lat * 1.4), m4RotY(cap)), m4RotX(Math.sin(t * 9 + r) * 0.06)), m4Echelle(1.4, 1.4, 1.4));
         tracer(O.cheval, M, [1, 1, 1]); tracer(O.cavalier, M, [1, 1, 1]);
       }
     }
