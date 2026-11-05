@@ -9840,7 +9840,7 @@ function dessinerAnimes(decor){
         const age = ((t * 1.6 + k / 3 + v.x * 0.013) % 1), d = 3 + age * 7, sz = (0.6 + age * 1.4) * (0.6 + 0.4 * f) * (moi ? 0.8 : 1);
         const px = v.x - fx * d, pz = v.z - fz * d;
         if (Math.hypot(px - cam.x, pz - cam.z) < 3.5) continue;              // jamais collée à la caméra
-        gl.blendColor(0, 0, 0, (moi ? 0.07 : 0.14) * (1 - age) * f);
+        gl.blendColor(0, 0, 0, (moi ? 0.16 : 0.22) * (1 - age * 0.8) * f);
         tracer(O.cube, m4Mul(m4Mul(m4Translation(px, v.y + 0.3 + age * (moi ? 0.4 : 0.8), pz), m4RotY(k + age * 2)), m4Echelle(sz * 1.8, sz * (moi ? 0.45 : 0.6), sz * 1.8)), [0.88, 0.72, 0.52], 0.9);
       }
     }
@@ -9889,8 +9889,18 @@ for (const cle of Object.keys(MODELES)){
 }
 objCiel = construireCiel();
 
+/* Au lancement, on se place sur la dernière course qu'on peut faire (et
+   dans DX PART 2 si elle est ouverte), plutôt que sur Bakou à chaque fois. */
+const indexDepart = (() => {
+  try {
+    const ordre = ordreCourses();
+    if (partie2Ouverte() && (carriere.niveau2 || 0) > 0) jeu.partie = 2;
+    let r0 = 0; for (let r = 0; r < ordre.length; r++) if (courseOuverte(r)) r0 = r;
+    return ordre[r0][1];
+  } catch (e) { return 0; }
+})();
 // Une piste est bâtie dès le lancement pour avoir un décor derrière le menu
-preparerCourse(0);
+preparerCourse(indexDepart);
 jeu.phase = "menu";
 rafraichirMenu();
 montrer("ecran-accueil");
