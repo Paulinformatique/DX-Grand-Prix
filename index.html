@@ -5652,6 +5652,7 @@ function rendre(){
     dessinerVoiture(v);
   }
   dessinerAir();                       // traînées d'air de l'aspiration
+  dessinerPoussiere(decor);
 }
 
 
@@ -9774,6 +9775,30 @@ function objetsAnimes(){
                 cheval: televerser(cheval), cavalier: televerser(cavalier), boule: televerser(boule), oiseau: televerser(oiseau) };
   return objAnimes;
 }
+/* Poussière du désert : dessinée après la route et les voitures (sinon la route,
+   tracée ensuite, la recouvrait entièrement). */
+function dessinerPoussiere(decor){
+  // poussière derrière les voitures (désert) : un voile léger et transparent, jamais devant la caméra
+  const A = decor.animes; if (!A || !A.poussiere) return;
+  const O = objetsAnimes(), t = performance.now() / 1000;
+  {
+    gl.enable(gl.BLEND); gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA); gl.depthMask(false);
+    for (const v of jeu.voitures){
+      if (v.cache || !(v.v > 18)) continue;
+      const moi = v === jeu.joueur;                                         // la nôtre : encore plus légère, au ras du sol
+      const dc = Math.hypot(v.x - cam.x, v.z - cam.z); if (dc > 90 || (!moi && dc < 6)) continue;
+      const fx = Math.sin(v.cap), fz = Math.cos(v.cap), f = Math.min(1, (v.v - 18) / 30);
+      for (let k = 0; k < 3; k++){
+        const age = ((t * 1.6 + k / 3 + v.x * 0.013) % 1), d = 3 + age * 7, sz = (0.6 + age * 1.4) * (0.6 + 0.4 * f) * (moi ? 0.8 : 1);
+        const px = v.x - fx * d, pz = v.z - fz * d;
+        if (Math.hypot(px - cam.x, pz - cam.z) < 3.5) continue;              // jamais collée à la caméra
+        gl.blendColor(0, 0, 0, (moi ? 0.13 : 0.18) * (1 - age * 0.8) * f);
+        tracer(O.cube, m4Mul(m4Mul(m4Translation(px, v.y + 0.3 + age * (moi ? 0.4 : 0.8), pz), m4RotY(k + age * 2)), m4Echelle(sz * 1.8, sz * (moi ? 0.45 : 0.6), sz * 1.8)), [0.88, 0.72, 0.52], 0.9);
+      }
+    }
+    gl.depthMask(true); gl.disable(gl.BLEND);
+  }
+}
 function dessinerAnimes(decor){
   if (decor.ecrans){
     gl.disable(gl.CULL_FACE);
@@ -9827,24 +9852,6 @@ function dessinerAnimes(decor){
     const a = t * b.v + b.ph, x = b.x + Math.cos(a) * b.r, z = b.z + Math.sin(a) * b.r;
     const M = m4Mul(m4Mul(m4Translation(x, b.y + Math.sin(t * 0.7 + b.ph) * 2, z), m4RotY(Math.atan2(-Math.sin(a), Math.cos(a)))), m4RotZ(0.35 + Math.sin(t * 2 + b.ph) * 0.08));
     tracer(O.oiseau, M, [1, 1, 1]);
-  }
-  // poussière derrière les voitures (désert) : un voile léger et transparent, jamais devant la caméra
-  if (A.poussiere){
-    gl.enable(gl.BLEND); gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA); gl.depthMask(false);
-    for (const v of jeu.voitures){
-      if (v.cache || !(v.v > 18)) continue;
-      const moi = v === jeu.joueur;                                         // la nôtre : encore plus légère, au ras du sol
-      const dc = Math.hypot(v.x - cam.x, v.z - cam.z); if (dc > 90 || (!moi && dc < 6)) continue;
-      const fx = Math.sin(v.cap), fz = Math.cos(v.cap), f = Math.min(1, (v.v - 18) / 30);
-      for (let k = 0; k < 3; k++){
-        const age = ((t * 1.6 + k / 3 + v.x * 0.013) % 1), d = 3 + age * 7, sz = (0.6 + age * 1.4) * (0.6 + 0.4 * f) * (moi ? 0.8 : 1);
-        const px = v.x - fx * d, pz = v.z - fz * d;
-        if (Math.hypot(px - cam.x, pz - cam.z) < 3.5) continue;              // jamais collée à la caméra
-        gl.blendColor(0, 0, 0, (moi ? 0.16 : 0.22) * (1 - age * 0.8) * f);
-        tracer(O.cube, m4Mul(m4Mul(m4Translation(px, v.y + 0.3 + age * (moi ? 0.4 : 0.8), pz), m4RotY(k + age * 2)), m4Echelle(sz * 1.8, sz * (moi ? 0.45 : 0.6), sz * 1.8)), [0.88, 0.72, 0.52], 0.9);
-      }
-    }
-    gl.depthMask(true); gl.disable(gl.BLEND);
   }
   for (const b of A.ballons){
     const x = b.x + Math.cos(b.dir) * Math.sin(t * 0.03 * b.vit + b.ph) * 120, z = b.z + Math.sin(b.dir) * Math.sin(t * 0.03 * b.vit + b.ph) * 120;
