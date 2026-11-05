@@ -2589,7 +2589,6 @@ function construireDecor(piste){
         reserver(x, z, 2);
       }
       boite(paysage, p.x, p.y + 8.6, p.z, 2 * E + 1, 0.7, 0.5, bois, ang);
-      for (const sg of [1, -1]) enseigne("§b:STEEL BALL SON", p.x - p.tx * sg * 0.3, p.y + 6.4, p.z - p.tz * sg * 0.3, p.tx * sg, p.tz * sg, 2 * E - 1, 2.0);
       // guirlande de fanions sur la poutre
       for (let k = 0; k < 16; k++){
         const u = -E + (k + 0.5) / 16 * 2 * E, q = [p.x + p.nx * u, p.y + 8.0, p.z + p.nz * u];
