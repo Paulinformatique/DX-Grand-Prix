@@ -9784,7 +9784,7 @@ function dessinerAnimes(decor){
   const O = objetsAnimes(), t = performance.now() / 1000;
   gl.disable(gl.CULL_FACE);
   for (const v of A.trains){
-    const vit = 17, cycle = v.L + 260, s0 = (t * vit) % cycle - 130;
+    const vit = 28, cycle = v.L + 160, s0 = (t * vit) % cycle - 40;   // ~100 km/h, il repart dès qu'il a disparu
     const pos = d => [v.x + v.dx * d, v.y, v.z + v.dz * d];
     const pieces = [[O.loco, 0], [O.wagon, -9.5], [O.wagon, -18.3], [O.wagon, -27.1]];
     for (const [obj, off] of pieces){
@@ -9793,7 +9793,7 @@ function dessinerAnimes(decor){
     }
     // la fumée : des boules grises qui montent et s'étirent vers l'arrière
     if (s0 > 0 && s0 < v.L) for (let j = 0; j < 10; j++){
-      const age = ((t * 1.6) + j / 10) % 1, d = s0 + 3.2 - age * 16, q = pos(d), sz = 1 + age * 3.2;
+      const age = ((t * 2.4) + j / 10) % 1, d = s0 + 3.2 - age * 24, q = pos(d), sz = 1 + age * 3.6;
       if (d < 0) continue;
       const g = 0.82 + age * 0.12;
       tracer(O.cube, m4Mul(m4Mul(m4Translation(q[0], q[1] + 5.2 + age * 9, q[2]), m4RotY(age * 3 + j)), m4Echelle(sz, sz * 0.8, sz)), [g, g, g], 0.9);
