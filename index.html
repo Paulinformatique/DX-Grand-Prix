@@ -2089,6 +2089,7 @@ function construireDecor(piste){
   const facades = creerMaillage(); facades.uv = [];
   const foule = creerMaillage(); foule.uv = [];
   const lumieres = creerMaillage();
+  const objetsAnimes = { trains: [], ballons: [], sentiers: [], virevoltants: [], vautours: [], poussiere: false };
   const reperes = [];                          // objets remarquables (pour les vérifier en image)            // ce qui brille (lanternes, lampes la nuit) : jamais assombri
   // tronc de pyramide à base rectangulaire, tourné de « ang »
   const tronc = (m, x, y, z, lb, pb, lh, ph, h, ang, col) => {
@@ -2333,12 +2334,40 @@ function construireDecor(piste){
     return true;
   };
 
+  /* SteelBallSon : on choisit tôt la rue principale de la ville western et le
+     canyon (deux lignes droites, hors de la grande), pour que le décor
+     ordinaire ne s'y pose pas. */
+  let rueSBS = null, canyonSBS = null, sentierSBS = null;
+  if (piste.def.nom === "SteelBallSon"){
+    const runs = []; let d0 = -1;
+    for (let i = 0; i < nb * 2; i++){
+      const k = Math.abs(P[i % nb].courbure) < 0.0035;
+      if (k && d0 < 0) d0 = i;
+      if ((!k || i === nb * 2 - 1) && d0 >= 0){ if (d0 < nb) runs.push([d0, i - d0]); d0 = -1; }
+    }
+    runs.sort((a, b) => b[1] - a[1]);
+    const pris = [];
+    const choisir = (lmin, longueurM) => {
+      const n2 = Math.round(longueurM / piste.pas);
+      for (const [deb, long] of runs.slice(1)){
+        if (long < Math.round(lmin / piste.pas)) continue;
+        const a0 = deb + Math.max(0, Math.floor((long - n2) / 2)), a1 = a0 + Math.min(n2, long);
+        if (pris.some(([x, y]) => !(a1 + 15 < x || a0 > y + 15))) continue;
+        pris.push([a0, a1]); return [a0, a1];
+      }
+      return null;
+    };
+    rueSBS = choisir(140, 230); canyonSBS = choisir(120, 260); sentierSBS = choisir(100, 300);
+  }
+  const dansSeg = (seg, i) => seg && ((i - seg[0]) % nb + nb) % nb <= seg[1] - seg[0] + 6;
+
   // --- décor : immeubles de bord de rue, ou arbres ---
   let graine = 20260930;
   const alea = () => (graine = (graine*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
   const ville = piste.def.decor === "ville";
 
   for (let i = 0; i < nb; i += (ville ? 4 : 3)){
+    if (dansSeg(rueSBS, i) || dansSeg(canyonSBS, i)) continue;     // rue western et canyon : décor dédié
     const p = P[i];
     for (const s of [1, -1]){
       const dedans = alea();
@@ -2409,6 +2438,16 @@ function construireDecor(piste){
   /* SteelBallSon : la statue du cavalier près de la ligne, la balle d'acier
      géante dans le désert, et un mur tagué le long d'une ligne droite. */
   let sbr = null;
+  const SOLp2 = (p, dec) => { const t2 = Math.min(1, (Math.abs(dec) - (DEMI_PISTE + ACCOTEMENT)) / (JUPE - DEMI_PISTE - ACCOTEMENT)); return (p.y - 0.35) + (SOL - (p.y - 0.35)) * t2; };
+  const chevalFixe = (m, x, y, z, a, k) => {
+    const c = [[0.42, 0.26, 0.14], [0.22, 0.15, 0.10], [0.70, 0.55, 0.38], [0.12, 0.10, 0.09]][k % 4], ca = Math.cos(a), sa = Math.sin(a);
+    const L = (u, h, v) => [x + ca * u + sa * v, y + h, z - sa * u + ca * v];
+    let q = L(0, 1.5, 0); boite(m, q[0], q[1], q[2], 0.7, 0.8, 2.0, c, a);
+    q = L(0, 2.1, 1.1); boite(m, q[0], q[1], q[2], 0.35, 0.9, 0.5, c, a);
+    q = L(0, 2.6, 1.55); boite(m, q[0], q[1], q[2], 0.3, 0.35, 0.8, c, a);
+    for (const [u, v] of [[-0.25, -0.75], [0.25, -0.75], [-0.25, 0.75], [0.25, 0.75]]){ q = L(u, 0.55, v); boite(m, q[0], q[1], q[2], 0.16, 1.1, 0.16, c, a); }
+    q = L(0, 1.6, -1.05); boite(m, q[0], q[1], q[2], 0.12, 0.6, 0.12, [0.1, 0.08, 0.06], a);
+  };
   if (piste.def.nom === "SteelBallSon"){
     sbr = {};
     const SOLx = (p, dec) => { const t2 = Math.min(1, (Math.abs(dec) - (DEMI_PISTE + ACCOTEMENT)) / (JUPE - DEMI_PISTE - ACCOTEMENT)); return (p.y - 0.35) + (SOL - (p.y - 0.35)) * t2; };
@@ -2431,7 +2470,7 @@ function construireDecor(piste){
       boite(paysage, st.x, st.y + 2.4, st.z, 8, 1.6, 8, pierre, versPiste);
       boite(paysage, st.x, st.y + 3.3, st.z, 8.6, 0.25, 8.6, pierreF, versPiste);
       sbr.statue = { x: st.x, y: st.y + 3.4, z: st.z, cap: versPiste }; reserver(st.x, st.z, 12);
-      enseigne("§q:STEEL BALL RUN", st.x + Math.sin(versPiste) * 4.05, st.y + 1.9, st.z + Math.cos(versPiste) * 4.05, -Math.sin(versPiste), -Math.cos(versPiste), 6.5, 1.1);
+      enseigne("§q:STEEL BALL SON", st.x + Math.sin(versPiste) * 4.05, st.y + 1.9, st.z + Math.cos(versPiste) * 4.05, -Math.sin(versPiste), -Math.cos(versPiste), 6.5, 1.1);
     }
     // la balle d'acier, posée sur un rocher, loin dans le désert
     const bl = chercher(0.38, DEMI_PISTE + ACCOTEMENT + 30, 10);
@@ -2466,6 +2505,116 @@ function construireDecor(piste){
       }
       return null;
     };
+    /* --- la rue principale : la piste traverse la ville. Saloons collés
+       des deux côtés, trottoirs en planches, chevaux attachés, château d'eau --- */
+    if (rueSBS){
+      const [a0, a1] = rueSBS, noms = ["SALOON", "SHERIFF", "BANK", "HOTEL", "GENERAL STORE", "BARBER", "POST OFFICE", "SALOON", "JAIL", "SALOON"];
+      let kN = 0;
+      for (const sd of [1, -1]){
+        let i = a0;
+        while (i < a1){
+          const lW = 9 + (kN * 7 % 5), nI = Math.max(2, Math.round(lW / piste.pas)), p = P[i % nb], p2 = P[(i + nI) % nb];
+          const E = DEMI_PISTE + ACCOTEMENT + 6, pW = 10, hW = 5 + (kN * 3 % 4);
+          const ux = -p.nx * sd, uz = -p.nz * sd;                                 // vers la piste
+          const cx = (p.x + p2.x) / 2 + p.nx * sd * (E + pW / 2), cz = (p.z + p2.z) / 2 + p.nz * sd * (E + pW / 2), y = p.y - 0.35;
+          const bois = COUL.facades[kN % COUL.facades.length], fonce = bois.map(c => c * 0.6), lac = p.cap;
+          boite(paysage, cx, y + hW / 2, cz, lW, hW, pW, bois, lac + Math.PI / 2);
+          const fx2 = cx + ux * pW / 2, fz2 = cz + uz * pW / 2, hF = hW + 3;
+          boite(paysage, fx2, y + hF / 2, fz2, lW, hF, 0.4, bois, lac + Math.PI / 2);
+          boite(paysage, fx2 + ux * 1.6, y + 3.4, fz2 + uz * 1.6, lW, 0.2, 3.2, fonce, lac + Math.PI / 2);
+          boite(paysage, fx2 + ux * 1.6, y + 0.15, fz2 + uz * 1.6, lW, 0.3, 3.2, fonce, lac + Math.PI / 2);
+          for (const c of [-0.45, 0.45]) boite(paysage, fx2 + ux * 3.1 + p.tx * lW * c, y + 1.7, fz2 + uz * 3.1 + p.tz * lW * c, 0.22, 3.4, 0.22, fonce, lac);
+          boite(paysage, fx2 + ux * 0.25, y + 1.3, fz2 + uz * 0.25, 1.6, 2.6, 0.1, [0.18, 0.12, 0.08], lac + Math.PI / 2);
+          enseigne("§q:" + noms[kN % noms.length], fx2 + ux * 0.27, y + hF - 1.6, fz2 + uz * 0.27, -ux, -uz, Math.min(lW * 0.75, 8.5), 1.2);
+          // barre d'attache et un cheval, une maison sur deux
+          if (kN % 2 === 0){
+            const hx = fx2 + ux * 4.2, hz = fz2 + uz * 4.2;
+            boite(paysage, hx, y + 1.0, hz, 0.12, 0.12, lW * 0.6, [0.42, 0.30, 0.18], lac);
+            chevalFixe(paysage, hx + ux * 1.4, y, hz + uz * 1.4, Math.atan2(-ux, -uz), kN);
+          }
+          kN++; i += nI + 1;
+        }
+      }
+      const pm = P[Math.floor((a0 + a1) / 2) % nb], E2 = DEMI_PISTE + ACCOTEMENT + 6 + 16;
+      // le château d'eau au bout de la rue
+      const tx2 = pm.x + pm.nx * E2, tz2 = pm.z + pm.nz * E2, ty = pm.y - 0.35;
+      for (const [u, v] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) cylindreY(paysage, tx2 + u, ty, tz2 + v, 0.2, 0.18, 10, 5, [0.36, 0.25, 0.15]);
+      cylindreY(paysage, tx2, ty + 10, tz2, 3.2, 3.2, 5, 12, [0.52, 0.37, 0.24]);
+      cylindreY(paysage, tx2, ty + 15, tz2, 3.5, 0.3, 2, 12, [0.30, 0.22, 0.16]);
+      for (let i = a0; i <= a1; i += 3){ const q = P[i % nb]; for (const sd of [1, -1]) reserver(q.x + q.nx * sd * (DEMI_PISTE + ACCOTEMENT + 11), q.z + q.nz * sd * (DEMI_PISTE + ACCOTEMENT + 11), 8); }
+      reperes.push(["rue", pm.x, pm.y, pm.z]);
+    }
+    /* --- le canyon : deux falaises rouges striées, la piste passe au fond --- */
+    if (canyonSBS){
+      const [a0, a1] = canyonSBS, n2 = a1 - a0;
+      for (let i = a0; i < a1; i += 2){
+        const a = P[i % nb], b = P[(i + 2) % nb], u = (i - a0) / n2;
+        const env = Math.sin(Math.PI * Math.min(1, Math.max(0, u * 1.25 - 0.12)));      // les falaises montent et redescendent
+        for (const sd of [1, -1]){
+          const H = (14 + 26 * env) * (0.85 + 0.15 * Math.sin(i * 0.37 + sd));
+          const e0 = sd * (DEMI_PISTE + ACCOTEMENT + 2.5 + (1 - env) * 6), e1 = sd * (DEMI_PISTE + ACCOTEMENT + 2.5 + H * 0.35 + 4);
+          const A0 = bord(a, e0), B0 = bord(b, e0), A1 = bord(a, e1), B1 = bord(b, e1);
+          const ya = a.y - 0.4, yb = b.y - 0.4;
+          // trois strates de couleur sur la paroi
+          let hPrec = 0;
+          for (const [f, col] of [[0.35, [0.62, 0.30, 0.18]], [0.62, [0.78, 0.46, 0.28]], [1.0, [0.68, 0.34, 0.20]]]){
+            const h1 = H * f, r0 = hPrec / H, r1 = f;
+            const pa0 = [A0[0] + (A1[0] - A0[0]) * r0 * 0.35, ya + hPrec, A0[2] + (A1[2] - A0[2]) * r0 * 0.35];
+            const pb0 = [B0[0] + (B1[0] - B0[0]) * r0 * 0.35, yb + hPrec, B0[2] + (B1[2] - B0[2]) * r0 * 0.35];
+            const pa1 = [A0[0] + (A1[0] - A0[0]) * r1 * 0.35, ya + h1, A0[2] + (A1[2] - A0[2]) * r1 * 0.35];
+            const pb1 = [B0[0] + (B1[0] - B0[0]) * r1 * 0.35, yb + h1, B0[2] + (B1[2] - B0[2]) * r1 * 0.35];
+            quad(paysage, pa0, pb0, pb1, pa1, col); quad(paysage, pb0, pa0, pa1, pb1, col);
+            hPrec = h1;
+          }
+          // le plateau au sommet, puis la pente arrière
+          const ta = [A0[0] + (A1[0] - A0[0]) * 0.35, ya + H, A0[2] + (A1[2] - A0[2]) * 0.35], tb = [B0[0] + (B1[0] - B0[0]) * 0.35, yb + H, B0[2] + (B1[2] - B0[2]) * 0.35];
+          const qa = [A1[0], ya + H * 0.9, A1[2]], qb = [B1[0], yb + H * 0.9, B1[2]];
+          quad(paysage, ta, tb, qb, qa, [0.80, 0.52, 0.32]); quad(paysage, tb, ta, qa, qb, [0.80, 0.52, 0.32]);
+          const Fa = bord(a, sd * (DEMI_PISTE + ACCOTEMENT + 2.5 + H * 0.35 + 30)), Fb = bord(b, sd * (DEMI_PISTE + ACCOTEMENT + 2.5 + H * 0.35 + 30));
+          quad(paysage, qa, qb, [Fb[0], SOL, Fb[2]], [Fa[0], SOL, Fa[2]], [0.66, 0.36, 0.22]); quad(paysage, qb, qa, [Fa[0], SOL, Fa[2]], [Fb[0], SOL, Fb[2]], [0.66, 0.36, 0.22]);
+          if (i % 6 === 0) reserver((A0[0] + A1[0]) / 2, (A0[2] + A1[2]) / 2, 10);
+        }
+      }
+      const pm = P[Math.floor((a0 + a1) / 2) % nb]; reperes.push(["canyon", pm.x, pm.y, pm.z]);
+    }
+    // l'arrivée façon course hippique : une arche en bois, la banderole, des fanions
+    {
+      const p = P[Math.max(1, Math.round(35 / piste.pas)) % nb], E = DEMI_PISTE + ACCOTEMENT + 1.5, ang = p.cap + Math.PI / 2, bois = [0.45, 0.30, 0.17];
+      for (const sd of [1, -1]){
+        const x = p.x + p.nx * sd * E, z = p.z + p.nz * sd * E;
+        boite(paysage, x, p.y + 4.2, z, 0.9, 9.2, 0.9, bois, p.cap);
+        boite(paysage, x, p.y + 9.2, z, 1.4, 0.8, 1.4, bois, p.cap);
+        reserver(x, z, 2);
+      }
+      boite(paysage, p.x, p.y + 8.6, p.z, 2 * E + 1, 0.7, 0.5, bois, ang);
+      for (const sg of [1, -1]) enseigne("§b:STEEL BALL SON", p.x - p.tx * sg * 0.3, p.y + 6.4, p.z - p.tz * sg * 0.3, p.tx * sg, p.tz * sg, 2 * E - 1, 2.0);
+      // guirlande de fanions sur la poutre
+      for (let k = 0; k < 16; k++){
+        const u = -E + (k + 0.5) / 16 * 2 * E, q = [p.x + p.nx * u, p.y + 8.0, p.z + p.nz * u];
+        const col = [[0.85, 0.15, 0.12], [0.95, 0.85, 0.2], [0.15, 0.4, 0.8], [0.95, 0.95, 0.9]][k % 4];
+        const A = [q[0] - p.nx * 0.45, q[1] + 0.1, q[2] - p.nz * 0.45], B = [q[0] + p.nx * 0.45, q[1] + 0.1, q[2] + p.nz * 0.45], C = [q[0], q[1] - 1.0, q[2]];
+        triangle(paysage, A, B, C, col); triangle(paysage, B, A, C, col);
+      }
+    }
+    // le sentier des cavaliers : une piste de terre parallèle à une ligne droite
+    if (sentierSBS){
+      const [a0, a1] = sentierSBS, pmS = P[Math.floor((a0 + a1) / 2) % nb];
+      for (const off of [26, 34, 44]){
+        let ok = true; const sd = -Math.sign(pmS.courbure) || 1;
+        for (let i = a0; i <= a1 && ok; i += 3){ const q = P[i % nb]; ok = libreD(q.x + q.nx * sd * (DEMI_PISTE + off), q.z + q.nz * sd * (DEMI_PISTE + off), 4); }
+        if (!ok) continue;
+        const pts2 = [];
+        for (let i = a0; i <= a1; i++){ const q = P[i % nb]; pts2.push([q.x + q.nx * sd * (DEMI_PISTE + off), SOLp2(q, DEMI_PISTE + off) + 0.05, q.z + q.nz * sd * (DEMI_PISTE + off)]); }
+        for (let k = 0; k + 1 < pts2.length; k++){
+          const A = pts2[k], B = pts2[k + 1], q = P[(a0 + k) % nb];
+          const w = (pp, s2) => [pp[0] + q.nx * 2.2 * s2, pp[1], pp[2] + q.nz * 2.2 * s2];
+          quad(paysage, w(A, -1), w(B, -1), w(B, 1), w(A, 1), [0.74, 0.54, 0.36]);
+        }
+        for (let k = 0; k < pts2.length; k += 3) reserver(pts2[k][0], pts2[k][2], 4);
+        objetsAnimes.sentiers.push(pts2);
+        break;
+      }
+    }
     sbr.mur = murTag(0.62); murTag(0.16);
   }
 
@@ -2479,6 +2628,19 @@ function construireDecor(piste){
       const y = SOLp(p, dec);
       cylindreY(paysage, x, y, z, 0.16, 0.13, 8.5, 5, bois);
       boite(paysage, x, y + 7.9, z, 0.18, 0.16, 2.4, bois, p.cap);
+    }
+    // virevoltants : ils roulent dans le désert, poussés par le vent, sur une bande parallèle à la piste
+    { let gv = 77; const alv = () => (gv = (gv * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+      for (let k = 0; k < 14; k++){
+        const i = Math.floor(alv() * nb), p = P[i], sd = alv() > 0.5 ? 1 : -1, dec = sd * (DEMI_PISTE + ACCOTEMENT + 10 + alv() * 25);
+        const x = p.x + p.nx * dec, z = p.z + p.nz * dec;
+        if (!libreD(x, z, 2)) continue;
+        objetsAnimes.virevoltants.push({ x, z, y: SOLp(p, dec), tx: p.tx, tz: p.tz, ph: alv() * 100, r: 0.5 + alv() * 0.4, amp: 18 + alv() * 14 });
+      }
+      // les vautours tournent au-dessus d'un point du circuit
+      const pv = P[Math.floor(nb * 0.4)];
+      for (let k = 0; k < 4; k++) objetsAnimes.vautours.push({ x: pv.x, z: pv.z, y: pv.y + 55 + k * 6, r: 25 + k * 9, ph: k * 1.7, v: 0.25 + k * 0.04 });
+      objetsAnimes.poussiere = true;
     }
     // un ranch : un enclos de bois et quelques vaches ; une arche de roche ; des arbres morts
     {
@@ -2936,7 +3098,7 @@ function construireDecor(piste){
 
   /* --- écrans géants : une animation en boucle, face aux pilotes qui
      arrivent au bout de la grande ligne droite --- */
-  const ecrans = {}, objetsAnimes = { trains: [], ballons: [] };
+  const ecrans = {};
   const ecranGeant = (nom) => {
     // bout de la grande ligne droite, puis on cherche droit devant (là où la piste a tourné)
     const fin = P[(meilleurDeb + meilleurLong - 2) % nb];
@@ -3414,7 +3576,8 @@ function construireDecor(piste){
 function construireCiel(){
   const m = creerMaillage();
   const R = 2000, seg = 20, anneaux = 7;
-  const zenith  = NUIT ? [0.01, 0.015, 0.05] : [0.16, 0.34, 0.62];
+  const western = PAYS_ACTIF && PAYS_ACTIF.western;
+  const zenith  = NUIT ? [0.01, 0.015, 0.05] : western ? [0.30, 0.19, 0.44] : [0.16, 0.34, 0.62];
   const horizon = HORIZON;
 
   for (let a = 0; a < anneaux; a++){
@@ -3438,6 +3601,18 @@ function construireCiel(){
   let g = 7; for (const ch of String((PAYS_ACTIF && PAYS_ACTIF.continent) || "") + HORIZON.join()) g = (g * 31 + ch.charCodeAt(0)) % 9973;
   const alea = () => (g = (g * 16807) % 2147483647) / 2147483647;
   const Rn = R * 0.96, sec = PAYS_ACTIF && PAYS_ACTIF.climat === "desert";
+  if (western){
+    // un gros soleil bas, orangé, avec son halo, dans la direction de la lumière
+    const az = Math.atan2(SOLEIL[0], SOLEIL[2]), ph = 0.07, r2 = R * 0.9;
+    const cx2 = Math.cos(ph) * Math.sin(az) * r2, cy2 = Math.sin(ph) * r2 - 60, cz2 = Math.cos(ph) * Math.cos(az) * r2;
+    const ux = Math.cos(az), uz = -Math.sin(az);
+    for (const [ray, c] of [[230, [1.0, 0.62, 0.36]], [150, [1.0, 0.80, 0.45]], [105, [1.0, 0.93, 0.70]]]){
+      const base = m.pos.length / 3;
+      m.pos.push(cx2, cy2, cz2); m.nor.push(0, 1, 0); m.col.push(...c);
+      for (let k = 0; k <= 32; k++){ const a = k / 32 * Math.PI * 2; m.pos.push(cx2 + ux * Math.cos(a) * ray, cy2 + Math.sin(a) * ray, cz2 + uz * Math.cos(a) * ray); m.nor.push(0, 1, 0); m.col.push(...(ray > 200 ? HORIZON : c)); }
+      for (let k = 0; k < 32; k++) m.idx.push(base, base + 1 + k, base + 2 + k, base, base + 2 + k, base + 1 + k);
+    }
+  }
   if (NUIT){
     // étoiles : de petits losanges blancs, et la lune
     for (let k = 0; k < 420; k++){
@@ -3785,7 +3960,9 @@ function preparerCourse(indexCircuit){
   const derniere = rangC === ordreC.length - 1;
   const renfort = rangC >= 15 ? 1.03 + 0.07 * (rangC - 15) / Math.max(1, ordreC.length - 16) : 1;
   const ultime = derniere ? 1.045 : 1;   // Vozinhato : le niveau ultime
+  const bondSBS = !p2 && !jeu.multi && def.nom === "SteelBallSon";   // SteelBallSon : 100 % d'un coup (Sbah reste à 93 %)
   const niveauCourse = jeu.multi ? (CIRCUITS[0].niveauIA || def.niveauIA) * NIVEAU_KAIMAXUS_MULTI : p2 ? (CIRCUITS[0].niveauIA || def.niveauIA) * 1.10 : (NIVEAU_DEBUT + ((CIRCUITS[0].niveauIA || def.niveauIA) - NIVEAU_DEBUT) * avancee) * renfort * ultime;
+  const niveauFinal = bondSBS ? (CIRCUITS[0].niveauIA || def.niveauIA) : niveauCourse;
   // Irrégularité : aux premières courses, des tours loin d'être parfaits
   const irregulier = (p2 || jeu.multi || rangC === ordreC.length - 1) ? 0 : 0.02 + 0.08 * (1 - avancee);   // aucune erreur à la dernière
 
@@ -3815,7 +3992,7 @@ function preparerCourse(indexCircuit){
     const auto = VOITURES[a.modele];
     /* Même mécanique que le joueur : le niveau ne joue que sur le pilotage
        (vitesse de passage en courbe, régularité), jamais sur le moteur. */
-    a.adresse = niveauCourse * ecart;
+    a.adresse = niveauFinal * ecart;
     /* Pour que le top 5 ne revienne pas toujours aux mêmes supercars :
        — le talent : les pilotes des voitures moins puissantes sont de
          meilleurs pilotes (jusqu'à +4,5 % en virage pour celui de la F40) ;
@@ -5454,7 +5631,7 @@ function rendre(){
            allume ? [1.0, 0.13, 0.08] : [0.18, 0.06, 0.06], allume ? 1.0 : undefined);
   });
   gl.disable(gl.CULL_FACE);
-  tracer(decor.foule, m4Identite(), [1,1,1], 0.85, texFoule);
+  tracer(decor.foule, m4Identite(), [1,1,1], 0.85, PAYS_ACTIF && PAYS_ACTIF.western ? texFouleWestern : texFoule);
   gl.enable(gl.CULL_FACE);
   tracer(decor.route,   m4Identite(), [1,1,1]);
   tracer(decor.rails,   m4Identite(), [1,1,1]);
@@ -9097,7 +9274,7 @@ const texFacadeNuit = (() => {
 
 /* Foule : des rangées de spectateurs dessinées au canevas — un buste
    coloré, une tête, sur des gradins sombres. Huit rangées par image. */
-function textureFoule(){
+function textureFoule(western){
   const c = document.createElement("canvas");
   c.width = 512; c.height = 512;
   const g = c.getContext("2d");
@@ -9119,7 +9296,7 @@ function textureFoule(){
     for (let x = 6; x < 512; x += 11 + Math.floor(alea() * 4)){
       if (alea() < 0.07) continue;                         // une place vide
       const dx = x + (alea() - 0.5) * 3, dy = y + 4 + (alea() - 0.5) * 5, ech = 0.9 + alea() * 0.25;
-      const habit = habits[Math.floor(alea() * habits.length)], peau = peaux[Math.floor(alea() * peaux.length)];
+      const habit = western ? ["#7a2a1e", "#3d5a80", "#8b6b3e", "#e8dcc4", "#4a3a2a", "#6a7a3a", "#b04a2a"][Math.floor(alea() * 7)] : habits[Math.floor(alea() * habits.length)], peau = peaux[Math.floor(alea() * peaux.length)];
       const debout = alea() < 0.35, base = dy + (debout ? 0 : 6);
       // bras levés (avant le corps), parfois une écharpe tendue ou un drapeau
       const bras = alea();
@@ -9141,8 +9318,14 @@ function textureFoule(){
       g.fillStyle = peau; g.fillRect(dx - 1.5, base + 17, 3, 5);
       g.beginPath(); g.ellipse(dx, base + 13, 4.4 * ech, 5.2 * ech, 0, 0, Math.PI * 2); g.fill();
       // cheveux, ou casquette, ou chapeau
-      const tete = alea();
-      if (tete < 0.18){ g.fillStyle = habits[Math.floor(alea() * habits.length)]; g.fillRect(dx - 4.8 * ech, base + 6.5, 9.6 * ech, 4); g.fillRect(dx, base + 9, 6 * ech, 1.8); }
+      const tete = western ? (alea() < 0.75 ? 0.2 : 0.5) : alea();
+      if (western && tete < 0.21){
+        // chapeau de cow-boy : large bord, calotte cabossée
+        const ch = ["#5a3a1e", "#2a1d12", "#c9a46a", "#8a6a44", "#1a1a1a"][Math.floor(alea() * 5)];
+        g.fillStyle = ch; g.fillRect(dx - 8 * ech, base + 8.2, 16 * ech, 2.2); g.fillRect(dx - 4.2 * ech, base + 3.2, 8.4 * ech, 5.4);
+        g.fillStyle = "#b7342a"; if (alea() < 0.4) g.fillRect(dx - 5 * ech, base + 18, 10 * ech, 3);      // bandana
+      }
+      else if (tete < 0.18){ g.fillStyle = habits[Math.floor(alea() * habits.length)]; g.fillRect(dx - 4.8 * ech, base + 6.5, 9.6 * ech, 4); g.fillRect(dx, base + 9, 6 * ech, 1.8); }
       else if (tete < 0.24){ g.fillStyle = "#d8c08a"; g.fillRect(dx - 7 * ech, base + 9, 14 * ech, 1.8); g.fillRect(dx - 4 * ech, base + 5, 8 * ech, 4.5); }
       else { g.fillStyle = cheveux[Math.floor(alea() * cheveux.length)]; g.beginPath(); g.ellipse(dx, base + 10, 4.7 * ech, 3.4 * ech, 0, Math.PI, Math.PI * 2); g.fill();
              if (alea() < 0.3) g.fillRect(dx - 4.7 * ech, base + 10, 2, 7); }
@@ -9161,6 +9344,7 @@ function textureFoule(){
   return t;
 }
 const texFoule = textureFoule();
+const texFouleWestern = textureFoule(true);
 
 /* ───────────────────────── DRAPEAUX DES PAYS ─────────────────────────
    Chaque drapeau est décrit puis dessiné au canevas : un fond de bandes
@@ -9567,7 +9751,25 @@ function objetsAnimes(){
     quad(ballon, q(v0, a0), q(v1, a0), q(v1, a1), q(v0, a1), c); quad(ballon, q(v0, a1), q(v1, a1), q(v1, a0), q(v0, a0), c);
   }
   boite(nacelle, 0, -1.75, 0, 0.35, 0.3, 0.35, [0.45, 0.30, 0.16], 0);
-  objAnimes = { loco: televerser(loco), wagon: televerser(wagon), cube: televerser(cube), ballon: televerser(ballon), nacelle: televerser(nacelle) };
+  // cheval et cavalier (avant vers +z), virevoltant, vautour
+  const cheval = creerMaillage(), cavalier = creerMaillage(), boule = creerMaillage(), oiseau = creerMaillage();
+  const robe = [0.42, 0.26, 0.14];
+  boite(cheval, 0, 1.5, 0, 0.7, 0.8, 2.0, robe, 0); boite(cheval, 0, 2.15, 1.1, 0.35, 0.9, 0.5, robe, 0);
+  boite(cheval, 0, 2.6, 1.55, 0.3, 0.35, 0.8, robe, 0); boite(cheval, 0, 1.6, -1.1, 0.12, 0.7, 0.12, [0.1, 0.08, 0.06], 0);
+  for (const [u, v] of [[-0.25, -0.75], [0.25, -0.75], [-0.25, 0.75], [0.25, 0.75]]) boite(cheval, u, 0.55, v, 0.16, 1.1, 0.16, robe, 0);
+  boite(cavalier, 0, 2.6, -0.1, 0.5, 0.75, 0.32, [0.55, 0.20, 0.15], 0); boite(cavalier, 0, 3.15, -0.05, 0.28, 0.3, 0.28, [0.85, 0.65, 0.48], 0);
+  boite(cavalier, 0, 3.33, -0.05, 0.75, 0.06, 0.75, [0.30, 0.20, 0.12], 0); boite(cavalier, 0, 3.45, -0.05, 0.32, 0.22, 0.32, [0.30, 0.20, 0.12], 0);
+  for (const u of [-0.3, 0.3]) boite(cavalier, u, 2.0, 0.05, 0.14, 0.6, 0.18, [0.25, 0.22, 0.35], 0);
+  for (let i = 0; i < 5; i++) for (let k = 0; k < 7; k++){
+    const t0 = i / 5 * Math.PI, t1 = (i + 1) / 5 * Math.PI, p0 = k / 7 * Math.PI * 2, p1 = (k + 1) / 7 * Math.PI * 2;
+    const q = (t, ph) => [Math.sin(t) * Math.cos(ph), Math.cos(t), Math.sin(t) * Math.sin(ph)];
+    const c = (i + k) % 2 ? [0.62, 0.46, 0.26] : [0.52, 0.38, 0.22];
+    quad(boule, q(t0, p0), q(t0, p1), q(t1, p1), q(t1, p0), c); quad(boule, q(t0, p1), q(t0, p0), q(t1, p0), q(t1, p1), c);
+  }
+  boite(oiseau, 0, 0, 0, 0.35, 0.3, 1.2, [0.08, 0.07, 0.07], 0);
+  for (const sg of [1, -1]){ triangle(oiseau, [0, 0, 0.3], [sg * 2.2, 0.25, -0.2], [0, 0, -0.35], [0.1, 0.09, 0.09]); triangle(oiseau, [0, 0, -0.35], [sg * 2.2, 0.25, -0.2], [0, 0, 0.3], [0.1, 0.09, 0.09]); }
+  objAnimes = { loco: televerser(loco), wagon: televerser(wagon), cube: televerser(cube), ballon: televerser(ballon), nacelle: televerser(nacelle),
+                cheval: televerser(cheval), cavalier: televerser(cavalier), boule: televerser(boule), oiseau: televerser(oiseau) };
   return objAnimes;
 }
 function dessinerAnimes(decor){
@@ -9593,6 +9795,45 @@ function dessinerAnimes(decor){
       if (d < 0) continue;
       const g = 0.82 + age * 0.12;
       tracer(O.cube, m4Mul(m4Mul(m4Translation(q[0], q[1] + 5.2 + age * 9, q[2]), m4RotY(age * 3 + j)), m4Echelle(sz, sz * 0.8, sz)), [g, g, g], 0.9);
+    }
+  }
+  // cavaliers : deux groupes au galop sur le sentier, aller puis retour
+  for (const S of A.sentiers || []){
+    if (!S.long){ S.cum = [0]; for (let k = 1; k < S.length; k++) S.cum.push(S.cum[k - 1] + Math.hypot(S[k][0] - S[k - 1][0], S[k][2] - S[k - 1][2])); S.long = S.cum[S.cum.length - 1]; }
+    const ou = d => { d = Math.max(0, Math.min(S.long - 0.01, d)); let k = 1; while (k < S.cum.length - 1 && S.cum[k] < d) k++;
+      const f = (d - S.cum[k - 1]) / Math.max(1e-6, S.cum[k] - S.cum[k - 1]), A2 = S[k - 1], B2 = S[k];
+      return [A2[0] + (B2[0] - A2[0]) * f, A2[1] + (B2[1] - A2[1]) * f, A2[2] + (B2[2] - A2[2]) * f, Math.atan2(B2[0] - A2[0], B2[2] - A2[2])]; };
+    for (let g = 0; g < 2; g++){
+      const cyc = (t * 13 + g * S.long * 0.9) % (2 * S.long), retour = cyc > S.long, d0 = retour ? 2 * S.long - cyc : cyc;
+      for (let r = 0; r < 3; r++){
+        const d = d0 + (retour ? 1 : -1) * r * 5, q = ou(d), lat = (r - 1) * 1.8, cap = q[3] + (retour ? Math.PI : 0);
+        const bond = Math.abs(Math.sin(t * 9 + r * 1.3 + g)) * 0.45;
+        const M = m4Mul(m4Mul(m4Translation(q[0] + Math.cos(cap) * lat, q[1] + bond, q[2] - Math.sin(cap) * lat), m4RotY(cap)), m4RotX(Math.sin(t * 9 + r) * 0.06));
+        tracer(O.cheval, M, [1, 1, 1]); tracer(O.cavalier, M, [1, 1, 1]);
+      }
+    }
+  }
+  // virevoltants : ils roulent avec le vent, disparaissent puis repartent
+  for (const v of A.virevoltants || []){
+    const cyc = ((t * 3.2 + v.ph) % (2 * v.amp)) - v.amp, x = v.x + v.tx * cyc, z = v.z + v.tz * cyc;
+    const bond = Math.abs(Math.sin(t * 3 + v.ph)) * 0.6;
+    const M = m4Mul(m4Mul(m4Mul(m4Translation(x, v.y + v.r + bond, z), m4RotY(Math.atan2(v.tx, v.tz))), m4RotX(cyc / v.r)), m4Echelle(v.r, v.r, v.r));
+    tracer(O.boule, M, [1, 1, 1]);
+  }
+  // vautours qui tournent en penchant
+  for (const b of A.vautours || []){
+    const a = t * b.v + b.ph, x = b.x + Math.cos(a) * b.r, z = b.z + Math.sin(a) * b.r;
+    const M = m4Mul(m4Mul(m4Translation(x, b.y + Math.sin(t * 0.7 + b.ph) * 2, z), m4RotY(Math.atan2(-Math.sin(a), Math.cos(a)))), m4RotZ(0.35 + Math.sin(t * 2 + b.ph) * 0.08));
+    tracer(O.oiseau, M, [1, 1, 1]);
+  }
+  // poussière derrière les voitures (désert) : de petits nuages de sable qui s'étirent
+  if (A.poussiere) for (const v of jeu.voitures){
+    if (v.cache || !(v.v > 12) || Math.hypot(v.x - cam.x, v.z - cam.z) > 140) continue;
+    const fx = Math.sin(v.cap), fz = Math.cos(v.cap), f = Math.min(1, (v.v - 12) / 30);
+    for (let k = 0; k < 5; k++){
+      const age = ((t * 2.2 + k / 5 + (v.x * 0.01)) % 1), d = 2.6 + age * 9, sz = (0.5 + age * 1.6) * f;
+      const g = 0.86 - age * 0.06, lat = Math.sin(k * 2.1 + t) * 0.8;
+      tracer(O.cube, m4Mul(m4Mul(m4Translation(v.x - fx * d + fz * lat, v.y + 0.3 + age * 1.2, v.z - fz * d - fx * lat), m4RotY(k + age * 2)), m4Echelle(sz * 1.6, sz * 0.7, sz * 1.6)), [g * 1.0, g * 0.80, g * 0.58], 0.85);
     }
   }
   for (const b of A.ballons){
