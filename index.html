@@ -1737,7 +1737,7 @@ const MONDE = [
   ["Équateur","Amériques","montagne","latine",0,"statue"],
   ["Haïti","Amériques","tropical","latine",1,"dome"],
   ["Jamaïque","Amériques","tropical","latine",1,"rocher"],
-  ["Mexique","Amériques","desert","latine",0,"pyramide"],
+  ["Mexique","Amériques","tempere","latine",0,"pyramide"],
   ["Panama","Amériques","tropical","moderne",1,"gratteciel"],
   ["Pérou","Amériques","montagne","latine",1,"rocher"],
   ["Uruguay","Amériques","tempere","europe",1,"obelisque"],
@@ -2372,7 +2372,8 @@ function construireDecor(piste){
         boite(paysage, x, y + hW + 0.6, z, lW * 1.02, 1.2, pW * 1.04, fonce, biais);                 // le toit
         const hF = hW + 2.4 + alea() * 2.2, fx = x + ux * pW / 2, fz = z + uz * pW / 2;
         boite(paysage, fx, y + hF / 2, fz, lW, hF, 0.4, bois, biais);                                // la fausse façade, plus haute
-        boite(paysage, fx + ux * 0.25, y + hF - 1.2, fz + uz * 0.25, lW * 0.62, 1.1, 0.12, [0.92, 0.84, 0.62], biais);  // l'enseigne
+        { const noms = ["SALOON", "SHERIFF", "BANK", "HOTEL", "GENERAL STORE", "BARBER", "POST OFFICE", "SALOON"], nomW = noms[Math.floor(alea() * noms.length)];
+          enseigne("§q:" + nomW, fx + ux * 0.27, y + hF - 1.75, fz + uz * 0.27, -ux, -uz, Math.min(lW * 0.7, 9), 1.15); }  // l'enseigne
         boite(paysage, fx + ux * 0.25, y + 1.3, fz + uz * 0.25, 1.4, 2.6, 0.12, [0.20, 0.13, 0.08], biais);              // la porte
         for (const k of [-0.3, 0.3]) boite(paysage, fx + ux * 0.25 + tx * lW * k, y + 2.6, fz + uz * 0.25 + tz * lW * k, 1.5, 1.3, 0.12, [0.16, 0.12, 0.10], biais);
         boite(paysage, fx + ux * 1.5, y + 3.3, fz + uz * 1.5, lW * 0.98, 0.18, 3.0, fonce, biais);     // l'auvent
@@ -2439,23 +2440,27 @@ function construireDecor(piste){
       cylindreY(paysage, bl.x, bl.y + 5, bl.z, 4.5, 3.6, 0.8, 8, [0.60, 0.30, 0.18]);
       sbr.balle = { x: bl.x, y: bl.y + 5.8 + 4.2, z: bl.z, r: 4.2 }; reserver(bl.x, bl.z, 12);
     }
-    // les murs tagués : de vieux murs en pisé, inclinés vers les pilotes qui arrivent
+    // les murs tagués : de vieux murs en pisé LE LONG de la piste, légèrement
+    // tournés vers les pilotes qui arrivent ; rien ne doit se mettre devant
     const murTag = (frac) => {
-      for (let k = 0; k < 80; k++){
+      for (let k = 0; k < 120; k++){
         const i = (Math.floor(nb * frac) + k * 2) % nb, p = P[i];
+        if (Math.abs(p.courbure) > 0.006) continue;
         for (const sd of [1, -1]){
-          const dec = sd * (DEMI_PISTE + ACCOTEMENT + 5.5), x = p.x + p.nx * dec, z = p.z + p.nz * dec;
-          // le mur entier doit être libre : on vérifie tout du long, et derrière
+          const dec = sd * (DEMI_PISTE + ACCOTEMENT + 9), x = p.x + p.nx * dec, z = p.z + p.nz * dec;
+          const b0 = 0.30, nTx = -p.nx * sd, nTz = -p.nz * sd;                 // vers la piste
+          const fx = nTx * Math.cos(b0) - p.tx * Math.sin(b0), fz = nTz * Math.cos(b0) - p.tz * Math.sin(b0);
+          const wx = fz, wz = -fx;                                              // le long du mur
           let ok = true;
-          for (let u = -14; u <= 14 && ok; u += 3.5) ok = libreD(x + p.tx * u, z + p.tz * u, 0) && libreD(x + p.tx * u + p.nx * sd * 3, z + p.tz * u + p.nz * sd * 3, 0);
+          for (let u = -16; u <= 16 && ok; u += 2) ok = libreD(x + wx * u, z + wz * u, 1) && libreD(x + wx * u - fx * 3, z + wz * u - fz * 3, 1);
           if (!ok) continue;
-          // le tag regarde vers l'arrière de la piste, tourné de 35° vers elle
-          const a0 = Math.atan2(-p.tx, -p.tz) + sd * 0.6, fx = Math.sin(a0), fz = Math.cos(a0);
-          const y = p.y - 0.35, ang = Math.atan2(fx, fz) + Math.PI / 2;
-          boite(paysage, x - fx * 0.55, y + 4.3, z - fz * 0.55, 30, 8.6, 1.0, [0.80, 0.62, 0.44], ang);
-          boite(paysage, x - fx * 0.55, y + 8.75, z - fz * 0.55, 30.6, 0.3, 1.3, [0.62, 0.44, 0.30], ang);
-          enseigne("§g:GYRO", x + fx * 0.02, y + 0.5, z + fz * 0.02, -fx, -fz, 28, 7.6);
-          reserver(x, z, 16);
+          const y = p.y - 0.35, lac = Math.atan2(wx, wz);
+          boite(paysage, x - fx * 0.5, y + 4.0, z - fz * 0.5, 1.0, 9.0, 32, [0.80, 0.62, 0.44], lac);
+          boite(paysage, x - fx * 0.5, y + 8.65, z - fz * 0.5, 1.4, 0.3, 32.6, [0.62, 0.44, 0.30], lac);
+          for (const u of [-16.5, 16.5]) boite(paysage, x + wx * u - fx * 0.5, y + 4.4, z + wz * u - fz * 0.5, 1.6, 9.8, 1.6, [0.70, 0.52, 0.36], lac);
+          enseigne("§g:GYRO", x + fx * 0.03, y + 0.6, z + fz * 0.03, -fx, -fz, 30, 7.5);
+          for (let u = -18; u <= 18; u += 4) reserver(x + wx * u, z + wz * u, 4);
+          for (let v = 3; v < 9; v += 3) for (let u = -16; u <= 16; u += 4) reserver(x + wx * u + fx * v, z + wz * u + fz * v, 2.5);   // rien devant
           return { x, y, z, fx, fz };
         }
       }
@@ -2474,6 +2479,45 @@ function construireDecor(piste){
       const y = SOLp(p, dec);
       cylindreY(paysage, x, y, z, 0.16, 0.13, 8.5, 5, bois);
       boite(paysage, x, y + 7.9, z, 0.18, 0.16, 2.4, bois, p.cap);
+    }
+    // un ranch : un enclos de bois et quelques vaches ; une arche de roche ; des arbres morts
+    {
+      let gw = 4242; const al2 = () => (gw = (gw * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+      const vache = (x, y, z, a) => {
+        const c = al2() > 0.5 ? [0.45, 0.28, 0.16] : [0.15, 0.12, 0.10], ca = Math.cos(a), sa = Math.sin(a);
+        boite(paysage, x, y + 1.3, z, 1.0, 1.0, 2.2, c, a);
+        boite(paysage, x + sa * 1.3, y + 1.6, z + ca * 1.3, 0.6, 0.6, 0.7, c, a);
+        for (const [u, v] of [[-0.35, -0.8], [0.35, -0.8], [-0.35, 0.8], [0.35, 0.8]]) boite(paysage, x + ca * u + sa * v, y + 0.4, z - sa * u + ca * v, 0.2, 0.8, 0.2, c, a);
+        boite(paysage, x + sa * 1.45, y + 2.0, z + ca * 1.45, 1.1, 0.1, 0.1, [0.9, 0.88, 0.8], a);
+      };
+      let ranchs = 0, arches = 0;
+      for (let k = 0; k < 300 && (ranchs < 2 || arches < 2); k++){
+        const i = Math.floor(al2() * nb), p = P[i], sd = al2() > 0.5 ? 1 : -1, dec = sd * (DEMI_PISTE + ACCOTEMENT + 30 + al2() * 40);
+        const x = p.x + p.nx * dec, z = p.z + p.nz * dec, y = SOLp(p, dec);
+        if (ranchs < 2 && libreD(x, z, 16)){
+          for (let a = 0; a < 16; a++){ const a0 = a / 16 * Math.PI * 2, a1 = (a + 1) / 16 * Math.PI * 2, r = 13;
+            const A = [x + Math.cos(a0) * r, z + Math.sin(a0) * r], B = [x + Math.cos(a1) * r, z + Math.sin(a1) * r];
+            boite(paysage, A[0], y + 0.7, A[1], 0.2, 1.4, 0.2, bois, 0);
+            const lg = Math.hypot(B[0] - A[0], B[1] - A[1]), ang2 = Math.atan2(B[0] - A[0], B[1] - A[1]);
+            for (const h of [0.6, 1.15]) boite(paysage, (A[0] + B[0]) / 2, y + h, (A[1] + B[1]) / 2, 0.08, 0.12, lg, [0.5, 0.36, 0.22], ang2); }
+          for (let v = 0; v < 4; v++) vache(x + (al2() - 0.5) * 14, y, z + (al2() - 0.5) * 14, al2() * 6.28);
+          reserver(x, z, 15); ranchs++; continue;
+        }
+        if (arches < 2 && libreD(x, z, 14)){
+          const ang = p.cap + al2(), ca = Math.cos(ang), sa = Math.sin(ang), rc = [0.72, 0.38, 0.22];
+          for (const u of [-8, 8]) tronc(paysage, x + ca * u, y - 0.5, z - sa * u, 5, 6, 3.4, 4, 15, ang, rc);
+          boite(paysage, x, y + 16.5, z, 22, 4, 4.5, rc, ang);
+          boite(paysage, x, y + 18.8, z, 18, 1.2, 3.6, [0.80, 0.48, 0.30], ang);
+          reserver(x, z, 13); arches++;
+        }
+      }
+      for (let k = 0; k < 18; k++){
+        const i = Math.floor(al2() * nb), p = P[i], sd = al2() > 0.5 ? 1 : -1, dec = sd * (DEMI_PISTE + ACCOTEMENT + 12 + al2() * 50);
+        const x = p.x + p.nx * dec, z = p.z + p.nz * dec, y = SOLp(p, dec);
+        if (!libreD(x, z, 3)) continue;
+        cylindreY(paysage, x, y, z, 0.25, 0.15, 4, 5, [0.36, 0.30, 0.24]);
+        for (let b = 0; b < 3; b++){ const a = al2() * 6.28; boite(paysage, x + Math.cos(a) * 0.9, y + 2.6 + b * 0.5, z + Math.sin(a) * 0.9, 0.12, 0.12, 2.2, [0.36, 0.30, 0.24], a); }
+      }
     }
     // quelques châteaux d'eau et moulins à vent, loin de la piste
     for (let i = 0; i < nb; i += Math.max(40, Math.floor(nb / 7))){
@@ -2893,50 +2937,56 @@ function construireDecor(piste){
   /* --- écrans géants : une animation en boucle, face aux pilotes qui
      arrivent au bout de la grande ligne droite --- */
   const ecrans = {}, objetsAnimes = { trains: [], ballons: [] };
-  const ecranGeant = (nom, frac) => {
-    for (let k = 0; k < 60; k++){
-      const i = (meilleurDeb + Math.floor(meilleurLong * frac) + k * 2) % nb, p = P[i];
-      for (const sd of [-coteInt, coteInt]){
-        const dec = sd * (DEMI_PISTE + ACCOTEMENT + 16), x = p.x + p.nx * dec, z = p.z + p.nz * dec;
-        if (!libreD(x, z, 12)) continue;
-        const a0 = Math.atan2(-p.tx, -p.tz) + sd * 0.45, fx = Math.sin(a0), fz = Math.cos(a0);   // regard du pilote
-        const ang = Math.atan2(fx, fz) + Math.PI / 2, y = p.y - 0.35, W = 26, H = W * 144 / 256, bas = 9;
-        // pieds, caisson noir, cadre
-        for (const c of [-0.35, 0.35]) boite(paysage, x + Math.cos(ang) * W * c * 0 + -fz * W * c, y + bas / 2, z + fx * W * c, 1.2, bas, 1.2, [0.18, 0.19, 0.21], ang);
-        boite(paysage, x - fx * 0.9, y + bas + H / 2, z - fz * 0.9, W + 1.6, H + 1.6, 1.4, [0.08, 0.08, 0.09], ang);
-        boite(paysage, x - fx * 0.9, y + bas + H + 1.3, z - fz * 0.9, W + 1.6, 1.0, 1.6, [0.85, 0.65, 0.15], ang);
-        const m = ecrans[nom] || (ecrans[nom] = Object.assign(creerMaillage(), { uv: [] }));
-        const rx = -fz * W / 2, rz = fx * W / 2, yb = y + bas;
-        const A = [x - rx, yb, z - rz], B = [x + rx, yb, z + rz], C = [B[0], yb + H, B[2]], D = [A[0], yb + H, A[2]];
-        const n = normale(A, B, C), base = m.pos.length / 3;
-        for (const [q, uv] of [[A, [0, 0]], [B, [1, 0]], [C, [1, 1]], [D, [0, 1]]]){ m.pos.push(...q); m.nor.push(...n); m.col.push(1, 1, 1); m.uv.push(...uv); }
-        m.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-        reserver(x, z, 16);
-        return true;
-      }
+  const ecranGeant = (nom) => {
+    // bout de la grande ligne droite, puis on cherche droit devant (là où la piste a tourné)
+    const fin = P[(meilleurDeb + meilleurLong - 2) % nb];
+    const W = 40, H = W * 144 / 256, bas = 7;
+    for (const D of [70, 90, 115, 145, 180]) for (const lat of [0, 20, -20, 40, -40]){
+      const x = fin.x + fin.tx * D + fin.nx * lat, z = fin.z + fin.tz * D + fin.nz * lat;
+      const fx = -fin.tx, fz = -fin.tz, wx = fz, wz = -fx;                  // il regarde les pilotes qui arrivent
+      let ok = libreD(x, z, 6);
+      for (let u = -W / 2 - 2; u <= W / 2 + 2 && ok; u += 4) ok = libreD(x + wx * u, z + wz * u, 2);
+      if (!ok) continue;
+      const y = fin.y - 0.35, lac = Math.atan2(wx, wz);
+      for (const c of [-0.38, 0.38]) boite(paysage, x + wx * W * c - fx * 1.5, y + (bas + H) / 2, z + wz * W * c - fz * 1.5, 1.6, bas + H, 1.6, [0.18, 0.19, 0.21], lac);
+      boite(paysage, x - fx * 0.9, y + bas + H / 2, z - fz * 0.9, 1.4, H + 2, W + 2, [0.08, 0.08, 0.09], lac);
+      boite(paysage, x - fx * 0.9, y + bas + H + 1.6, z - fz * 0.9, 1.6, 1.2, W + 2, [0.85, 0.65, 0.15], lac);
+      const m = ecrans[nom] || (ecrans[nom] = Object.assign(creerMaillage(), { uv: [] }));
+      const rx = -fz * W / 2, rz = fx * W / 2, yb = y + bas;
+      // vu par un pilote qui regarde vers -f : sa droite est (fz, -fx)… on place u=0 à sa gauche
+      const A = [x + rx, yb, z + rz], B = [x - rx, yb, z - rz], C = [B[0], yb + H, B[2]], D2 = [A[0], yb + H, A[2]];
+      const n = normale(A, B, C), base = m.pos.length / 3;
+      for (const [q, uv] of [[A, [0, 0]], [B, [1, 0]], [C, [1, 1]], [D2, [0, 1]]]){ m.pos.push(...q); m.nor.push(...n); m.col.push(1, 1, 1); m.uv.push(...uv); }
+      m.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      for (let u = -W / 2; u <= W / 2; u += 5) reserver(x + wx * u, z + wz * u, 4);
+      reperes.push(["ecran", x, yb + H / 2, z, fx, fz]);
+      return true;
     }
     return false;
   };
-  if (piste.def.pays === "Cap-Vert") ecranGeant("voz", 0.78);
-  if (piste.def.nom === "SteelBallSon") ecranGeant("sbr", 0.78);
+  if (piste.def.pays === "Cap-Vert") ecranGeant("voz");
+  if (piste.def.nom === "SteelBallSon") ecranGeant("sbr");
 
   /* --- SteelBallSon : une voie ferrée parallèle à la grande ligne droite,
      loin dans le désert, où passe un train à vapeur --- */
   if (piste.def.nom === "SteelBallSon"){
     const pm2 = P[(meilleurDeb + Math.floor(meilleurLong / 2)) % nb];
     let voie = null;
-    for (const off of [70, 95, 125, 160]) for (const sd of [-coteInt, coteInt]){
+    for (const off of [55, 70, 90, 115, 145, 180]) for (const sd of [coteInt, -coteInt]){       // côté stands d'abord : les tribunes ne le cachent pas
       if (voie) break;
       const ox = pm2.x + pm2.nx * sd * (DEMI_PISTE + off), oz = pm2.z + pm2.nz * sd * (DEMI_PISTE + off);
       const Lv = meilleurLong * piste.pas + 700;
       let ok = true;
-      for (let d = -Lv / 2; d <= Lv / 2 && ok; d += 20) ok = libreD(ox + pm2.tx * d, oz + pm2.tz * d, 4);
+      for (let d = -Lv / 2; d <= Lv / 2 && ok; d += 10) ok = libreD(ox + pm2.tx * d, oz + pm2.tz * d, 8);
       if (ok) voie = { x: ox - pm2.tx * Lv / 2, z: oz - pm2.tz * Lv / 2, dx: pm2.tx, dz: pm2.tz, L: Lv, cap: Math.atan2(pm2.tx, pm2.tz) };
     }
     if (voie){
       const tt = Math.min(1, ((DEMI_PISTE + 90) - (DEMI_PISTE + ACCOTEMENT)) / (JUPE - DEMI_PISTE - ACCOTEMENT));
       voie.y = (pm2.y - 0.35) + (SOL - (pm2.y - 0.35)) * Math.min(1, tt) + 0.0;
-      voie.y = Math.max(voie.y, SOL);
+      voie.y = pm2.y - 0.35 + 3.0;                                   // sur un remblai, à hauteur de la piste
+      boite(paysage, voie.x + voie.dx * voie.L / 2, (voie.y + SOL) / 2 - 0.4, voie.z + voie.dz * voie.L / 2, 9, voie.y - SOL + 0.2, voie.L, [0.70, 0.52, 0.36], voie.cap);
+      boite(paysage, voie.x + voie.dx * voie.L / 2, (voie.y + SOL) / 2 - 1.2, voie.z + voie.dz * voie.L / 2, 15, voie.y - SOL - 1.4, voie.L, [0.66, 0.48, 0.32], voie.cap);
+      for (let d = 0; d < voie.L; d += 4) reserver(voie.x + voie.dx * d, voie.z + voie.dz * d, 6);
       for (let d = 0; d < voie.L; d += 2.2){
         const x = voie.x + voie.dx * d, z = voie.z + voie.dz * d;
         boite(paysage, x, voie.y + 0.15, z, 3.2, 0.25, 0.5, [0.36, 0.24, 0.14], voie.cap + Math.PI / 2);   // traverses
@@ -2954,11 +3004,11 @@ function construireDecor(piste){
   /* --- montgolfières dans le ciel : SteelBallSon, et quelques circuits ensoleillés --- */
   {
     let cxB = 0, czB = 0; for (const p of P){ cxB += p.x; czB += p.z; } cxB /= nb; czB /= nb;
-    const nbB = piste.def.nom === "SteelBallSon" ? 5 : (["desert", "savane", "mediter", "tropical"].includes(T.climat) || /Turquie|Cap-Vert|Mexique|Égypte/.test(piste.def.pays)) ? 2 : 0;
+    const nbB = piste.def.nom === "SteelBallSon" ? 1 : 0;          // une seule montgolfière, et seulement au-dessus de SteelBallSon
     let gb = nb * 7 + 3; const al = () => (gb = (gb * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
     const couls = [[0.92, 0.30, 0.24], [0.96, 0.78, 0.22], [0.30, 0.55, 0.88], [0.94, 0.94, 0.90], [0.85, 0.35, 0.65]];
     for (let k = 0; k < nbB; k++){
-      const a = al() * Math.PI * 2, r = 120 + al() * 300;
+      const a = al() * Math.PI * 2, r = 90 + al() * 120;
       objetsAnimes.ballons.push({ x: cxB + Math.cos(a) * r, z: czB + Math.sin(a) * r, y: SOL + 70 + al() * 90, r: 13 + al() * 6,
         c1: couls[k % couls.length], c2: couls[(k + 2) % couls.length], ph: al() * 10, vit: 0.6 + al() * 0.8, dir: al() * Math.PI * 2 });
     }
@@ -3304,9 +3354,11 @@ function construireDecor(piste){
       return STYLE.h * Math.max(0.12, v);
     };
     const neige = [0.95, 0.96, 0.99];
-    const melange = (c, f) => c.map((v, k) => v + (HORIZON[k] - v) * f);
+    // les chaînes lointaines pâlissent vers une brume bleutée (sauf dans le désert, où elle est chaude)
+    const brumeM = (T.western || T.climat === "desert") ? HORIZON : [0.66, 0.73, 0.82];
+    const melange = (c, f) => c.map((v, k) => v + (brumeM[k] - v) * f);
     let gr2 = graine * 7 + 11; const al = () => (gr2 = (gr2 * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-    const plat = !!T.western || T.climat === "desert";
+    const plat = !!T.western;                  // des mesas seulement au Far West
     // trois chaînes : la plus proche, sombre et nette ; les autres, plus hautes et plus pâles
     for (const [rr, fh, pale, nPics] of [[R + 520, 1.55, 0.42, 34], [R + 260, 1.2, 0.22, 44], [R, 0.85, 0, 56]]){
       for (let k = 0; k < nPics; k++){
