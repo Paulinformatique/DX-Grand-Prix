@@ -7550,7 +7550,7 @@ async function serveurOuvrir(premier, debut){
     if (!reseau.ws || reseau.ws.readyState !== 1) return;
     reseau.ws.send(JSON.stringify({ t: "ping", t0: performance.now() }));
     // avant d'être accueilli, le serveur qui vient de se réveiller peut mettre longtemps à préparer le jeu
-    if (performance.now() - reseau.vuHote > (reseau.moi ? 15000 : 90000)){ multiStatut("Plus de nouvelles du serveur."); try { reseau.ws.close(); } catch (e) {} }
+    if (performance.now() - reseau.vuHote > (reseau.moi ? 25000 : 90000)){ multiStatut("Plus de nouvelles du serveur."); try { reseau.ws.close(); } catch (e) {} }
   }, 3000);
 }
 function serveurEnvoyer(o){
