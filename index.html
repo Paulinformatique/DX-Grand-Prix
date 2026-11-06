@@ -4429,9 +4429,20 @@ function suivrePiste(v){
       v.tours.push(v.tempsTour);
       if (v.meilleur === null || v.tempsTour < v.meilleur) v.meilleur = v.tempsTour;
     }
+    v.tempsTourAvant = v.tempsTour;
     v.tempsTour = 0;
   } else if (v.idx < nb*0.25 && best > nb*0.75){
-    v.tour--;   // marche arrière sur la ligne
+    /* Marche arrière sur la ligne : ce passage ne comptait pas. On annule le
+       tour qu'il avait enregistré (et le « meilleur tour » qu'il avait pu
+       donner), et le chrono du tour reprend là où il en était : au prochain
+       passage, le vrai tour complet est compté, demi-tour compris. */
+    if (v.tour >= 1 && v.tours.length){
+      v.tours.pop();
+      v.meilleur = v.tours.length ? Math.min(...v.tours) : null;
+    }
+    v.tour--;
+    v.tempsTour = (v.tempsTourAvant || 0) + v.tempsTour;
+    v.tempsTourAvant = 0;
   }
   v.idx = best;
 
