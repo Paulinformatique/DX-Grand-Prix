@@ -3214,6 +3214,18 @@ function construireDecor(piste){
   };
   if (piste.def.pays === "Cap-Vert") ecranGeant("voz");
   if (piste.def.nom === "SteelBallSon") ecranGeant("sbr");
+  /* --- SteelBallSon : la foule de la grande tribune brandit un tifo --- */
+  if (piste.def.nom === "SteelBallSon"){
+    const s2 = -coteInt;
+    for (const f of [0.5, 0.35, 0.65]){
+      const pt = P[(meilleurDeb + Math.floor(meilleurLong * f)) % nb], mil = bord(pt, s2 * (MARCHE + PROF_TRIB / 2));
+      if (!libre(mil[0], mil[2], 0)) continue;      // pas de tribune ici
+      const c = bord(pt, s2 * (MARCHE + PROF_TRIB * 0.45));
+      enseigne("§z:GO ! GO ! ZEPPELI !", c[0], pt.y + 0.6 + HAUT_TRIB * 0.45 - 1.5, c[2], pt.nx * s2, pt.nz * s2, 34, 8.5);
+      reperes.push(["tifo", c[0], pt.y + HAUT_TRIB * 0.5, c[2], -pt.nx * s2, -pt.nz * s2]);
+      break;
+    }
+  }
   /* --- SteelBallSon : les statues des héros de la course (sur un socle de
      pierre, tournées vers les pilotes qui arrivent) et l'affiche de Pocoloco
      sur un panneau en bois --- */
@@ -3248,20 +3260,45 @@ function construireDecor(piste){
     statue("diego", 0.33, 7.5, 2.2);
     statue("valentine", 0.53, 8.0, 2.2);
     statue("tusk", 0.86, 4.0, 1.6);
-    // l'affiche de Pocoloco, sur un panneau en bois (3 × 4)
-    place(0.44, 6, (x, y, z, fx, fz) => {
-      const W = 6.3, H = 8.4, bas = 2.2, wx = fz, wz = -fx, lac = Math.atan2(wx, wz), bois = [0.48, 0.32, 0.20];
-      for (const c of [-0.42, 0.42]) boite(paysage, x + wx * W * c - fx * 0.6, y + (bas + H) / 2, z + wz * W * c - fz * 0.6, 0.5, bas + H + 1, 0.5, bois, lac);
-      boite(paysage, x - fx * 0.35, y + bas + H / 2, z - fz * 0.35, 0.4, H + 1.0, W + 1.0, [0.58, 0.40, 0.25], lac);
-      boite(paysage, x - fx * 0.2, y + bas + H + 0.7, z - fz * 0.2, 0.7, 0.35, W + 1.6, bois, lac);
-      const m = ecrans.poco || (ecrans.poco = Object.assign(creerMaillage(), { uv: [] }));
-      const rx = -fz * W / 2, rz = fx * W / 2, yb = y + bas, x2 = x + fx * 0.02, z2 = z + fz * 0.02;
-      const A = [x2 + rx, yb, z2 + rz], B = [x2 - rx, yb, z2 - rz], C = [B[0], yb + H, B[2]], D2 = [A[0], yb + H, A[2]];
-      const n = normale(A, B, C), base = m.pos.length / 3;
-      for (const [q, uv] of [[A, [0, 0]], [B, [1, 0]], [C, [1, 1]], [D2, [0, 1]]]){ m.pos.push(...q); m.nor.push(...n); m.col.push(1, 1, 1); m.uv.push(...uv); }
-      m.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-      reperes.push(["affiche", x, yb + H / 2, z, fx, fz]);
-    });
+    /* l'affiche de Pocoloco (3 × 4), grande, sur un panneau en bois : tout
+       droit au bout de la ligne droite de la flèche verte, dans le décor
+       extérieur du virage, face aux pilotes qui arrivent — on la lit en entier */
+    { // les fins de lignes droites suivies d'un vrai virage (sauf la grande, qui a l'écran géant)
+      const fins = []; let d0 = -1;
+      for (let i = 0; i < nb * 2; i++){
+        if (Math.abs(P[i % nb].courbure) < 0.0028){ if (d0 < 0) d0 = i; }
+        else { if (d0 >= 0 && d0 < nb && (i - d0) * piste.pas >= 90) fins.push([i - d0, (i - 1) % nb]); d0 = -1; }
+      }
+      fins.sort((u, v) => v[0] - u[0]); fins.shift();
+      const W = 9.6, H = 12.8, bas = 2.5;
+      let fait = false;
+      for (const [, iF] of fins){
+      const vir = Math.abs(P[(iF + 6) % nb].courbure) + Math.abs(P[(iF + 10) % nb].courbure);
+      if (fait || vir < 0.01 || dansSeg(canyonSBS, iF) || dansSeg(rueSBS, iF)) continue;
+      const fin = P[iF];
+      for (const D of [45, 55, 70, 90]) for (const lat of [0, 10, -10, 20, -20]){
+        if (fait) break;
+        const x = fin.x + fin.tx * D + fin.nx * lat, z = fin.z + fin.tz * D + fin.nz * lat;
+        const fx = -fin.tx, fz = -fin.tz, wx = fz, wz = -fx;
+        let ok = libreD(x, z, 5);
+        for (let u = -W / 2 - 1; u <= W / 2 + 1 && ok; u += 2) ok = libreD(x + wx * u, z + wz * u, 1.5);
+        if (!ok) continue;
+        fait = true;
+        const y = solEn(x, z)[0], lac = Math.atan2(wx, wz), bois = [0.48, 0.32, 0.20];
+        for (const c of [-0.42, 0.42]) boite(paysage, x + wx * W * c - fx * 0.7, y + (bas + H) / 2 - 0.5, z + wz * W * c - fz * 0.7, 0.6, bas + H + 1, 0.6, bois, lac);
+        boite(paysage, x - fx * 0.4, y + bas + H / 2, z - fz * 0.4, 0.5, H + 1.2, W + 1.2, [0.58, 0.40, 0.25], lac);
+        boite(paysage, x - fx * 0.2, y + bas + H + 0.8, z - fz * 0.2, 0.8, 0.4, W + 2, bois, lac);
+        const m = ecrans.poco || (ecrans.poco = Object.assign(creerMaillage(), { uv: [] }));
+        const rx = -fz * W / 2, rz = fx * W / 2, yb = y + bas, x2 = x + fx * 0.02, z2 = z + fz * 0.02;
+        const A = [x2 + rx, yb, z2 + rz], B = [x2 - rx, yb, z2 - rz], C = [B[0], yb + H, B[2]], D2 = [A[0], yb + H, A[2]];
+        const n = normale(A, B, C), base = m.pos.length / 3;
+        for (const [q, uv] of [[A, [0, 0]], [B, [1, 0]], [C, [1, 1]], [D2, [0, 1]]]){ m.pos.push(...q); m.nor.push(...n); m.col.push(1, 1, 1); m.uv.push(...uv); }
+        m.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        for (let u = -W / 2; u <= W / 2; u += 3) reserver(x + wx * u, z + wz * u, 4);
+        reperes.push(["affiche", x, yb + H / 2, z, fx, fz, iF]);
+      }
+      }
+    }
   }
 
   /* --- montgolfières dans le ciel : SteelBallSon, et quelques circuits ensoleillés --- */
@@ -4966,8 +5003,8 @@ function balleSBS(pst){
 function latBalle(t){ const A = DEMI_PISTE + 0.6; return A * Math.sin((t || 0) * (14 / 3.6) / A); }
 /* La flèche verte : sur une autre ligne droite (ni celle de la balle, ni
    près du départ), elle se promène lentement d'un côté à l'autre de la
-   piste. Passer dessus donne +10 km/h, aux bots aussi. */
-const FLECHE_L = 6, FLECHE_DEMI = 1.4, FLECHE_BONUS = 10 / 3.6;
+   piste. Passer dessus donne +20 km/h, aux bots aussi. */
+const FLECHE_L = 6, FLECHE_DEMI = 1.4, FLECHE_BONUS = 20 / 3.6;
 function flecheSBS(pst){
   pst = pst || piste;
   if (!pst || !pst.def || pst.def.nom !== "SteelBallSon") return null;
@@ -6076,7 +6113,7 @@ function dessinerHUD(){
   if (jeu.flashFleche && performance.now() - jeu.flashFleche < 1000){
     const a = 1 - (performance.now() - jeu.flashFleche) / 1000;
     ctx2.save(); ctx2.globalAlpha = a; ctx2.textAlign = "center"; ctx2.fillStyle = "#4dff6a";
-    ctx2.font = `900 ${44*E}px Bahnschrift, sans-serif`; ctx2.fillText("+10 km/h", W/2, H*0.32 - (1 - a) * 30*E); ctx2.restore();
+    ctx2.font = `900 ${44*E}px Bahnschrift, sans-serif`; ctx2.fillText("+20 km/h", W/2, H*0.32 - (1 - a) * 30*E); ctx2.restore();
   }
   if (jeu.phase === "compte" && departPistolet()){
     /* Départ hippique : pas de feux, le starter charge son revolver (une
@@ -9909,10 +9946,23 @@ function textureEnseigne(texte){
   if (texTextes[texte]) return texTextes[texte];
   const style = texte.slice(0, 3), mot = texte.slice(3);
   const c = document.createElement("canvas");
-  c.width = style === "§b:" || style === "§g:" || style === "§h:" ? 1024 : 256; c.height = style === "§b:" || style === "§h:" ? 128 : style === "§g:" ? 256 : 192;
+  c.width = style === "§b:" || style === "§g:" || style === "§h:" || style === "§z:" ? 1024 : 256; c.height = style === "§b:" || style === "§h:" ? 128 : style === "§g:" || style === "§z:" ? 256 : 192;
   const g = c.getContext("2d"), W = c.width, H = c.height;
   g.textAlign = "center"; g.textBaseline = "middle";
-  if (style === "§w:"){
+  if (style === "§z:"){
+    // tifo : grande toile verte, rayures, texte jaune cerné de noir, la balle d'acier de chaque côté
+    g.fillStyle = "#1f8a3a"; g.fillRect(0, 0, W, H);
+    g.fillStyle = "#26a346"; for (let x = -H; x < W; x += 80){ g.beginPath(); g.moveTo(x, H); g.lineTo(x + 40, H); g.lineTo(x + 40 + H, 0); g.lineTo(x + H, 0); g.fill(); }
+    g.strokeStyle = "#f5d33a"; g.lineWidth = 14; g.strokeRect(7, 7, W - 14, H - 14);
+    for (const bx of [120, W - 120]){
+      const gr = g.createRadialGradient(bx - 18, H / 2 - 20, 6, bx, H / 2, 70); gr.addColorStop(0, "#e9ffd8"); gr.addColorStop(0.45, "#4be35c"); gr.addColorStop(1, "#0d4d18");
+      g.fillStyle = gr; g.beginPath(); g.arc(bx, H / 2, 68, 0, Math.PI * 2); g.fill();
+    }
+    g.font = "900 104px Impact, 'Arial Black', sans-serif"; g.lineJoin = "round";
+    g.strokeStyle = "#111"; g.lineWidth = 14; g.strokeText(mot, W / 2, H / 2 + 4);
+    g.fillStyle = "#ffe14a"; g.fillText(mot, W / 2, H / 2 + 4);
+  }
+  else if (style === "§w:"){
     // panneau western : planche jaune, la balle verte, le texte
     g.fillStyle = "#e9b730"; g.fillRect(0, 0, W, H);
     g.strokeStyle = "#2a1a0c"; g.lineWidth = 12; g.strokeRect(6, 6, W - 12, H - 12);
@@ -10015,7 +10065,7 @@ function dessinerFleche(){
     maillageFleche = televerser(m, true);
   }
   const lf = latFleche(jeu.chrono), p = auPoint(piste, F.s), t = performance.now() / 1000;
-  const M = m4Mul(m4Translation(p.x + p.nx * lf, p.y + 0.05, p.z + p.nz * lf), m4RotY(p.cap));
+  const M = m4Mul(m4Translation(p.x + p.nx * lf, p.y + 0.05, p.z + p.nz * lf), m4RotY(p.cap + Math.PI));   // pointe vers l'avant de la course
   const k = 0.75 + 0.25 * Math.sin(t * 6);
   tracer(maillageFleche, M, [k, k, k], 1.0);
 }
