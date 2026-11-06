@@ -10630,9 +10630,18 @@ requestAnimationFrame(boucle);
   }
 
   function inviter(conv){
-    if (!dansUnGroupeMulti()){ S.erreur = "Crée ou rejoins d'abord un groupe multijoueur."; rendre(); return; }
-    envoi({ t: "c-inviter", conv, code: reseau.code });
-    toastLocal("Invitation envoyée !");
+    if (dansUnGroupeMulti()){ envoi({ t: "c-inviter", conv, code: reseau.code }); toastLocal("Invitation envoyée !"); return; }
+    if (enCourse()){ toastLocal("Termine ta course d'abord !"); return; }
+    // pas encore de groupe multijoueur : on le crée, et l'invitation part dès qu'il est prêt
+    try {
+      const nom = $("mu-nom"); if (!nom.value && S.etat) nom.value = S.etat.nom;
+      fermer(); $("btn-multi").click(); multiCreer();
+    } catch (e) { toastLocal("Impossible de créer le groupe : " + e.message); return; }
+    toastLocal("Création de ton groupe multijoueur…");
+    const t0 = Date.now(), att = setInterval(() => {
+      if (dansUnGroupeMulti()){ clearInterval(att); envoi({ t: "c-inviter", conv, code: reseau.code }); toastLocal("Groupe " + reseau.code + " créé : invitation envoyée !"); }
+      else if (Date.now() - t0 > 120000){ clearInterval(att); toastLocal("Le groupe multijoueur n'a pas pu être créé : invitation pas envoyée."); }
+    }, 500);
   }
   function rejoindre(code){
     if (enCourse()){ toastLocal("Termine ta course d'abord !"); return; }
@@ -10687,7 +10696,8 @@ requestAnimationFrame(boucle);
     const peutEcrire = grp || !!a, idP = conv.slice(2);
     const fermerMenu = () => { S.menu = false; };
     const menu = S.menu ? el("div", { class: "tx-menu" },
-      dansUnGroupeMulti() ? el("button", { onclick: () => { fermerMenu(); inviter(conv); rendre(); } }, "🏁 Inviter dans mon groupe multi") : null,
+      el("button", { onclick: () => { fermerMenu(); inviter(conv); rendre(); } }, dansUnGroupeMulti() ? "🏁 Inviter dans mon groupe multi" : "🏁 Inviter à une course multi"),
+      grp ? el("button", { onclick: () => { fermerMenu(); S.renom = g.id; S.renomTexte = null; rendre(); } }, "✏️ Renommer le groupe") : null,
       grp ? g.membres.filter(x => x.id !== E.id).map(x => el("button", { onclick: () => { fermerMenu(); voirProfil(x.id); } }, "👤 Profil de " + x.nom))
           : el("button", { onclick: () => { fermerMenu(); voirProfil(idP); } }, "👤 Voir le profil"),
       grp ? [
@@ -10698,12 +10708,23 @@ requestAnimationFrame(boucle);
         a ? el("button", { class: "rouge", onclick: () => { envoi({ t: "c-ami-retirer", id: idP }); S.vue = "liste"; fermerMenu(); rendre(); } }, "Retirer de mes amis") : null,
         el("button", { class: "rouge", onclick: () => { envoi({ t: "c-bloquer", id: idP }); S.vue = "liste"; fermerMenu(); rendre(); } }, "Bloquer " + nomConv(conv))
       ]) : null;
+    let renom = null;
+    if (grp && S.renom === g.id){
+      // le texte tapé survit aux messages qui arrivent (le panneau est redessiné)
+      const premier = S.renomTexte == null; if (premier) S.renomTexte = g.nom;
+      const ch = el("input", { class: "tx-champ", value: S.renomTexte, maxlength: 30, autocomplete: "off", enterkeyhint: "done" });
+      ch.addEventListener("input", () => { S.renomTexte = ch.value; });
+      const valider = () => { const n = ch.value.trim(); S.renom = null; S.renomTexte = null; if (n && n !== g.nom) envoi({ t: "c-groupe-renommer", id: g.id, nom: n }); rendre(); };
+      ch.addEventListener("keydown", e => { if (e.key === "Enter") valider(); if (e.key === "Escape"){ S.renom = null; S.renomTexte = null; rendre(); } });
+      renom = el("div", { class: "tx-saisie" }, ch, el("button", { class: "tx-btn", onclick: valider }, "OK"), el("button", { class: "tx-btn gris", onclick: () => { S.renom = null; S.renomTexte = null; rendre(); } }, "✕"));
+      setTimeout(() => { try { ch.focus(); if (premier) ch.select(); else ch.setSelectionRange(ch.value.length, ch.value.length); } catch (e) {} }, 30);
+    }
     const titre = grp ? nomConv(conv) : el("span", { class: "tx-cliquable", title: "Voir le profil", onclick: () => voirProfil(idP) }, nomConv(conv));
-    return [tete(titre, sous, retourListe(), plus), menu,
+    return [tete(titre, sous, retourListe(), plus), menu, renom,
       el("div", { style: "flex:1;display:flex;flex-direction:column;min-height:0;position:relative" }, msgs),
       S.erreur ? el("div", { class: "tx-erreur", style: "padding:0 12px" }, S.erreur) : null,
       peutEcrire ? el("div", { class: "tx-saisie" },
-        dansUnGroupeMulti() ? el("button", { class: "tx-icone", title: "Inviter dans mon groupe multijoueur", onclick: () => inviter(conv) }, "🏁") : null,
+        el("button", { class: "tx-icone", title: dansUnGroupeMulti() ? "Inviter dans mon groupe multijoueur" : "Inviter à une course multijoueur (crée ton groupe)", onclick: () => inviter(conv) }, "🏁"),
         champ, el("button", { class: "tx-btn", onclick: envoyerMsg }, "Envoyer"))
         : el("p", { class: "tx-vide" }, "Vous n'êtes plus amis.")];
   }
