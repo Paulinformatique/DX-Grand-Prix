@@ -1253,19 +1253,19 @@ function ambianceSBS(){
   const G = segmentsSBS();
   if (G && G.canyon && J.tour === 2 && J.tempeteTour !== 2 && jeu.phase === "course"){
     const Lp = piste.longueur, d = ((J.s - G.canyon[1] * piste.pas) % Lp + Lp) % Lp;
-    if (d < 40){ J.tempeteTour = 2; J.tempeteA = jeu.chrono; sonVent(); }
+    if (d < 40){ J.tempeteTour = 2; J.tempeteA = jeu.chrono; sonVent(); }   // dès la sortie du canyon
   }
-  if (J.tempeteA != null){ const t = jeu.chrono - J.tempeteA; if (t >= 0 && t < 5) TEMPETE = Math.max(0, Math.min(1, t / 0.6, (5 - t) / 1.2)); }
+  if (J.tempeteA != null){ const t = jeu.chrono - J.tempeteA; if (t >= 0 && t < 10){ const u = Math.min(1, t / 3.5); TEMPETE = Math.max(0, Math.min(u * u * (3 - 2 * u), 10 - t)); } }
   if (forcer.tempete != null) TEMPETE = forcer.tempete;
 }
 // le vent de la tempête : un souffle filtré qui monte et retombe
 function sonVent(){
   if (!audio || !sonActif) return;
   const t = audio.currentTime, sb = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
-  sb.buffer = bruitBlanc(5.6); f.type = "bandpass"; f.Q.value = 0.8;
-  f.frequency.setValueAtTime(380, t); f.frequency.linearRampToValueAtTime(900, t + 2.5); f.frequency.linearRampToValueAtTime(420, t + 5.4);
-  g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.6); g.gain.setValueAtTime(0.5, t + 3.8); g.gain.linearRampToValueAtTime(0.001, t + 5.5);
-  sb.connect(f).connect(g).connect(audio.destination); sb.start(t); sb.stop(t + 5.6);
+  sb.buffer = bruitBlanc(10.2); f.type = "bandpass"; f.Q.value = 0.8;
+  f.frequency.setValueAtTime(320, t); f.frequency.linearRampToValueAtTime(900, t + 4); f.frequency.linearRampToValueAtTime(420, t + 10);
+  g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.5, t + 3.5); g.gain.setValueAtTime(0.5, t + 9); g.gain.linearRampToValueAtTime(0.001, t + 10);
+  sb.connect(f).connect(g).connect(audio.destination); sb.start(t); sb.stop(t + 10.2);
 }
 function tracer(obj, modele, teinte, ambiante, texture){
   gl.bindBuffer(gl.ARRAY_BUFFER, obj.pos); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
@@ -2325,7 +2325,23 @@ function construireDecor(piste){
     }
   }
 
-  const lampesCrep = creerMaillage(), halosCrep = creerMaillage();
+  const lampesCrep = creerMaillage(), halosCrep = creerMaillage(), spotsNuit = creerMaillage();
+  /* La nuit (dernier tour de SteelBallSon) : un petit projecteur au pied de
+     chaque statue — une flaque de lumière sur le socle et un faisceau doux
+     qui monte le long de la statue (dessinés en lumière ajoutée). */
+  const spotStatue = (x, y, z, haut, fx, fz) => {
+    const chaud = [0.42, 0.33, 0.18], noir = [0, 0, 0];
+    const v = (q, c) => { spotsNuit.pos.push(...q); spotsNuit.nor.push(0, 1, 0); spotsNuit.col.push(...c); };
+    let base = spotsNuit.pos.length / 3; v([x, y + 0.08, z], chaud);
+    for (let k = 0; k <= 16; k++){ const a = k / 16 * Math.PI * 2; v([x + Math.cos(a) * 4.2, y + 0.08, z + Math.sin(a) * 4.2], noir); if (k) spotsNuit.idx.push(base, base + k, base + k + 1); }
+    // le faisceau : deux plans croisés, lumineux en bas, qui s'éteignent en haut
+    for (const [ux, uz] of [[fz, -fx], [fx, fz]]){
+      base = spotsNuit.pos.length / 3; const w = haut * 0.22, doux = [0.17, 0.13, 0.07];
+      v([x - ux * w, y, z - uz * w], doux); v([x + ux * w, y, z + uz * w], doux);
+      v([x + ux * w * 1.3, y + haut * 1.15, z + uz * w * 1.3], noir); v([x - ux * w * 1.3, y + haut * 1.15, z - uz * w * 1.3], noir);
+      spotsNuit.idx.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2);
+    }
+  };
   /* --- réverbères --- */
   for (let i = 4; i < nb; i += 11){
     if (dansTunnel(i, 3)) continue;
@@ -2552,6 +2568,7 @@ function construireDecor(piste){
       boite(paysage, st.x, st.y + 2.4, st.z, 8, 1.6, 8, pierre, versPiste);
       boite(paysage, st.x, st.y + 3.3, st.z, 8.6, 0.25, 8.6, pierreF, versPiste);
       sbr.statue = { x: st.x, y: st.y + 3.4, z: st.z, cap: versPiste }; reserver(st.x, st.z, 12);
+      spotStatue(st.x, st.y + 3.4, st.z, 12, Math.sin(versPiste), Math.cos(versPiste));
       enseigne("§q:STEEL BALL SON", st.x + Math.sin(versPiste) * 4.05, st.y + 1.9, st.z + Math.cos(versPiste) * 4.05, -Math.sin(versPiste), -Math.cos(versPiste), 6.5, 1.1);
     }
     // la balle d'acier, posée sur un rocher, loin dans le désert
@@ -3301,7 +3318,7 @@ function construireDecor(piste){
       boite(paysage, x, y + socle / 2 - 0.6, z, 4.4, socle + 1.2, 4.4, pierreF, a);
       boite(paysage, x, y + socle - 0.1, z, 5.0, 0.4, 5.0, pierre, a);
       incruster(paysage, M.m, M.pal, (lx, ly, lz) => [x + (lx * ca + lz * sa) * haut, y + socle + 0.1 + ly * haut, z + (-lx * sa + lz * ca) * haut]);
-      reperes.push(["statue " + nom, x, y + socle + haut / 2, z, fx, fz]);
+      reperes.push(["statue " + nom, x, y + socle + haut / 2, z, fx, fz]); spotStatue(x, y + socle, z, haut, fx, fz);
     });
     statue("johnny", 0.10, 7.5, 2.2);
     statue("diego", 0.33, 7.5, 2.2);
@@ -3322,7 +3339,7 @@ function construireDecor(piste){
         boite(paysage, x, y + socle - 0.1, z, 4.8, 0.4, 4.8, pierre, a2);
         incruster(paysage, M.m, M.pal, (lx, ly, lz) => [x + (lx * ca + lz * sa) * haut, y + socle + 0.1 + ly * haut, z + (-lx * sa + lz * ca) * haut]);
         reserver(x, z, 6);
-        reperes.push(["statue tusk", x, y + socle + haut / 2, z, fx, fz]);
+        reperes.push(["statue tusk", x, y + socle + haut / 2, z, fx, fz]); spotStatue(x, y + socle, z, haut, fx, fz);
       }
       if (!fait) statue("tusk", 0.86, 4.0, 1.6);
     }
@@ -3763,6 +3780,7 @@ function construireDecor(piste){
   return {
     feux, sbr, animes: objetsAnimes, lumieres: televerser(lumieres), reperes,
     lampesCrep: lampesCrep.idx.length ? televerser(lampesCrep) : null, halosCrep: halosCrep.idx.length ? televerser(halosCrep) : null,
+    spotsNuit: spotsNuit.idx.length ? televerser(spotsNuit) : null,
     ecrans: Object.fromEntries(Object.entries(ecrans).map(([k, m]) => [k, televerser(m)])),
     reliefs: televerser(reliefs),
     enseignes: Object.fromEntries(Object.entries(enseignes).map(([k, m]) => [k, televerser(m)])),
@@ -6051,7 +6069,7 @@ function rendre(){
   }
 
   // Le monde, dans la brume (la tempête de sable la rapproche à quelques mètres)
-  gl.uniform1f(U.uBrumeDebut, 260 + (4 - 260) * TEMPETE); gl.uniform1f(U.uBrumeFin, 1100 + (75 - 1100) * TEMPETE);
+  gl.uniform1f(U.uBrumeDebut, 260 + (6 - 260) * TEMPETE); gl.uniform1f(U.uBrumeFin, 1100 + (92 - 1100) * TEMPETE);
   tracer(decor.paysage, m4Identite(), [1,1,1]);
   tracer(decor.facades, m4Identite(), NUIT ? [0.85, 0.85, 0.9] : [1,1,1], NUIT ? 1.0 : undefined, NUIT ? texFacadeNuit : texFacade);
   if (decor.lumieres) tracer(decor.lumieres, m4Identite(), [1, 1, 1], 1.0);
@@ -6093,6 +6111,9 @@ function rendre(){
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
       gl.uniform3fv(U.uBrume, [0, 0, 0]);
       tracer(decor.halosCrep, m4Identite(), [f * 1.2, f * 1.2, f * 1.2], 1.0);
+      // dernier tour (la nuit) : les statues un peu éclairées, juste assez pour les voir
+      const g2 = Math.max(0, Math.min(1, (CREP - 0.85) / 0.15));
+      if (g2 > 0 && decor.spotsNuit){ gl.disable(gl.CULL_FACE); tracer(decor.spotsNuit, m4Identite(), [g2 * 0.8, g2 * 0.8, g2 * 0.8], 1.0); gl.enable(gl.CULL_FACE); }
       gl.uniform3fv(U.uBrume, horizonV);
       gl.depthMask(true); gl.disable(gl.BLEND);
     }
@@ -6267,8 +6288,8 @@ function dessinerHUD(){
   if (TEMPETE > 0){
     // le sable qui vole devant l'écran
     const t = performance.now() / 1000;
-    ctx2.save(); ctx2.globalAlpha = 0.28 * TEMPETE; ctx2.fillStyle = "#c79a5c"; ctx2.fillRect(0, 0, W, H);
-    ctx2.globalAlpha = 0.55 * TEMPETE; ctx2.strokeStyle = "#e8c48c"; ctx2.lineWidth = 1.6 * E;
+    ctx2.save(); ctx2.globalAlpha = 0.24 * TEMPETE; ctx2.fillStyle = "#c79a5c"; ctx2.fillRect(0, 0, W, H);
+    ctx2.globalAlpha = 0.5 * TEMPETE; ctx2.strokeStyle = "#e8c48c"; ctx2.lineWidth = 1.6 * E;
     for (let k = 0; k < 90; k++){
       const hz = Math.sin(k * 91.7) * 43758.5, a = hz - Math.floor(hz), b = (Math.sin(k * 12.3) * 9999) % 1;
       const x = ((a * W + t * (900 + a * 700) * E) % (W + 200)) - 100, y = (Math.abs(b) * H + Math.sin(t * 3 + k) * 20) % H;
