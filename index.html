@@ -593,14 +593,6 @@
     <button class="lien" id="btn-recommencer-course">Recommencer (R)</button>
     <button class="lien" id="btn-abandon">Abandonner</button>
   </div>
-  <button class="lien" id="btn-carte" style="margin-top:6px">🗺️ Carte du circuit (M)</button>
-</div>
-<div id="carte-circuit" style="position:fixed;inset:0;z-index:60;background:rgba(9,12,18,.94);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;box-sizing:border-box">
-  <div style="display:flex;gap:12px;align-items:center;width:min(1100px,100%)"><h2 id="carte-titre" style="margin:0;flex:1;font-size:20px;color:#f5b82e"></h2><button class="lien" id="carte-fermer">Fermer ✕</button></div>
-  <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;width:min(1100px,100%);min-height:0;flex:1">
-    <canvas id="carte-canvas" style="flex:1 1 520px;max-width:760px;min-width:0;aspect-ratio:1/1;max-height:78vh;background:#141a24;border-radius:10px"></canvas>
-    <div id="carte-legende" style="flex:0 1 300px;max-height:78vh;overflow:auto;font-size:14px;line-height:1.55;color:#e8e8ec"></div>
-  </div>
 </div>
 
 <script>/* Écrans géants : images JPEG d'animations en boucle, 24 par seconde */
@@ -2635,7 +2627,9 @@ function construireDecor(piste){
       const profil = (j, sd) => {
         const u = Math.min(1, Math.max(0, (j - a0) / n2)), env = Math.pow(Math.sin(Math.PI * u), 0.75);
         const bruit = 0.84 + 0.09 * Math.sin(j * 0.21 + sd * 2) + 0.07 * Math.sin(j * 0.07 + sd);
-        const H = 0.4 + 40 * env * bruit, eb = DEMI_PISTE + ACCOTEMENT + 2.5 + (1 - env) * 10, pente = H * 0.12 + 1.4;
+        // là où la piste se rétrécit, les falaises viennent jusqu'au muret de rochers (elles avalent les barrières)
+        const nE = etroitSBS(j * piste.pas), fE = nE / (DEMI_PISTE * 0.4);
+        const H = 0.4 + 40 * env * bruit, eb = DEMI_PISTE + ACCOTEMENT + 2.5 + (1 - env) * 10 - (ACCOTEMENT + 1.6 + nE) * fE, pente = H * 0.12 + 1.4;
         const solA = P[j % nb].y - 0.4;
         return [[eb, 0], [eb + pente * 0.35, H * 0.35], [eb + pente * 0.62, H * 0.62], [eb + pente, H], [eb + pente + 6 + H * 0.15, H * 0.9], [eb + pente + 12 + H * 1.1, SOL - solA]];
       };
@@ -6939,89 +6933,6 @@ function terminer(){
 
 document.getElementById("btn-pause").onclick = () => { if (jeu.phase === "course") basculerPause(); };
 
-/* La carte du circuit : la piste vue du ciel, et tous les éléments du décor
-   et de la course (numérotés, avec leur légende). */
-function elementsCarte(){
-  const E = [], d = decor || {}, nomS = { johnny: "Johnny Joestar", diego: "Diego Brando", valentine: "Funny Valentine & D4C", tusk: "Tusk Act 1" };
-  const ajout = (ic, nom, x, z, coul) => E.push({ ic, nom, x, z, coul: coul || "#f5b82e" });
-  const enS = (s, lat) => { const p = auPoint(piste, s); return [p.x + p.nx * (lat || 0), p.z + p.nz * (lat || 0)]; };
-  const p0 = piste.pts[0]; ajout("🏁", "Départ / arrivée", p0.x, p0.z, "#ffffff");
-  for (const r of d.reperes || []){
-    const n = r[0];
-    if (n.startsWith("statue ")) ajout("🗿", "Statue de " + (nomS[n.slice(7)] || n.slice(7)), r[1], r[3]);
-    else if (n === "ecran") ajout("📺", "Écran géant", r[1], r[3]);
-    else if (n === "affiche") ajout("🖼️", "Affiche de Pocoloco « Nah, I'd win »", r[1], r[3]);
-    else if (n === "tifo") ajout("🎌", "Tifo « GO ! GO ! ZEPPELI ! » dans la tribune", r[1], r[3]);
-    else if (n === "canyon") ajout("🏜️", "Canyon : la piste se rétrécit", r[1], r[3], "#e07a4a");
-    else if (n === "rue") ajout("🤠", "Rue western (saloons, shérif…)", r[1], r[3]);
-    else if (n === "pyramide") ajout("🔺", "Pyramide", r[1], r[3]);
-    else if (n === "sphinx") ajout("🦁", "Sphinx", r[1], r[3]);
-    else if (n === "yacht") ajout("🛥️", "Yacht", r[1], r[3]);
-  }
-  if (d.sbr){
-    if (d.sbr.statue) ajout("🗽", "Statue géante de Gyro (bras qui bougent)", d.sbr.statue.x, d.sbr.statue.z);
-    if (d.sbr.balle) ajout("🟩", "Balle d'acier géante sur son socle", d.sbr.balle.x, d.sbr.balle.z);
-    for (const m of d.sbr.murs || []) ajout("🎨", "Mur tagué « GYRO »", m.x, m.z, "#7cff8a");
-  }
-  const A = d.animes || {};
-  for (const t of A.trains || []) ajout("🚂", "Train à vapeur (voie ferrée)", t.x + t.dx * t.L / 2, t.z + t.dz * t.L / 2);
-  for (const S of A.sentiers || []){ const m = S[Math.floor(S.length / 2)]; if (m) ajout("🐎", "Cavaliers sur leur sentier", m[0], m[2]); }
-  for (const b of A.ballons || []) ajout("🎈", "Montgolfière", b.x, b.z);
-  const B = balleSBS(); if (B){ const [x, z] = enS(B.s); ajout("🟢", "Balle d'acier qui traverse la piste (obstacle)", x, z, "#3fe05a"); }
-  const F = flecheSBS(); if (F){ const [x, z] = enS(F.s); ajout("⏩", "Flèche verte : +20 km/h", x, z, "#3fe05a"); }
-  const TU = typeof TUNNELS !== "undefined" && TUNNELS[piste.def.nom];
-  if (TU){ const [x, z] = enS((TU[0] + TU[1]) / 2 * piste.longueur); ajout("🚇", "Tunnel", x, z); }
-  return E;
-}
-function ouvrirCarte(){
-  if (!piste) return;
-  const div = document.getElementById("carte-circuit"), cv = document.getElementById("carte-canvas");
-  div.style.display = "flex";
-  document.getElementById("carte-titre").textContent = "🗺️ " + (piste.def.nom || "Circuit") + (piste.def.pays ? " · " + piste.def.pays : "");
-  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = Math.max(300, r.width * dpr); cv.height = Math.max(300, r.height * dpr);
-  const g = cv.getContext("2d"), W = cv.width, H = cv.height, P = piste.pts, El = elementsCarte();
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  for (const q of P.concat(El.map(e => ({ x: e.x, z: e.z })))){ x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z); }
-  const m = 40 * dpr, k = Math.min((W - 2 * m) / (x1 - x0 || 1), (H - 2 * m) / (z1 - z0 || 1));
-  const X = x => m + (x - x0) * k + ((W - 2 * m) - (x1 - x0) * k) / 2, Z = z => m + (z - z0) * k + ((H - 2 * m) - (z1 - z0) * k) / 2;
-  g.clearRect(0, 0, W, H); g.lineJoin = g.lineCap = "round";
-  const trace = (larg, coul) => { g.strokeStyle = coul; g.lineWidth = larg; g.beginPath(); P.forEach((q, i) => i ? g.lineTo(X(q.x), Z(q.z)) : g.moveTo(X(q.x), Z(q.z))); g.closePath(); g.stroke(); };
-  trace(Math.max(7, DEMI_PISTE * 2 * k + 4), "#0b0e14"); trace(Math.max(4, DEMI_PISTE * 2 * k), "#4a505c");
-  // le canyon rétréci en orange
-  if (segmentsSBS()){
-    g.strokeStyle = "#e07a4a"; g.lineWidth = Math.max(4, DEMI_PISTE * 2 * k); g.beginPath(); let on = false;
-    P.forEach((q, i) => { const e = etroitSBS(i * piste.pas) > 0.1; if (e){ on ? g.lineTo(X(q.x), Z(q.z)) : g.moveTo(X(q.x), Z(q.z)); } on = e; }); g.stroke();
-  }
-  // les voies du train et les sentiers
-  for (const t of (decor && decor.animes && decor.animes.trains) || []){ g.strokeStyle = "#8b6b4a"; g.lineWidth = 3 * dpr; g.setLineDash([6 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(X(t.x), Z(t.z)); g.lineTo(X(t.x + t.dx * t.L), Z(t.z + t.dz * t.L)); g.stroke(); g.setLineDash([]); }
-  // sens de la course
-  const pd = P[0], pn = P[Math.min(P.length - 1, 6)];
-  g.fillStyle = "#fff"; g.save(); g.translate(X(pn.x), Z(pn.z)); g.rotate(Math.atan2(Z(pn.z) - Z(pd.z), X(pn.x) - X(pd.x)));
-  g.beginPath(); g.moveTo(10 * dpr, 0); g.lineTo(-6 * dpr, -7 * dpr); g.lineTo(-6 * dpr, 7 * dpr); g.fill(); g.restore();
-  // les éléments numérotés
-  g.textAlign = "center"; g.textBaseline = "middle";
-  El.forEach((e, i) => {
-    const x = X(e.x), z = Z(e.z), rr = 11 * dpr;
-    g.fillStyle = e.coul; g.beginPath(); g.arc(x, z, rr, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = "#0b0e14"; g.lineWidth = 2 * dpr; g.stroke();
-    g.fillStyle = "#0b0e14"; g.font = `800 ${11 * dpr}px sans-serif`; g.fillText(String(i + 1), x, z + 0.5);
-  });
-  document.getElementById("carte-legende").innerHTML = El.map((e, i) =>
-    `<div style="display:flex;gap:8px;align-items:baseline"><b style="display:inline-block;min-width:22px;text-align:center;border-radius:11px;background:${e.coul};color:#0b0e14">${i + 1}</b><span>${e.ic} ${e.nom}</span></div>`).join("")
-    + `<div style="margin-top:10px;opacity:.7;font-size:12px">Gris : la piste · ▶ blanc : le sens de la course${segmentsSBS() ? " · orange : le canyon rétréci · pointillés : la voie ferrée" : ""}</div>`;
-}
-function fermerCarte(){ document.getElementById("carte-circuit").style.display = "none"; }
-document.getElementById("btn-carte").onclick = ouvrirCarte;
-document.getElementById("carte-fermer").onclick = fermerCarte;
-document.getElementById("carte-circuit").onclick = e => { if (e.target.id === "carte-circuit") fermerCarte(); };
-addEventListener("keydown", e => {
-  if (e.code !== "KeyM" || /INPUT|TEXTAREA/.test((document.activeElement || {}).tagName || "")) return;
-  const ouverte = document.getElementById("carte-circuit").style.display === "flex";
-  if (ouverte){ fermerCarte(); return; }
-  if (jeu.phase === "course" && !jeu.multi) basculerPause();
-  if (jeu.phase === "course" || jeu.phase === "pause" || jeu.phase === "compte" || jeu.pauseMulti) ouvrirCarte();
-});
 function basculerPause(){
   if (jeu.multi && jeu.phase === "course"){
     jeu.pauseMulti = !jeu.pauseMulti;
