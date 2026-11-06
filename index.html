@@ -3294,7 +3294,7 @@ function construireDecor(piste){
     // l'arche d'entrée : un portique au nom du stade, au-dessus de la piste
     const pe = P[j0], E = DEMI_PISTE + ACCOTEMENT + 2;
     for (const sd of [1, -1]) boite(paysage, pe.x + pe.nx * sd * E, pe.y + 5, pe.z + pe.nz * sd * E, 1.6, 10.6, 1.6, [0.85, 0.85, 0.88], pe.cap);
-    boite(paysage, pe.x, pe.y + 10.6, pe.z, 2 * E + 2, 2.6, 1.2, [0.85, 0.85, 0.88], pe.cap + Math.PI / 2);
+    boite(paysage, pe.x, pe.y + 10.6, pe.z, 2 * E + 2, 2.6, 1.2, [0.85, 0.85, 0.88], pe.cap);
     enseigne("§b:FORO PARUNA", pe.x - pe.tx * 0.7, pe.y + 9.4, pe.z - pe.tz * 0.7, pe.tx, pe.tz, 2 * E, 2.3);
   }
 
