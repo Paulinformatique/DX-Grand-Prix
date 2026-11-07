@@ -10474,8 +10474,18 @@ function dessinerAnimes(decor){
     const x = b.x + Math.cos(b.dir) * Math.sin(t * 0.03 * b.vit + b.ph) * 120, z = b.z + Math.sin(b.dir) * Math.sin(t * 0.03 * b.vit + b.ph) * 120;
     const y = b.y + Math.sin(t * 0.3 + b.ph) * 6;
     const M = m4Mul(m4Mul(m4Translation(x, y, z), m4RotY(t * 0.05 + b.ph)), m4Echelle(b.r, b.r, b.r));
-    tracer(O.ballon, M, b.c1);
-    tracer(O.ballon, m4Mul(M, m4Echelle(1.002, 1.002, 1.002)), b.c2.map(c => c * 0.6));
+    // dernier tour, la nuit : le brûleur s'allume et l'enveloppe brille de l'intérieur, comme une lanterne
+    const nuitB = Math.max(0, Math.min(1, (CREP - 0.85) / 0.15));
+    if (nuitB > 0){
+      const fl = 0.85 + 0.15 * Math.sin(t * 13 + b.ph) * Math.sin(t * 7.3), lueur = [1.0, 0.62, 0.32].map(c => c * fl);
+      const melB = (c) => c.map((v, k) => v * CREP_T[k] * (1 - nuitB) + (v * 0.35 + 0.95) * lueur[k] * nuitB);   // la flamme éclaire l'enveloppe, quelle que soit sa couleur
+      tracer(O.ballon, M, melB(b.c1), 1.0);
+      tracer(O.ballon, m4Mul(M, m4Echelle(1.002, 1.002, 1.002)), melB(b.c2.map(c => c * 0.6)), 1.0);
+      tracer(O.cube, m4Mul(M, m4Mul(m4Translation(0, -1.36, 0), m4Echelle(0.07, 0.16 * fl, 0.07))), [1.6 * nuitB, 0.75 * nuitB, 0.2 * nuitB], 1.0);
+    } else {
+      tracer(O.ballon, M, b.c1);
+      tracer(O.ballon, m4Mul(M, m4Echelle(1.002, 1.002, 1.002)), b.c2.map(c => c * 0.6));
+    }
     tracer(O.nacelle, M, [1, 1, 1]);
   }
   gl.enable(gl.CULL_FACE);
