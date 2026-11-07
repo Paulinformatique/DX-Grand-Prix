@@ -7100,7 +7100,7 @@ function basculerPause(){
 
 /* ───────────────────────── 16. LES MENUS ──────────────────────────── */
 
-const ECRANS = ["ecran-actus", "ecran-multi", "ecran-paddock", "ecran-accueil","ecran-menu","ecran-garage","ecran-fin","ecran-pause","ecran-atelier", "ecran-joueur", "ecran-maker"];
+const ECRANS = ["ecran-actus", "ecran-multi", "ecran-paddock", "ecran-accueil","ecran-menu","ecran-garage","ecran-fin","ecran-pause","ecran-atelier", "ecran-joueur", "ecran-maker", "ecran-idees", "ecran-trapezoidu"];
 
 function cacherTout(){
   for (const id of ECRANS) document.getElementById(id).classList.add("cache");
@@ -8751,6 +8751,8 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
   const nbMots = () => champ.value.trim().split(/\s+/).filter(Boolean).length;
   const majCompte = () => { const n = nbMots(); compte.textContent = n + (n > 1 ? " mots" : " mot") + " · entre 5 et 200"; compte.style.color = n >= 5 && n <= 200 ? "" : "#ff9a7a"; };
   champ.addEventListener("input", majCompte);
+  // les touches tapées ici ne vont pas aux commandes du jeu (sinon Espace et les flèches sont bloqués)
+  champ.addEventListener("keydown", e => e.stopPropagation());
   let attente = null;
   const dire = (t, ok) => { statut.textContent = t; statut.style.color = ok ? "#7cff8a" : "#ff9a7a"; };
   btn.onclick = () => {
