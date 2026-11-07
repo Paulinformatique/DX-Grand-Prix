@@ -268,6 +268,8 @@
           <button class="acc-lien" id="btn-maker">DX Maker</button>
           <button class="acc-lien" id="btn-monde">🌍 Classement</button>
           <button class="acc-lien" id="btn-actus">📰 Actualités<b class="acc-nouveau" id="actus-nouveau" hidden>NOUVEAU</b></button>
+          <button class="acc-lien" id="btn-idees">💡 Boîte à idées</button>
+          <button class="acc-lien" id="btn-trapezoidu" style="display:none">🛡️ Trapezoidu</button>
           <button class="acc-lien" id="btn-atelier" style="display:none">Atelier</button>
         </div>
       </div>
@@ -543,6 +545,30 @@
   <div class="rangee"><button class="lien" id="btn-retour-actus">← Retour</button></div>
 </div>
 
+<div class="ecran cache" id="ecran-idees" style="justify-content:flex-start">
+  <div class="sstitre">Boîte à idées</div>
+  <h1>TON IDÉE POUR LE JEU</h1>
+  <p class="aide" style="margin:-6px 0 4px;max-width:620px">Une nouvelle course, une voiture, un mode, un décor, un bug à corriger… Écris-la en quelques phrases (entre 5 et 200 mots). Une idée par heure. Les insultes et les mots déplacés ne passent pas.</p>
+  <textarea id="idee-texte" maxlength="1800" rows="8" style="width:min(640px,100%);box-sizing:border-box;background:#141b26;color:#eef0f4;border:1px solid var(--trait);border-radius:10px;padding:12px;font:15px/1.5 inherit;resize:vertical" placeholder="Mon idée : …"></textarea>
+  <div style="display:flex;gap:12px;align-items:center;width:min(640px,100%);justify-content:space-between;flex-wrap:wrap">
+    <span id="idee-compte" class="aide" style="margin:0">0 mot</span>
+    <button class="action" id="idee-envoyer">Envoyer mon idée</button>
+  </div>
+  <p id="idee-statut" class="aide" style="min-height:22px;margin:0;max-width:640px"></p>
+  <div class="rangee"><button class="lien" id="btn-retour-idees">← Retour</button></div>
+</div>
+<div class="ecran cache" id="ecran-trapezoidu" style="justify-content:flex-start">
+  <div class="sstitre">Espace Trapezoidu</div>
+  <h1>LE JEU EN DIRECT</h1>
+  <div class="rangee" style="gap:8px;flex-wrap:wrap">
+    <button class="lien" id="tz-onglet-donnees">📊 Données</button>
+    <button class="lien" id="tz-onglet-idees">💡 Idées reçues</button>
+    <button class="lien" id="tz-onglet-joueurs">👥 Tous les joueurs</button>
+    <button class="lien" id="tz-actualiser">↻ Actualiser</button>
+  </div>
+  <div id="tz-contenu" style="width:min(820px,100%);text-align:left"></div>
+  <div class="rangee"><button class="lien" id="btn-retour-trapezoidu">← Retour</button></div>
+</div>
 <div class="ecran cache" id="ecran-paddock" style="justify-content:flex-start">
   <div class="sstitre">Paddock</div>
   <h1>LES PILOTES</h1>
@@ -8713,6 +8739,91 @@ document.getElementById("btn-actus").onclick = () => {
   majPastilleActus(); montrer("ecran-actus"); document.getElementById("ecran-actus").scrollTop = 0;
 };
 document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); montrer("ecran-accueil"); };
+
+/* ───── Boîte à idées : un paragraphe (5 à 200 mots), une idée par heure ───── */
+{
+  const champ = document.getElementById("idee-texte"), compte = document.getElementById("idee-compte"), statut = document.getElementById("idee-statut"), btn = document.getElementById("idee-envoyer");
+  const nbMots = () => champ.value.trim().split(/\s+/).filter(Boolean).length;
+  const majCompte = () => { const n = nbMots(); compte.textContent = n + (n > 1 ? " mots" : " mot") + " · entre 5 et 200"; compte.style.color = n >= 5 && n <= 200 ? "" : "#ff9a7a"; };
+  champ.addEventListener("input", majCompte);
+  let attente = null;
+  const dire = (t, ok) => { statut.textContent = t; statut.style.color = ok ? "#7cff8a" : "#ff9a7a"; };
+  btn.onclick = () => {
+    const n = nbMots();
+    if (n < 5 || n > 200){ dire("Ton idée doit faire entre 5 et 200 mots (" + n + " pour l'instant)."); return; }
+    const envoyer = () => window.TCHAT_api && TCHAT_api.envoyer({ t: "c-idee", texte: champ.value.trim() });
+    btn.disabled = true; dire("Envoi…", true);
+    if (!envoyer()){
+      // le chat se connecte (il crée le compte la première fois) : on réessaie un moment
+      let k = 0; clearInterval(attente);
+      attente = setInterval(() => { if (envoyer()){ clearInterval(attente); } else if (++k > 40){ clearInterval(attente); btn.disabled = false; dire("Pas de connexion au serveur : réessaie dans un instant."); } }, 500);
+    }
+  };
+  window.addEventListener("dx-chat", e => {
+    const d = e.detail;
+    if (d.t === "c-idee-ok"){ btn.disabled = false; champ.value = ""; majCompte(); dire("Merci ! Ton idée a bien été envoyée. 💡", true); }
+    if (d.t === "c-idee-refus"){ btn.disabled = false; dire(d.raison); }
+  });
+  document.getElementById("btn-idees").onclick = () => { majCompte(); statut.textContent = ""; btn.disabled = false; montrer("ecran-idees"); setTimeout(() => champ.focus(), 50); };
+  document.getElementById("btn-retour-idees").onclick = () => { rafraichirMenu(); montrer("ecran-accueil"); };
+}
+
+/* ───── Espace Trapezoidu (administrateur) : qui est en ligne, les groupes,
+   les dernières parties en ligne, et les idées reçues avec leur auteur ───── */
+{
+  const zone = document.getElementById("tz-contenu");
+  let onglet = "donnees", donnees = null, filtre = "";
+  const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const quand = t => { const d = new Date(t), j = (Date.now() - t) / 86400000; return (j < 1 && d.getDate() === new Date().getDate() ? "aujourd'hui" : d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); };
+  const temps = tf => tf == null ? "" : Math.floor(tf / 60) + ":" + (tf % 60).toFixed(3).padStart(6, "0");
+  const carte = (titre, corps) => `<div class="actu" style="flex-direction:column;gap:6px;margin:10px 0"><b style="color:var(--or)">${titre}</b>${corps}</div>`;
+  function rendre(){
+    if (!donnees){ zone.innerHTML = `<p class="aide">Connexion…</p>`; return; }
+    if (donnees.refuse){ zone.innerHTML = `<p class="aide">Cet espace est réservé au compte Trapezoidu.</p>`; return; }
+    if (onglet === "donnees"){
+      const enL = donnees.enLigne || [], gr = donnees.groupes || [], pt = donnees.parties || [];
+      zone.innerHTML =
+        carte(`🟢 ${enL.length} joueur${enL.length > 1 ? "s" : ""} en ligne · ${donnees.comptes} comptes en tout`,
+          enL.length ? enL.map(j => `<div>${esc(j.nom)} <span class="aide" style="margin:0">#${esc(j.id)}${j.enCourse ? " · 🏁 en course" + (j.enCourse ? " (" + esc(j.enCourse) + ")" : "") : ""}</span></div>`).join("") : `<div class="aide">Personne.</div>`) +
+        carte(`🎮 ${gr.length} groupe${gr.length > 1 ? "s" : ""} multijoueur ouvert${gr.length > 1 ? "s" : ""}`,
+          gr.length ? gr.map(g => `<div><b>${esc(g.code)}</b> · ${g.enCourse ? "🏁 en course : " + esc(g.circuit) : "dans le salon"} · ${esc(g.mode)}<br><span class="aide" style="margin:0">${g.joueurs.map(esc).join(", ") || "vide"}</span></div>`).join("") : `<div class="aide">Aucun.</div>`) +
+        carte(`🏁 Dernières parties en ligne`,
+          pt.length ? pt.map(x => `<div style="border-top:1px solid var(--trait);padding-top:6px"><b>${esc(x.circuit)}</b> · ${esc(x.mode)} · <span class="aide" style="margin:0">${quand(x.t)}</span><br>` +
+            (x.joueurs || []).map(j => `${j.place}. ${esc(j.nom)}${j.parti ? " (parti)" : j.tf != null ? " — " + temps(j.tf) : j.elim ? " (éliminé)" : ""}`).join(" · ") + `</div>`).join("") : `<div class="aide">Pas encore de partie enregistrée.</div>`);
+    } else if (onglet === "joueurs"){
+      const tous = donnees.tous || [], f = (filtre || "").trim().toLowerCase();
+      const l = tous.filter(j => !f || j.nom.toLowerCase().includes(f) || String(j.id).includes(f.replace(/[#\s]/g, "")));
+      zone.innerHTML = `<input id="tz-filtre" class="mu-champ" placeholder="Chercher un nom ou un #ID…" value="${esc(filtre)}" style="width:100%;box-sizing:border-box;margin:8px 0">` +
+        carte(`👥 ${tous.length} comptes${f ? " · " + l.length + " trouvé" + (l.length > 1 ? "s" : "") : ""} (les plus récemment venus d'abord)`,
+          l.slice(0, 400).map(j => `<button data-profil="${esc(j.id)}" style="display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--trait);color:inherit;padding:6px 2px;cursor:pointer;font:inherit">
+            <span>${j.enLigne ? "🟢" : "⚪"} <b>${esc(j.nom)}</b> <span class="aide" style="margin:0">#${esc(j.id)}</span></span>
+            <span class="aide" style="margin:0;text-align:right">${j.courses != null ? j.courses + " courses · " + j.voitures + " voitures · " + (j.victoires || 0) + " vict." : "pas de stats"}<br>${j.enLigne ? "en ligne" : j.vu ? "vu " + quand(j.vu) : j.cree ? "créé " + quand(j.cree) : ""}</span></button>`).join(""));
+      const ch = document.getElementById("tz-filtre");
+      ch.oninput = () => { filtre = ch.value; const pos = ch.selectionStart; rendre(); const n = document.getElementById("tz-filtre"); n.focus(); n.setSelectionRange(pos, pos); };
+      for (const b of zone.querySelectorAll("[data-profil]")) b.onclick = () => window.TCHAT_voirProfil && TCHAT_voirProfil(b.dataset.profil);
+    } else {
+      const id = donnees.idees || [];
+      zone.innerHTML = carte(`💡 ${id.length} idée${id.length > 1 ? "s" : ""} reçue${id.length > 1 ? "s" : ""}`,
+        id.length ? id.map(x => `<div style="border-top:1px solid var(--trait);padding-top:6px"><b>${esc(x.nom)}</b> <span class="aide" style="margin:0">#${esc(x.de)} · ${quand(x.t)}</span><div style="white-space:pre-wrap;margin-top:3px">${esc(x.texte)}</div></div>`).join("") : `<div class="aide">Aucune idée pour l'instant.</div>`);
+    }
+    document.getElementById("tz-onglet-donnees").style.color = onglet === "donnees" ? "var(--or)" : "";
+    document.getElementById("tz-onglet-idees").style.color = onglet === "idees" ? "var(--or)" : "";
+    document.getElementById("tz-onglet-joueurs").style.color = onglet === "joueurs" ? "var(--or)" : "";
+  }
+  let essais = null;
+  function demander(){
+    clearInterval(essais); let k = 0;
+    const go = () => window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin" });
+    if (!go()) essais = setInterval(() => { if (go() || ++k > 40) clearInterval(essais); }, 500);
+  }
+  window.addEventListener("dx-chat", e => { if (e.detail.t === "c-admin"){ donnees = e.detail; rendre(); } });
+  document.getElementById("btn-trapezoidu").onclick = () => { if (!estAdmin()) return; donnees = null; rendre(); montrer("ecran-trapezoidu"); demander(); };
+  document.getElementById("tz-onglet-donnees").onclick = () => { onglet = "donnees"; rendre(); };
+  document.getElementById("tz-onglet-idees").onclick = () => { onglet = "idees"; rendre(); };
+  document.getElementById("tz-onglet-joueurs").onclick = () => { onglet = "joueurs"; rendre(); };
+  document.getElementById("tz-actualiser").onclick = demander;
+  document.getElementById("btn-retour-trapezoidu").onclick = () => { rafraichirMenu(); montrer("ecran-accueil"); };
+}
 document.getElementById("btn-paddock").onclick = () => { rafraichirPaddock(); montrer("ecran-paddock"); };
 document.getElementById("btn-retour-paddock").onclick = () => { rafraichirMenu(); montrer("ecran-accueil"); };
 for (const b of document.querySelectorAll("#paddock-filtre [data-pf]"))
@@ -9433,16 +9544,16 @@ document.getElementById("btn-retour").onclick  = () => { rafraichirMenu(); montr
 /* Mode administrateur : l'Atelier et « Tout débloquer » n'apparaissent que
    si le prénom du joueur est le mot de passe. Le jeu n'en garde qu'une
    empreinte (FNV-1a), pour qu'il ne soit pas lisible dans le fichier. */
-const EMPREINTE_ADMIN = "21578e8a";
+const EMPREINTE_ADMIN = "40f0f59a";
 function empreinte(t){
   let h = 0x811c9dc5;
   for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, "0");
 }
-function estAdmin(){ return empreinte((carriere.prenom || "").trim()) === EMPREINTE_ADMIN; }
+function estAdmin(){ return empreinte((carriere.prenom || "").trim().toLowerCase()) === EMPREINTE_ADMIN; }
 function appliquerAdmin(){
   const admin = estAdmin();
-  for (const id of ["btn-atelier", "btn-tout", "btn-tout-carte"]) document.getElementById(id).style.display = admin ? "" : "none";
+  for (const id of ["btn-atelier", "btn-tout", "btn-tout-carte", "btn-trapezoidu"]) document.getElementById(id).style.display = admin ? "" : "none";
   // hors mode administrateur, on revient à la vraie progression
   if (!admin && carriere.toutDebloque) basculerTout();
 }
@@ -10805,6 +10916,7 @@ requestAnimationFrame(boucle);
       if (S.ouvert && S.vue === "profil" && S.profil && !S.profil.moi) envoi({ t: "c-profil", id: S.profil.id });     // profil ouvert : à jour (en course ?)
       rendre(); badge(); joueurTchat(); return;
     }
+    if (d.t === "c-idee-ok" || d.t === "c-idee-refus" || d.t === "c-admin"){ try { window.dispatchEvent(new CustomEvent("dx-chat", { detail: d })); } catch (e) {} return; }
     if (d.t === "c-refus"){
       if (!S.connecte){
         const ws = S.ws; S.ws = null; try { ws.close(); } catch (e) {}
@@ -11148,6 +11260,9 @@ requestAnimationFrame(boucle);
 
   /* ─── classement mondial : par course et par voiture ─── */
   S.fileRecords = [];
+  // pour la boîte à idées et l'espace Trapezoidu : envoyer dès que le chat est connecté
+  window.TCHAT_voirProfil = id => { if (!S.ouvert){ try { ouvrir(); } catch (e) {} } voirProfil(id); };
+  window.TCHAT_api = { envoyer: (o) => { if (enLigneServeur()){ envoi(o); return true; } assurerCompte(); return false; }, connecte: () => enLigneServeur() };
   window.TCHAT_record = r => {
     const m = { t: "c-record", course: r.course, voiture: r.voiture, tf: r.tf, tour: r.tour };
     S.dernierRecord = r;
