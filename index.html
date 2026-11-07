@@ -548,10 +548,10 @@
 <div class="ecran cache" id="ecran-idees" style="justify-content:flex-start">
   <div class="sstitre">Boîte à idées</div>
   <h1>TON IDÉE POUR LE JEU</h1>
-  <p class="aide" style="margin:-6px 0 4px;max-width:620px">Une nouvelle course, une voiture, un mode, un décor, un bug à corriger… Écris-la en quelques phrases (entre 5 et 200 mots). Une idée par heure. Les insultes et les mots déplacés ne passent pas.</p>
-  <textarea id="idee-texte" maxlength="1800" rows="8" style="width:min(640px,100%);box-sizing:border-box;background:#141b26;color:#eef0f4;border:1px solid var(--trait);border-radius:10px;padding:12px;font:15px/1.5 inherit;resize:vertical" placeholder="Mon idée : …"></textarea>
+  <p class="aide" style="margin:-6px 0 4px;max-width:620px">Une nouvelle course, une voiture, un mode, un décor, un bug à corriger… Écris-la en quelques mots (entre 5 et 200 caractères). Une idée par heure. Les insultes et les mots déplacés ne passent pas.</p>
+  <textarea id="idee-texte" maxlength="200" rows="8" style="width:min(640px,100%);box-sizing:border-box;background:#141b26;color:#eef0f4;border:1px solid var(--trait);border-radius:10px;padding:12px;font:15px/1.5 inherit;resize:vertical" placeholder="Mon idée : …"></textarea>
   <div style="display:flex;gap:12px;align-items:center;width:min(640px,100%);justify-content:space-between;flex-wrap:wrap">
-    <span id="idee-compte" class="aide" style="margin:0">0 mot</span>
+    <span id="idee-compte" class="aide" style="margin:0">0 / 200</span>
     <button class="action" id="idee-envoyer">Envoyer mon idée</button>
   </div>
   <p id="idee-statut" class="aide" style="min-height:22px;margin:0;max-width:640px"></p>
@@ -8745,19 +8745,19 @@ document.getElementById("btn-actus").onclick = () => {
 };
 document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); montrer("ecran-accueil"); };
 
-/* ───── Boîte à idées : un paragraphe (5 à 200 mots), une idée par heure ───── */
+/* ───── Boîte à idées : 5 à 200 caractères, une idée par heure ───── */
 {
   const champ = document.getElementById("idee-texte"), compte = document.getElementById("idee-compte"), statut = document.getElementById("idee-statut"), btn = document.getElementById("idee-envoyer");
-  const nbMots = () => champ.value.trim().split(/\s+/).filter(Boolean).length;
-  const majCompte = () => { const n = nbMots(); compte.textContent = n + (n > 1 ? " mots" : " mot") + " · entre 5 et 200"; compte.style.color = n >= 5 && n <= 200 ? "" : "#ff9a7a"; };
+  const nbLettres = () => champ.value.trim().length;
+  const majCompte = () => { const n = nbLettres(); compte.textContent = n + " / 200 caractères (5 minimum)"; compte.style.color = n >= 5 && n <= 200 ? "" : "#ff9a7a"; };
   champ.addEventListener("input", majCompte);
   // les touches tapées ici ne vont pas aux commandes du jeu (sinon Espace et les flèches sont bloqués)
   champ.addEventListener("keydown", e => e.stopPropagation());
   let attente = null;
   const dire = (t, ok) => { statut.textContent = t; statut.style.color = ok ? "#7cff8a" : "#ff9a7a"; };
   btn.onclick = () => {
-    const n = nbMots();
-    if (n < 5 || n > 200){ dire("Ton idée doit faire entre 5 et 200 mots (" + n + " pour l'instant)."); return; }
+    const n = nbLettres();
+    if (n < 5 || n > 200){ dire("Ton idée doit faire entre 5 et 200 caractères (" + n + " pour l'instant)."); return; }
     const envoyer = () => window.TCHAT_api && TCHAT_api.envoyer({ t: "c-idee", texte: champ.value.trim() });
     btn.disabled = true; dire("Envoi…", true);
     if (!envoyer()){
