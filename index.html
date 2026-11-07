@@ -8841,8 +8841,24 @@ document.getElementById("joueur-prenom").addEventListener("input", (e) => {
   document.getElementById("joueur-titre").textContent = carriere.prenom.trim() ? carriere.prenom.trim().toUpperCase() : "PILOTE";
 });
 // Copie de sécurité : un fichier à garder, ou à recharger dans un autre navigateur
+/* Le sceau de la sauvegarde : une empreinte du contenu, mélangée à un secret.
+   Changer une seule valeur du fichier exporté (l'argent, les voitures…) et
+   le sceau ne correspond plus : l'import refuse. */
+function sceauSauvegarde(d){
+  const o = Object.assign({}, d); delete o.sceau;
+  const t = "dx·gp·sceau·7Kq2·" + JSON.stringify(o) + "·" + (o.prenom || "") + "·v1";
+  let a = 0x811c9dc5, b = 0x1b873593, c = 0x85ebca6b;
+  for (let i = 0; i < t.length; i++){
+    const k = t.charCodeAt(i);
+    a = Math.imul(a ^ k, 0x01000193) >>> 0;
+    b = Math.imul((b ^ k) + (a >>> 7), 0x5bd1e995) >>> 0;
+    c = Math.imul(c ^ (k * 31 + (b & 0xffff)), 0x27d4eb2d) >>> 0;
+  }
+  return [a, b, c].map(x => x.toString(16).padStart(8, "0")).join("");
+}
 document.getElementById("btn-exporter").onclick = () => {
-  const blob = new Blob([JSON.stringify(carriere, null, 1)], { type: "application/json" });
+  const d = Object.assign({}, carriere); delete d.sceau; d.sceau = sceauSauvegarde(d);
+  const blob = new Blob([JSON.stringify(d, null, 1)], { type: "application/json" });
   const lien = document.createElement("a");
   lien.href = URL.createObjectURL(blob);
   lien.download = "dx-grand-prix-sauvegarde.json";
@@ -8861,6 +8877,12 @@ document.getElementById("fichier-import").onchange = (e) => {
     try {
       const d = JSON.parse(lecteur.result);
       if (!d || typeof d !== "object" || !("argent" in d) || !Array.isArray(d.possedees)) throw new Error();
+      // une sauvegarde modifiée à la main (ou sans sceau) n'est pas acceptée
+      if (!d.sceau || d.sceau !== sceauSauvegarde(d)){
+        alert("Cette sauvegarde a été modifiée (ou elle vient d'une ancienne version du jeu) : elle ne peut pas être importée. Exporte-la de nouveau depuis le jeu.");
+        return;
+      }
+      delete d.sceau;
       Object.assign(carriere, d);
       sauver();
       location.reload();                    // recharge pour réintégrer les circuits de l'atelier
