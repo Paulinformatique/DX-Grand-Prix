@@ -10902,7 +10902,10 @@ requestAnimationFrame(boucle);
     if (!S.compte){ S.compte = { cle: nouvelleCle(), nouveau: true }; ecrireCompte(S.compte); }
     connecter();
   }
+  // un navigateur piloté par un robot (les tests automatiques) ne crée pas de compte sur le vrai serveur
+  const robot = (() => { try { return !!navigator.webdriver && !/[?&]serveur=/.test(location.search); } catch (e) { return false; } })();
   function connecter(){
+    if (robot) return;
     if (!S.compte || (S.ws && S.ws.readyState <= 1)) return;
     const url = adresse(); if (!url) return;
     let ws; try { ws = new WebSocket(url); } catch (e) { return; }
