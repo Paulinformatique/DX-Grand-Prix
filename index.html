@@ -462,7 +462,7 @@
     <label class="aide" id="mu-gyro-choix" style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer">
       <input type="checkbox" id="mu-gyro" style="width:18px;height:18px;accent-color:#3fe27a"> <span><b style="color:#4dff86">Gyro</b> pour tout le monde (nitro vert, touche G)</span></label>
     <label class="aide" id="mu-remplir-choix" style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer">
-      <input type="checkbox" id="mu-remplir" style="width:18px;height:18px;accent-color:#5aa0ff"> <span>🤖 Remplir la grille (18 voitures avec les pilotes du jeu)</span></label>
+      <input type="checkbox" id="mu-remplir" style="width:18px;height:18px;accent-color:#5aa0ff"> <span>🤖 Remplir la grille (12 voitures avec les pilotes du jeu)</span></label>
     <div id="mu-tchat">
       <div id="mu-tchat-msgs"></div>
       <div style="display:flex;gap:8px"><input id="mu-tchat-champ" class="mu-champ" maxlength="300" autocomplete="off" placeholder="Écrire au groupe…" style="flex:1;min-width:0">
@@ -4031,12 +4031,12 @@ const PILOTES = [
   { nom:"Santos", voiture: indiceVoiture("Porsche 911 Turbo") },
   { nom:"Zozanesson", voiture: indiceVoiture("Subaru BRZ tS") },
 ];
-/* Multijoueur, « remplir la grille » : on complète jusqu'à 18 voitures avec
+/* Multijoueur, « remplir la grille » : on complète jusqu'à 12 voitures (autant que de joueurs possibles) avec
    les pilotes, du plus iconique au moins iconique. Kaimaxus garde sa case :
    coché, il prend une place ; décoché, on passe au suivant. */
 const ORDRE_ICONIQUE = ["Bastiet", "Kaimaxus", "Roucky", "Vito", "Melkior", "Bryan", "Kevin", "Giornoe", "Zoroh",
   "AliBeurreton", "Claudio", "Rafa", "Sonny", "Paulnareff", "Santos", "Rogeo", "Zozanesson"];
-const GRILLE_PLEINE = 18;
+const GRILLE_PLEINE = 12;
 function botsMulti(nJoueurs, kaimaxus, remplir){
   const noms = kaimaxus ? ["Kaimaxus"] : [];
   if (remplir) for (const n of ORDRE_ICONIQUE){ if (nJoueurs + noms.length >= GRILLE_PLEINE) break; if (n !== "Kaimaxus") noms.push(n); }
@@ -10823,6 +10823,10 @@ requestAnimationFrame(boucle);
   #tx-toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:50;background:#182130;border:1px solid var(--or);
     border-radius:10px;padding:10px 16px;font-size:14px;max-width:min(92vw,420px);cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.5)}
   #tx-toast.cache{display:none}
+  .tx-interrupteur{flex:none;width:42px;height:24px;border-radius:12px;background:#3a4556;position:relative;transition:background .2s}
+  .tx-interrupteur::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+  .tx-interrupteur.on{background:var(--or)}
+  .tx-interrupteur.on::after{left:21px}
   .tx-code{font-family:ui-monospace,Consolas,monospace;font-size:15px;background:#141b26;border:1px dashed #3d4c63;border-radius:8px;
     padding:12px;word-break:break-all;color:#ffe6a6}
   /* chat du salon multijoueur */
@@ -11053,11 +11057,18 @@ requestAnimationFrame(boucle);
     document.title = n ? "(" + n + ") DX GRAND PRIX" : "DX GRAND PRIX";
   }
   let minToast = null;
+  /* Ne pas déranger (réglage dans Amis) : activé, rien ne s'affiche pendant
+     les courses et on retrouve tout au menu ; désactivé, les notifications
+     arrivent en haut de l'écran même en pleine course. */
+  let nePasDeranger = (() => { try { return localStorage.getItem("dx-ne-pas-deranger") !== "0"; } catch (e) { return true; } })();
+  let ratesEnCourse = 0;
   function toast(texte, clic){
-    if (enCourse()) return;          // pas pendant qu'on conduit
+    const course = enCourse();
+    if (course && nePasDeranger){ ratesEnCourse++; return; }          // on le dira au retour au menu
     const t = $("tx-toast"); t.textContent = texte; t.classList.remove("cache");
-    t.onclick = () => { t.classList.add("cache"); if (clic) clic(); };
-    clearTimeout(minToast); minToast = setTimeout(() => t.classList.add("cache"), 5000);
+    // en course, toucher la notification la ferme seulement (le chat ne s'ouvre pas en pleine course)
+    t.onclick = () => { t.classList.add("cache"); if (clic && !enCourse()) clic(); };
+    clearTimeout(minToast); minToast = setTimeout(() => t.classList.add("cache"), course ? 3500 : 5000);
   }
   function toastLocal(t){ const x = $("tx-toast"); x.textContent = t; x.classList.remove("cache"); x.onclick = () => x.classList.add("cache");
     clearTimeout(minToast); minToast = setTimeout(() => x.classList.add("cache"), 2500); }
@@ -11066,6 +11077,9 @@ requestAnimationFrame(boucle);
     const cacher = enCourse();
     $("tx-bouton").classList.toggle("cache", cacher);
     if (cacher && S.ouvert) fermer();
+    // de retour au menu : ce qui est arrivé pendant la course
+    if (!cacher && ratesEnCourse){ const n = ratesEnCourse; ratesEnCourse = 0;
+      toast("💬 " + n + (n > 1 ? " notifications reçues" : " notification reçue") + " pendant ta course", () => ouvrir()); }
   }, 400);
 
   // ─── ouverture ───
@@ -11177,7 +11191,13 @@ requestAnimationFrame(boucle);
         el("div", { class: "tx-rang" }, champ,
           el("button", { class: "tx-btn gris", title: "Voir son profil", onclick: () => { const i = champ.value.replace(/[#\s]/g, "");
             if (!/^\d{8}$/.test(i)){ S.erreur = "Un ID fait 8 chiffres."; rendre(); return; } voirProfil(i); } }, "👤"),
-          el("button", { class: "tx-btn", onclick: ajouter }, "Ajouter")), erreur());
+          el("button", { class: "tx-btn", onclick: ajouter }, "Ajouter")), erreur(),
+        el("div", { class: "tx-ligne", style: "cursor:pointer", role: "switch", "aria-checked": String(nePasDeranger), onclick: () => {
+            nePasDeranger = !nePasDeranger; try { localStorage.setItem("dx-ne-pas-deranger", nePasDeranger ? "1" : "0"); } catch (e) {} rendre(); } },
+          el("div", { class: "tx-txt" }, el("div", { class: "tx-nom" }, (nePasDeranger ? "🔕" : "🔔") + " Ne pas déranger"),
+            el("div", { class: "tx-sous", style: "white-space:normal;overflow:visible" }, nePasDeranger ? "Activé : pas de notifications pendant tes courses, tu les retrouves au menu"
+                                                         : "Désactivé : les notifications s'affichent en haut de l'écran pendant la course")),
+          el("span", { class: "tx-interrupteur" + (nePasDeranger ? " on" : "") })));
       if (E.demandes.length){
         corps.append(el("div", { class: "tx-titre" }, "Demandes reçues"));
         for (const x of E.demandes) corps.append(el("div", { class: "tx-ligne", onclick: () => voirProfil(x.id) }, avatar(x.nom),
