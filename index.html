@@ -5617,7 +5617,7 @@ function replacer(v){
 
 function majIA(v, dt){
   const R = v.R;
-  chocObstaclesK(v, dt); eviterSablesK(v, dt);
+  v.viseSableK = null; v.capK = null; chocObstaclesK(v, dt); eviterSablesK(v, dt);
 
   // Poussé dans l'herbe : il y roule lentement (voir plus bas pour le retour)
   const dehors = Math.abs(v.lat) > DEMI_PISTE + BORDURE * 0.7;
@@ -5656,6 +5656,7 @@ function majIA(v, dt){
   // l'herbe freine franchement (il y roulait encore à 120-130 km/h, le long
   // de la piste, comme sur une voie de dégagement)
   if (dehors) cible = Math.min(cible, v.crashe ? 0 : R.vmax * 0.18);   // contre le mur : arrêté
+  if (v.capK) cible = Math.min(cible, v.capK);
   { const fS = sableKujota(v); if (fS > 0) cible = Math.min(cible, R.vmax * (fS >= 1.5 ? 0.5 : Math.max(0.5, 1 - 0.5 * fS))); }   // Kujota : le sable
 
   /* Erreurs de pilotage, rares : un virage pris trop large, ou un blocage
@@ -5925,6 +5926,7 @@ function majIA(v, dt){
       if (v.vaFleche) vise = latFleche(jeu.chrono + dF / Math.max(v.v, 8));
     }
   }
+  if (v.viseSableK != null) vise = v.viseSableK;              // (Kujota : contourner un sable mouvant)
   v.latCible = Math.max(-bornee, Math.min(bornee, vise));
   // en manœuvre (dépassement, sillage, place laissée) : hors de sa ligne
   v.enManoeuvre = Math.abs(v.latCible - Math.max(-bornee, Math.min(bornee, viseLigne))) > 0.6 || v.esquive > 0;
@@ -5980,7 +5982,7 @@ function majIA(v, dt){
      centimètres en une image. On borne donc la vitesse de déport : un
      pilote change de file en braquant, pas en se téléportant. */
   // pendant une feinte de dépassement, le coup de volant est franc
-  const tenue = v.trouble > 0 ? 0.30 : (v.esquive > 0 ? 4.5 : 1.5);
+  const tenue = v.trouble > 0 ? 0.30 : (v.esquive > 0 || v.evitK > 0 ? 4.5 : 1.5);
   const latAvant = v.lat;
   const voulu = (v.latCible - v.lat) * Math.min(1, dt * tenue);
   // bousculé, il se laisse déporter : il ne corrige qu'un tiers aussi vite
@@ -5989,7 +5991,8 @@ function majIA(v, dt){
      montée progressive : il braque, la voiture s'inscrit, puis il contre-
      braque. Avant, il pouvait glisser de côté à 15 m/s d'une image à
      l'autre, comme sur un rail. */
-  const vLatMax = (1.4 + 3.4 * Math.min(1, v.v / 40)) * (v.trouble > 0 ? 0.3 : 1) * (v.esquive > 0 ? 1.45 : 1.05);
+  if (v.evitK > 0) v.evitK -= dt;
+  const vLatMax = (1.4 + 3.4 * Math.min(1, v.v / 40)) * (v.trouble > 0 ? 0.3 : 1) * (v.esquive > 0 || v.evitK > 0 ? 1.6 : 1.05);
   const accLat = 9;                                           // m/s² de déport
   const reste = v.latCible - v.lat;
   let vlVoulu = Math.sign(reste) * Math.min(vLatMax, Math.sqrt(2 * accLat * Math.abs(reste)) * 0.9, Math.abs(voulu) / Math.max(dt, 1e-4));
@@ -7837,18 +7840,43 @@ function eviterSablesK(v, dt){
   if (!piste || !piste.def || piste.def.nom !== "Kujota" || v.s == null) return;
   const L = piste.longueur, s = ((v.s % L) + L) % L, lat = v.lat || 0;
   if (s < ZONE_SABLE_K.d0 * L - 60 || s > ZONE_SABLE_K.d1 * L) return;
-  for (const q of sablesMouvants()){ const ds = q.s - s; if (ds < 1 || ds > 60) continue;
-    const dl = lat - q.lat; if (Math.abs(dl) < q.r * 0.55 + 2.4) v.vlat = (v.vlat || 0) + (Math.sign(dl) || -Math.sign(q.lat) || 1) * 20 * dt; }
+  for (const q of sablesMouvants()){ const ds = q.s - s; if (ds < -4 || ds > 70) continue;
+    // il passe du côté du milieu de la piste (les ronds sont près des bords), sans jamais viser le bord
+    const marge = q.r * 0.55 + 2.2, cote = -Math.sign(q.lat) || 1, vis = q.lat + cote * marge;
+    if (Math.abs(lat - q.lat) < marge + 0.6 || Math.abs(v.latCible - q.lat) < marge) v.viseSableK = Math.max(-(DEMI_PISTE - 1.3), Math.min(DEMI_PISTE - 1.3, vis));
+    break; }
+}
+// un adversaire choisit où passer : à côté du prochain obstacle, en pensant déjà au suivant, sans jamais viser le bord
+function planObstK(v, liste){
+  const L = piste.longueur, s = ((v.s % L) + L) % L, lat = v.lat || 0, B = Math.min(4.8, DEMI_PISTE - 1.3);
+  const devant = liste.filter(e => e.s - s > -2 && e.s - s < 110);
+  if (!devant.length) return;
+  const e = devant[0], m = e.r + 2.0;
+  if (Math.abs(lat - e.lat) > m + 0.8 && Math.abs((v.latCible || 0) - e.lat) > m && e.s - s > 45) return;
+  let best = null, bc = 1e9;
+  for (let c = -B; c <= B + 1e-6; c += 0.4){
+    if (Math.abs(c - e.lat) < m) continue;
+    let cout = Math.abs(c - lat) * 0.25;
+    for (const o of devant){ if (o === e) continue; const d = o.s - e.s, g = o.r + 2.0 - Math.abs(c - o.lat); if (g > 0) cout += g * (d < 40 ? 6 : 1.5); }
+    if (cout < bc){ bc = cout; best = c; }
+  }
+  v.capK = null;
+  if (best != null){
+    v.viseSableK = best; v.evitK = 0.4;
+    // trop serré pour passer à cette vitesse : il lève le pied le temps de se décaler
+    const t = Math.max(0.15, (e.s - s - 2) / Math.max(v.v, 8)), besoin = Math.abs(best - lat) / t;
+    if (besoin > 6.5 && e.s - s > 3) v.capK = Math.max(25, v.v * 6.5 / besoin);
+  }
 }
 function chocObstaclesK(v, dt){
-  const liste = obstaclesPour(v); if (!liste || v.s == null) return;
+  const liste = obstaclesPour(v); if (!liste || v.s == null) return; liste.sort((a, b) => a.s - b.s); if (!v.joueur) planObstK(v, liste);
   const L = piste.longueur, s = ((v.s % L) + L) % L, lat = v.lat || 0;
   v._chocsK = v._chocsK || {};
   for (const e of liste){
     const u = e.type === "geyser" ? etatGeyser(e) : 1; if (e.type === "geyser" && u < 0.05) continue;
     const ds = s - e.s, dl = lat - e.lat;
     // les adversaires voient l'obstacle venir et s'écartent
-    if (!v.joueur && ds > -50 && ds < -3 && Math.abs(dl) < e.r + 1.8) v.vlat = (v.vlat || 0) + (Math.sign(dl) || (e.lat > 0 ? -1 : 1)) * 16 * dt;
+    
     if (ds * ds + dl * dl > (e.r + 1.1) ** 2) continue;
     const cle = e.type === "geyser" ? e.id + ":" + v.tour + ":" + Math.floor((jeu.chrono + e.ph) / PERIODE_G) : e.id;
     if (v._chocsK[cle] || (v.joueur && e.casse)) continue;
@@ -9092,7 +9120,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 13;      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 14;      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
