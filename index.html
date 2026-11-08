@@ -1294,6 +1294,27 @@ function ambianceSBS(){
     if (forcer.tempete != null) TEMPETE = forcer.tempete;
     return;
   }
+  if (piste && piste.def && piste.def.nom === "Bafisson" && !NUIT && decor){
+    const J = jeu.joueur; if (!J || !/compte|course|pause|arrivee/.test(jeu.phase)) return;
+    const forcer = typeof window !== "undefined" && window.ESSAI_BAF || {}, ev = forcer.ev || evBaf(J.tour);
+    if (ev && J.evBafVu !== J.tour && jeu.phase === "course"){
+      J.evBafVu = J.tour;                                          // le volcan gronde à chaque nouvel événement
+      bip(48, 1.8, 0.4, "sawtooth"); bip(36, 2.4, 0.35, "triangle");
+      if (ev === "fiss" || ev === "eruption") secousse = Math.max(secousse, ev === "eruption" ? 2.2 : 1.2);
+      if (ev === "cendres"){ J.cendresA = jeu.chrono; sonVent(); }
+    }
+    if (ev !== "cendres" && J.cendresA != null && J.cendresFin == null) J.cendresFin = jeu.chrono;
+    SABLE_ACT = CENDRE;
+    if (ev === "cendres" && J.cendresA != null){ const u = Math.min(1, (jeu.chrono - J.cendresA) / 6); TEMPETE = 0.72 * u * u * (3 - 2 * u); }
+    else if (J.cendresFin != null){ const k = (jeu.chrono - J.cendresFin) / 5; if (k < 1) TEMPETE = 0.72 * (1 - k); }
+    if (ev === "eruption"){
+      const prog = Math.max(0, (J.distance || 0) / piste.longueur - (toursCourse() - 1));
+      CREP = 0.25 + 0.2 * Math.min(1, prog * 2);
+      CREP_T = melange3([1, 1, 1], [1.0, 0.62, 0.48], CREP * 2); CREP_C = melange3([1, 1, 1], [1.2, 0.42, 0.26], CREP * 2);
+    }
+    if (forcer.tempete != null) TEMPETE = forcer.tempete;
+    return;
+  }
   if (!piste || !piste.def || piste.def.nom !== "SteelBallSon" || NUIT || !decor) return;
   const J = jeu.joueur; if (!J || !/compte|course|pause|arrivee/.test(jeu.phase)) return;
   const n = toursCourse(), forcer = typeof window !== "undefined" && window.ESSAI_SBS || {};      // (essais : forcer une heure ou la tempête)
@@ -1890,10 +1911,16 @@ PAYS["Far West"] = { continent: "Amériques", climat: "desert", arbre: "cactus",
   couleurs: { herbe: [0.84, 0.58, 0.36], herbe2: [0.80, 0.54, 0.33], degage: [0.88, 0.66, 0.42],
               palmier: [0.36, 0.26, 0.16], tronc: [0.36, 0.26, 0.16],
               facades: [[0.56, 0.38, 0.24], [0.66, 0.48, 0.30], [0.48, 0.32, 0.20], [0.80, 0.64, 0.44], [0.86, 0.72, 0.52]] } };
+/* Bafisson : la course sur un volcan islandais. Champs de lave noire et de
+   mousse, pas de ville, et le volcan qui fume au-dessus du circuit. */
+PAYS["Volcan"] = { continent: "Europe", climat: "nordique", arbre: "lave", mer: false, monument: null, volcan: true,
+  horizon: [0.74, 0.70, 0.68], relief: { h: 150, c: [0.19, 0.18, 0.19], neige: true },
+  couleurs: { herbe: [0.25, 0.29, 0.19], herbe2: [0.17, 0.16, 0.16], degage: [0.13, 0.12, 0.12], tronc: [0.12, 0.11, 0.11],
+              facades: [[0.86, 0.62, 0.48], [0.92, 0.86, 0.62], [0.72, 0.80, 0.86], [0.94, 0.92, 0.88]] } };
 /* Gou se court de nuit : la ville illuminée, des lanternes rouges, la lune. */
 PAYS["Chine de nuit"] = Object.assign({}, PAYS["Chine"], { nuit: true, horizon: [0.07, 0.08, 0.17] });
 PAYS["Malaisie"].feuilles = true;          // la grande tribune aux toits en feuilles (Yingpang)
-const decorDe = def => def.nom === "SteelBallSon" ? "Far West" : def.nom === "Gou" ? "Chine de nuit" : def.pays;
+const decorDe = def => def.nom === "SteelBallSon" ? "Far West" : def.nom === "Bafisson" ? "Volcan" : def.nom === "Gou" ? "Chine de nuit" : def.pays;
 let NUIT = 0;
 // climat des huit premiers pays, décrits à la main
 Object.assign(PAYS["Azerbaïdjan"], { climat: "mediter" }); Object.assign(PAYS["Monaco"], { climat: "mediter" });
@@ -1929,6 +1956,11 @@ function arbre(m, style, x, y, z, h, alea){
     cylindreY(m, x, y, z, 0.3, 0.25, 1.4, 5, COUL.tronc);
     cylindreY(m, x, y + 1.2, z, 2.4, 0.9, h*0.55, 7, [0.10,0.26,0.14]);
     cylindreY(m, x, y + 1.2 + h*0.45, z, 1.7, 0, h*0.7, 7, [0.12,0.30,0.16]);
+  } else if (style === "lave"){
+    // champ de lave : des blocs de basalte noir, souvent couverts de mousse
+    const r = 0.9 + h * 0.16, mousse = alea() < 0.4;
+    boite(m, x, y + r * 0.3, z, r * (1.3 + alea() * 0.9), r * (0.6 + alea() * 0.7), r * (1.1 + alea() * 0.9), mousse ? [0.30, 0.37, 0.22] : [0.12, 0.11, 0.11], alea() * 3);
+    if (alea() < 0.55) boite(m, x + r * 0.7, y + r * 0.15, z - r * 0.5, r * 0.8, r * 0.45, r * 0.7, mousse ? [0.26, 0.33, 0.20] : [0.17, 0.16, 0.15], alea() * 3);
   } else if (style === "cactus"){
     // saguaro : un fût et un ou deux bras dressés ; parfois un rocher rouge à la place
     if (alea() < 0.22){
@@ -3360,6 +3392,28 @@ function construireDecor(piste){
     }
   }
 
+  /* ───── Bafisson ─────
+     Au premier virage, à l'extérieur : un muret de basalte, PREMIERESSON en
+     grand et les noms de la bande autour. */
+  let bafLaveM = null, bafVolcan = null;
+  if (T.volcan){
+    let a = -1;
+    for (let i = 3; i < nb && a < 0; i++) if (Math.abs(P[i].courbure) > 1 / 160){ let b = i, k = Math.abs(P[i].courbure); for (let j = i; j < Math.min(nb, i + 30); j++) if (Math.abs(P[j].courbure) > k){ k = Math.abs(P[j].courbure); b = j; } a = b; }
+    if (a > 0){
+      const p = P[a], q1 = P[(a - 15 + nb) % nb], q2 = P[(a + 15) % nb];
+      const mx = (q1.x + q2.x) / 2 - p.x, mz = (q1.z + q2.z) / 2 - p.z, sIn = Math.sign(mx * p.nx + mz * p.nz) || 1;   // côté intérieur du virage
+      const off = -sIn * (DEMI_PISTE + ACCOTEMENT + 2.0), x = p.x + p.nx * off, z = p.z + p.nz * off, y = p.y - 0.35;
+      const Lm = 42, Hm = 5.0, lacet = Math.atan2(-p.tz, p.tx);
+      boite(paysage, x, y + Hm / 2, z, Lm, Hm, 1.1, [0.17, 0.16, 0.15], lacet);
+      boite(paysage, x, y + Hm + 0.12, z, Lm + 0.6, 0.24, 1.4, [0.10, 0.10, 0.10], lacet);          // la margelle
+      const fx = sIn * p.nx, fz = sIn * p.nz;                                                        // vers la piste
+      enseigne("§m:PREMIERESSON|Bafisson|Raphasson|Paulnaref|Josephsson|Almasson|Sososson|Gayasson|Elisson|Ellisson|Emiliesson|Livsson",
+               x + fx * 0.58, y + 1.45, z + fz * 0.58, -fx, -fz, Lm - 0.6, (Lm - 0.6) * 160 / 2048);
+      reserver(x, z, 24);
+      reperes.push(["premieresson", x, y + 2, z, fx, fz]);
+    }
+  }
+
   const persoD = jozuki || bonzi || kujota;      // un circuit au décor fait sur mesure
   // --- décor : immeubles de bord de rue, ou arbres ---
   let graine = 20260930;
@@ -3368,6 +3422,7 @@ function construireDecor(piste){
 
   for (let i = 0; i < nb; i += (ville ? 4 : 3)){
     if (dansSeg(rueSBS, i) || dansSeg(canyonSBS, i)) continue;     // rue western et canyon : décor dédié
+    if (T.volcan) break;                                            // Bafisson : pas de ville sur le volcan
     const p = P[i];
     for (const s of [1, -1]){
       const dedans = alea();
@@ -4738,8 +4793,75 @@ function construireDecor(piste){
     }
   }
 
+  if (T.volcan){
+    /* Le volcan : un grand cône, au loin, droit devant la ligne droite des
+       stands. Coulées de lave sur son flanc, cratère rougeoyant (dessinés à
+       part, lumineux). Plus un petit volcan à côté. */
+    let cx = 0, cz = 0; for (const q of P){ cx += q.x; cz += q.z; } cx /= nb; cz /= nb;
+    let ext = 0; for (const q of P) ext = Math.max(ext, Math.hypot(q.x - cx, q.z - cz));
+    const qv = P[Math.floor(nb * 0.17)], dvx = qv.x - cx, dvz = qv.z - cz, dl = Math.hypot(dvx, dvz) || 1;
+    bafLaveM = creerMaillage();
+    let gV = 7331; const alV = () => (gV = (gV * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const volcan = (vx, vz, H, Rb, Rc, lave) => {
+      const N = 30, R = 9, y0 = SOL - 4, bruit = [];
+      for (let k = 0; k < N; k++) bruit.push(0.85 + alV() * 0.3);
+      const pt = (k, j) => { const a2 = (k % N) / N * Math.PI * 2, u = j / R, r = Rc + (Rb - Rc) * Math.pow(1 - u, 2.2) * bruit[k % N];
+        return [vx + Math.cos(a2) * r, y0 + H * u * (0.96 + 0.04 * bruit[(k + 3) % N]), vz + Math.sin(a2) * r]; };
+      for (let k = 0; k < N; k++) for (let j = 0; j < R; j++){
+        const u = j / R, c = u > 0.82 ? [0.30, 0.29, 0.30] : (k + j) % 3 === 0 ? [0.21, 0.19, 0.19] : [0.17, 0.16, 0.16];
+        const neige = u > 0.55 && u < 0.8 && bruit[k] > 1.05 ? [0.86, 0.87, 0.90] : c;
+        quad(reliefs, pt(k, j), pt(k + 1, j), pt(k + 1, j + 1), pt(k, j + 1), neige);
+      }
+      // le cratère : un creux sombre, et son fond qui rougeoie (lumineux)
+      const yH = y0 + H, cr = (k, r, y) => { const a2 = k / N * Math.PI * 2; return [vx + Math.cos(a2) * r, y, vz + Math.sin(a2) * r]; };
+      for (let k = 0; k < N; k++){
+        quad(reliefs, pt(k + 1, R), pt(k, R), cr(k, Rc * 0.55, yH - H * 0.05), cr(k + 1, Rc * 0.55, yH - H * 0.05), [0.10, 0.09, 0.09]);
+        if (lave) triangle(bafLaveM, cr(k, Rc * 0.55, yH - H * 0.05 + 0.5), cr(k + 1, Rc * 0.55, yH - H * 0.05 + 0.5), [vx, yH - H * 0.05 + 0.5, vz], [1.0, 0.45 + 0.2 * (k % 2), 0.08]);
+      }
+      if (!lave) return null;
+      // des coulées sur le flanc tourné vers le circuit
+      const aV = Math.atan2(cz - vz, cx - vx);
+      for (const da of [-0.32, -0.08, 0.17, 0.38]){
+        let a2 = aV + da, larg = 9 + alV() * 6;
+        for (let j = R; j > 2; j--){
+          const u0 = j / R, u1 = (j - 1) / R, w0 = larg * (0.6 + 0.4 * (1 - u0)), w1 = larg * (0.6 + 0.4 * (1 - u1));
+          const P0 = (u, aa, ww) => { const r = Rc + (Rb - Rc) * Math.pow(1 - u, 2.2) + 2.5; const ex = -Math.sin(aa), ez = Math.cos(aa);
+            return [vx + Math.cos(aa) * r + ex * ww / 2, y0 + H * u * 0.97 + 1, vz + Math.sin(aa) * r + ez * ww / 2]; };
+          const a3 = a2 + (alV() - 0.5) * 0.05;
+          const coul = j > R - 3 ? [1.0, 0.62, 0.12] : [0.95, 0.32 + 0.1 * (j % 2), 0.06];
+          quad(bafLaveM, P0(u1, a3, -w1), P0(u1, a3, w1), P0(u0, a2, w0), P0(u0, a2, -w0), coul);
+          a2 = a3;
+        }
+      }
+      return [vx, yH, vz];
+    };
+    const dV = ext + 520 + 260, vx = cx + dvx / dl * dV, vz = cz + dvz / dl * dV;
+    const crat = volcan(vx, vz, 360, 520, 70, true);
+    const px2 = -dvz / dl, pz2 = dvx / dl;
+    volcan(vx + px2 * 520 + dvx / dl * 160, vz + pz2 * 520 + dvz / dl * 160, 190, 300, 40, false);
+    bafVolcan = { x: crat[0], y: crat[1], z: crat[2], H: 360 };
+    // champs de lave : blocs de basalte et buttes de mousse ; des fumerolles qui fument
+    let gR = 4417; const alR = () => (gR = (gR * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const fum = [];
+    for (let i = 0; i < nb; i += 2){
+      const p = P[i];
+      for (const s of [1, -1]){
+        if (alR() > 0.75) continue;
+        const dec = s * (DEMI_PISTE + ACCOTEMENT + 6 + alR() * alR() * 140), x = p.x + p.nx * dec + (alR() - 0.5) * 8, z = p.z + p.nz * dec + (alR() - 0.5) * 8;
+        const r = 1.2 + alR() * 3.5; if (!libreD(x, z, r + 1)) continue;
+        const y = solEn(x, z)[0], mousse = alR() < 0.45;
+        if (mousse) cylindreY(paysage, x, y - 0.2, z, r * 1.3, r * 0.5, r * 0.7, 7, alR() < 0.5 ? [0.27, 0.33, 0.20] : [0.31, 0.37, 0.22]);
+        else { boite(paysage, x, y + r * 0.3, z, r * 1.6, r * (0.6 + alR() * 0.6), r * 1.3, alR() < 0.5 ? [0.12, 0.11, 0.11] : [0.16, 0.15, 0.14], alR() * 3);
+               if (alR() < 0.4) boite(paysage, x + r * 0.8, y + r * 0.2, z + r * 0.3, r * 0.9, r * 0.5, r * 0.8, [0.10, 0.10, 0.10], alR() * 3); }
+        if (fum.length < 16 && i % 50 < 2 && Math.abs(dec) > 30 && Math.abs(dec) < 90){ fum.push([x, y + r * 0.6, z, alR() * 10]);
+          cylindreY(paysage, x, y - 0.1, z, 3.2, 1.4, 1.2, 8, [0.62, 0.56, 0.38]); }        // le soufre jaune autour de la bouche
+      }
+    }
+    bafVolcan.fum = fum;
+  }
   return {
     feux, sbr, animes: objetsAnimes, lumieres: televerser(lumieres), reperes, hieroK: hieroKm ? televerser(hieroKm) : null,
+    bafLave: bafLaveM && bafLaveM.idx.length ? televerser(bafLaveM) : null, bafVolcan,
     lampesCrep: lampesCrep.idx.length ? televerser(lampesCrep) : null, halosCrep: halosCrep.idx.length ? televerser(halosCrep) : null,
     spotsNuit: spotsNuit.idx.length ? televerser(spotsNuit) : null,
     ecrans: Object.fromEntries(Object.entries(ecrans).map(([k, m]) => [k, televerser(m)])),
@@ -5421,6 +5543,7 @@ function majGyro(v, dt){
 }
 function majJoueur(v, dt){
   chocObstaclesK(v, dt);                                  // Kujota : geysers, émeraudes
+  chocBaf(v, dt);                                         // Bafisson : fissures, bombes de lave
   majRetour(v, dt);
   majGyro(v, dt);
   // Dérive latérale après un coup sur le côté : la voiture glisse, puis la
@@ -5464,6 +5587,7 @@ function majJoueur(v, dt){
   if (v.aspi > 0.05 && v.v < vA) v.v += v.aspi * 0.9 * dt;
   // après le Gyro, on redescend en douceur à la vitesse normale (pas un mur)
   if (v.v > vA) v.v = v.gyroFin > 0 ? Math.max(vA, v.v - 11 * dt) : vA;
+  { const cB = capBaf(v); if (cB < 1){ const vS = R.vmax * cB; if (v.v > vS) v.v = Math.max(vS, v.v - 30 * dt); } }   // Bafisson : lave, cendre
   if (sableK > 0){ const vS = R.vmax * (sableK >= 1.5 ? 0.5 : Math.max(0.5, 1 - 0.5 * sableK)); if (v.v > vS) v.v = Math.max(vS, v.v - (sableK >= 1.5 ? 32 : 6 + 10 * sableK) * dt); }   // le sable retient
 
   const part = Math.min(1, v.v / R.vmax);
@@ -5617,7 +5741,7 @@ function replacer(v){
 
 function majIA(v, dt){
   const R = v.R;
-  v.viseSableK = null; v.capK = null; chocObstaclesK(v, dt); eviterSablesK(v, dt);
+  v.viseSableK = null; v.capK = null; chocObstaclesK(v, dt); eviterSablesK(v, dt); chocBaf(v, dt);
 
   // Poussé dans l'herbe : il y roule lentement (voir plus bas pour le retour)
   const dehors = Math.abs(v.lat) > DEMI_PISTE + BORDURE * 0.7;
@@ -5657,6 +5781,7 @@ function majIA(v, dt){
   // de la piste, comme sur une voie de dégagement)
   if (dehors) cible = Math.min(cible, v.crashe ? 0 : R.vmax * 0.18);   // contre le mur : arrêté
   if (v.capK) cible = Math.min(cible, v.capK);
+  { const cB = capBaf(v); if (cB < 1) cible = Math.min(cible, R.vmax * cB); }       // Bafisson : lave, cendre
   { const fS = sableKujota(v); if (fS > 0) cible = Math.min(cible, R.vmax * (fS >= 1.5 ? 0.5 : Math.max(0.5, 1 - 0.5 * fS))); }   // Kujota : le sable
 
   /* Erreurs de pilotage, rares : un virage pris trop large, ou un blocage
@@ -7193,7 +7318,7 @@ function rendre(){
     dessinerVoiture(v);
   }
   dessinerAir();                       // traînées d'air de l'aspiration
-  gl.disable(gl.CULL_FACE); dessinerObstaclesK(); gl.enable(gl.CULL_FACE);   // Kujota : geysers, émeraudes (après la route)
+  gl.disable(gl.CULL_FACE); dessinerObstaclesK(); dessinerBaf(); gl.enable(gl.CULL_FACE);   // Kujota : geysers, émeraudes (après la route)
   dessinerPoussiere(decor);
 }
 
@@ -7348,9 +7473,9 @@ function dessinerHUD(){
   if (TEMPETE > 0){
     // le sable qui vole devant l'écran
     const t = performance.now() / 1000;
-    const jaune = SABLE_ACT === SABLE_KUJOTA;
-    ctx2.save(); ctx2.globalAlpha = (jaune ? 0.30 : 0.24) * TEMPETE; ctx2.fillStyle = jaune ? "#dcae3c" : "#c79a5c"; ctx2.fillRect(0, 0, W, H);
-    ctx2.globalAlpha = 0.5 * TEMPETE; ctx2.strokeStyle = jaune ? "#f4d47a" : "#e8c48c"; ctx2.lineWidth = 1.6 * E;
+    const jaune = SABLE_ACT === SABLE_KUJOTA, gris = SABLE_ACT === CENDRE;
+    ctx2.save(); ctx2.globalAlpha = (jaune ? 0.30 : gris ? 0.34 : 0.24) * TEMPETE; ctx2.fillStyle = jaune ? "#dcae3c" : gris ? "#3b3836" : "#c79a5c"; ctx2.fillRect(0, 0, W, H);
+    ctx2.globalAlpha = 0.5 * TEMPETE; ctx2.strokeStyle = jaune ? "#f4d47a" : gris ? "#b5b0aa" : "#e8c48c"; ctx2.lineWidth = 1.6 * E;
     for (let k = 0; k < 90; k++){
       const hz = Math.sin(k * 91.7) * 43758.5, a = hz - Math.floor(hz), b = (Math.sin(k * 12.3) * 9999) % 1;
       const x = ((a * W + t * (900 + a * 700) * E) % (W + 200)) - 100, y = (Math.abs(b) * H + Math.sin(t * 3 + k) * 20) % H;
@@ -7358,7 +7483,7 @@ function dessinerHUD(){
     }
     ctx2.restore();
   }
-  dessinerEvenementsK(ctx2, W, H, E);
+  dessinerEvenementsK(ctx2, W, H, E); dessinerEvenementsBaf(ctx2, W, H, E);
   if (jeu.zw) dessinerZaWarudo(ctx2, W, H, E);
   if (jeu.flashFleche && performance.now() - jeu.flashFleche < 1000){
     const a = 1 - (performance.now() - jeu.flashFleche) / 1000;
@@ -7943,6 +8068,201 @@ function chocObstaclesK(v, dt){
 }
 // les obstacles, en 3D (une émeraude qui tourne, un geyser qui jaillit, sa flaque)
 let meshK = null;
+/* ───── Bafisson : un événement par tour ─────
+   Tout dépend du tour de CHAQUE voiture et du chrono de la course : c'est
+   pareil chez tout le monde (et sur le serveur), sans rien à s'envoyer. */
+const estBaf = () => !!piste && !!piste.def && piste.def.nom === "Bafisson";
+const PER_B = 5.5, PER_E = 6.5, AVERT_B = 1.6, FLAQUE_B = 2.6, PER_F = 3.2, OUVERT_F = 1.25;
+const CENDRE = [0.34, 0.33, 0.33];
+function evBaf(tour){
+  if (!estBaf() || tour == null || tour < 0) return null;
+  const n = toursCourse();
+  if (tour === n - 1) return "eruption";
+  return ["fiss", "bombes", "coulee", "cendres"][tour] || null;
+}
+let bafCache = null;
+function sitesBaf(){
+  if (bafCache && bafCache.piste === piste) return bafCache;
+  const L = piste.longueur, D = DEMI_PISTE;
+  let g = 9173; const al = () => (g = (g * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  // une bombe tombe d'un côté de la piste : il reste toujours un passage de l'autre
+  const site = (d, per) => ({ s: d * L, lat: (al() < 0.5 ? -1 : 1) * D * (0.42 + al() * 0.18), ph: al() * per, r: 2.6 });
+  const fiss = []; for (let k = 0; k < 6; k++) fiss.push({ s: (0.245 + k * 0.014) * L, ph: k * 0.55 });
+  const bombes = []; for (let k = 0; k < 12; k++) bombes.push(site(0.55 + k * 0.012, PER_B));
+  const eruption = []; for (let k = 0; k < 40; k++) eruption.push(site(0.06 + k * 0.022, PER_E));
+  const coulees = [{ s: 0.383 * L, lane: D * 0.5 }, { s: 0.80 * L, lane: -D * 0.5 }];
+  return (bafCache = { piste, fiss, bombes, eruption, coulees });
+}
+function etatBombe(e, per){
+  const u = ((jeu.chrono + e.ph) % per + per) % per;
+  return u < AVERT_B ? { ph: "avert", u: u / AVERT_B } : u < AVERT_B + FLAQUE_B ? { ph: "flaque", u: (u - AVERT_B) / FLAQUE_B } : null;
+}
+const ouverteF = f => ((jeu.chrono + f.ph) % PER_F + PER_F) % PER_F < OUVERT_F;
+const dansLaveB = (S, s, lat) => S.coulees.some(c => Math.abs(s - c.s) < 9 && Math.abs(lat - c.lane) > 1.7);
+// la vitesse que le volcan laisse (1 : rien)
+function capBaf(v){
+  if (!estBaf() || v.s == null || v.tempsFinal != null) return 1;
+  const ev = evBaf(v.tour); if (!ev || ev === "fiss") return 1;
+  const L = piste.longueur, s = ((v.s % L) + L) % L, lat = v.lat || 0, S = sitesBaf();
+  let f = 1;
+  if (ev === "coulee" && dansLaveB(S, s, lat)) f = 0.45;                       // dans la lave
+  if (ev === "cendres" && s > 0.80 * L && s < 0.95 * L) f = 0.8;              // la cendre
+  if (ev === "bombes" || ev === "eruption"){
+    const [liste, per] = ev === "bombes" ? [S.bombes, PER_B] : [S.eruption, PER_E];
+    for (const e of liste){ if (Math.abs(s - e.s) > 4) continue; const st = etatBombe(e, per);
+      if (st && st.ph === "flaque" && (s - e.s) ** 2 + (lat - e.lat) ** 2 < (e.r * 0.85) ** 2) f = Math.min(f, 0.55); }
+  }
+  return f;
+}
+function fxBaf(v, c, force){ v.flashB = { c, t: jeu.chrono }; if (v === jeu.joueur && typeof secousse !== "undefined") secousse = Math.max(secousse, force); }
+// les chocs (fissures, impacts) et, pour les bots, où passer
+function chocBaf(v, dt){
+  if (!estBaf() || v.s == null || v.tempsFinal != null) return;
+  const ev = evBaf(v.tour); if (!ev) return;
+  const L = piste.longueur, s = ((v.s % L) + L) % L, lat = v.lat || 0, S = sitesBaf();
+  v._chocB = v._chocB || {};
+  if (ev === "fiss"){
+    for (const fi of S.fiss){
+      if (Math.abs(s - fi.s) > 1.6 || !ouverteF(fi)) continue;
+      const cle = "f" + Math.round(fi.s) + ":" + Math.floor((jeu.chrono + fi.ph) / PER_F); if (v._chocB[cle]) continue; v._chocB[cle] = 1;
+      v.v *= 0.78;
+      if (v.joueur){ fxBaf(v, "#ff6a1a", 1.0); bip(62, 0.5, 0.35, "sawtooth"); bip(41, 0.7, 0.3, "square"); }
+    }
+    // les bots qui voient une fissure ouverte juste devant lèvent un peu le pied
+    if (!v.joueur) for (const fi of S.fiss){ const ds = fi.s - s; if (ds > 2 && ds < 30 && ouverteF(fi)){ v.capK = Math.max(30, v.v * 0.9); break; } }
+  }
+  if (ev === "bombes" || ev === "eruption"){
+    const [liste, per] = ev === "bombes" ? [S.bombes, PER_B] : [S.eruption, PER_E];
+    const danger = [];
+    for (const e of liste){
+      const ds = e.s - s; if (ds < -6 || ds > 110) continue;
+      const st = etatBombe(e, per); if (st) danger.push(e);
+      if (!st || st.ph !== "flaque" || st.u > 0.08) continue;                                  // l'impact
+      if ((s - e.s) ** 2 + (lat - e.lat) ** 2 > (e.r + 1.2) ** 2) continue;
+      const cle = "b" + Math.round(e.s) + ":" + Math.floor((jeu.chrono + e.ph) / per); if (v._chocB[cle]) continue; v._chocB[cle] = 1;
+      v.v *= 0.55;
+      if (v.joueur){ fxBaf(v, "#ff4a10", 1.5); bip(80, 0.6, 0.4, "sawtooth"); bip(45, 0.9, 0.4, "square"); }
+      else v.vlat = (v.vlat || 0) + (Math.sign(lat - e.lat) || 1) * 5;
+    }
+    if (!v.joueur && danger.length && typeof planObstK === "function") planObstK(v, danger.sort((a, b) => a.s - b.s));
+  }
+  if (ev === "coulee"){
+    if (!v.joueur){ for (const c of S.coulees){ const ds = c.s - s; if (ds > -10 && ds < 90){ v.viseSableK = Math.max(-(DEMI_PISTE - 1.3), Math.min(DEMI_PISTE - 1.3, c.lane)); v.evitK = 0.4; break; } } }
+    else if (dansLaveB(S, s, lat)){ if (!(jeu.chrono - (v.laveB || -9) < 0.6)) bip(110, 0.3, 0.25, "sawtooth"); v.laveB = jeu.chrono; }
+  }
+}
+// les maillages de Bafisson (une fois par circuit)
+let meshB = null;
+function maillagesBaf(){
+  if (meshB && meshB.piste === piste) return meshB;
+  const disque = (coulB, coulR, n = 18) => { const m = creerMaillage(); for (let k = 0; k < n; k++){ const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2;
+    triangle(m, [0, 0, 0], [Math.cos(a1), 0, Math.sin(a1)], [Math.cos(a0), 0, Math.sin(a0)], k % 2 ? coulB : coulR); } return televerser(m); };
+  const anneau = coul => { const m = creerMaillage(), n = 24; for (let k = 0; k < n; k++){ const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2;
+    quad(m, [Math.cos(a0) * 0.86, 0, Math.sin(a0) * 0.86], [Math.cos(a1) * 0.86, 0, Math.sin(a1) * 0.86], [Math.cos(a1), 0, Math.sin(a1)], [Math.cos(a0), 0, Math.sin(a0)], coul); } return televerser(m); };
+  const boule = (c1, c2) => { const m = creerMaillage(), N = 8, M = 6;
+    const pt = (i, j) => { const th = j / M * Math.PI, ph = i / N * Math.PI * 2; return [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]; };
+    for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) quad(m, pt(i, j), pt(i + 1, j), pt(i + 1, j + 1), pt(i, j + 1), (i + j) % 2 ? c1 : c2); return televerser(m); };
+  // fissure : une ligne brisée en travers de la piste (sur une largeur de 1)
+  const fissure = () => { const m = creerMaillage(); let g = 5; const al = () => (g = (g * 16807) % 2147483647) / 2147483647;
+    const n = 12; let z0 = 0; for (let k = 0; k < n; k++){ const x0 = -0.5 + k / n, x1 = -0.5 + (k + 1) / n, z1 = (al() - 0.5) * 0.9, w = 0.18 + al() * 0.22;
+      quad(m, [x0, 0, z0 - w], [x1, 0, z1 - w], [x1, 0, z1 + w], [x0, 0, z0 + w], [1, 1, 1]); z0 = z1; } return televerser(m); };
+  // les rivières de lave, en travers de la piste, avec leur croûte noire praticable
+  const coulees = [];
+  for (const c of sitesBaf().coulees){
+    const lave = creerMaillage(), croute = creerMaillage(), D = DEMI_PISTE + 7; let g = Math.round(c.s); const al = () => (g = (g * 16807 + 7) % 2147483647) / 2147483647;
+    for (let ds = -9; ds < 9; ds += 1.5){
+      const a = auPoint(piste, c.s + ds), b = auPoint(piste, c.s + ds + 1.5);
+      for (let l = -D; l < D; l += 1.5){
+        const P4 = (p, ll) => [p.x + p.nx * ll, p.y + 0.06 + (Math.abs(ll) > DEMI_PISTE ? 0.3 : 0), p.z + p.nz * ll];
+        const k = al(), coul = k < 0.25 ? [1.0, 0.78, 0.22] : k < 0.65 ? [1.0, 0.42, 0.06] : [0.82, 0.18, 0.04];
+        quad(lave, P4(a, l + 1.5), P4(b, l + 1.5), P4(b, l), P4(a, l), coul);
+      }
+      const P5 = (p, ll) => [p.x + p.nx * ll, p.y + 0.12, p.z + p.nz * ll];
+      quad(croute, P5(a, c.lane + 1.7), P5(b, c.lane + 1.7), P5(b, c.lane - 1.7), P5(a, c.lane - 1.7), (Math.round(ds) % 3) ? [0.09, 0.08, 0.08] : [0.14, 0.12, 0.11]);
+    }
+    coulees.push({ lave: televerser(lave), croute: televerser(croute) });
+  }
+  return (meshB = { piste, avert: anneau([1.0, 0.25, 0.05]), cible: disque([0.9, 0.2, 0.04], [0.6, 0.1, 0.02]), feu: boule([1.0, 0.55, 0.08], [1.0, 0.85, 0.3]),
+                    flaque: disque([1.0, 0.45, 0.06], [0.85, 0.22, 0.04]), fumee: boule([0.42, 0.40, 0.40], [0.34, 0.32, 0.32]), fissure: fissure(), coulees });
+}
+function dessinerBaf(){
+  const J = jeu.joueur; if (!J || !estBaf() || !decor) return;
+  const M = maillagesBaf(), S = sitesBaf(), t = performance.now() / 1000, L = piste.longueur;
+  const forcer = (typeof window !== "undefined" && window.ESSAI_BAF) || {};
+  const ev = forcer.ev || evBaf(J.tour);
+  const V = decor.bafVolcan;
+  // le volcan : coulées et cratère lumineux, panache de fumée (feu au dernier tour), vus de loin
+  if (V){
+    gl.uniform1f(U.uBrumeDebut, 500); gl.uniform1f(U.uBrumeFin, 2700);
+    if (decor.bafLave){ const p = 0.85 + 0.15 * Math.sin(t * 2.1); tracer(decor.bafLave, m4Identite(), [p, p, p], 1.0); }
+    const eru = ev === "eruption", n = eru ? 16 : 11;
+    for (let k = 0; k < n; k++){
+      const u = ((t * (eru ? 0.16 : 0.07) + k / n) % 1), r = 30 + u * (eru ? 170 : 120), h = u * (eru ? 520 : 380);
+      const dx = Math.sin(k * 2.3) * r * 0.4 + u * 90, dz = Math.cos(k * 1.7) * r * 0.4;
+      const g = eru ? 0.42 - u * 0.2 : 0.62 - u * 0.12;
+      tracer(M.fumee, m4Mul(m4Translation(V.x + dx, V.y + h, V.z + dz), m4Echelle(r, r * 0.8, r)), [g, g * 0.97, g * 0.96]);
+    }
+    if (eru) for (let k = 0; k < 14; k++){                             // les jets de lave
+      const u = ((t * 0.7 + k * 0.137) % 1), a = k * 2.4, sp = 60 + (k % 4) * 25;
+      const x = V.x + Math.cos(a) * sp * u * 1.4, z = V.z + Math.sin(a) * sp * u * 1.4, y = V.y + 260 * u - 300 * u * u;
+      tracer(M.feu, m4Mul(m4Translation(x, y, z), m4Echelle(9, 9, 9)), [1, 1, 1], 1.0);
+    }
+  }
+  gl.uniform1f(U.uBrumeDebut, 260 + (6 - 260) * TEMPETE); gl.uniform1f(U.uBrumeFin, 1100 + (92 - 1100) * TEMPETE);
+  if (V && V.fum) for (const [x, y, z, ph] of V.fum){                         // les fumerolles
+    if ((x - J.x) ** 2 + (z - J.z) ** 2 > 500 * 500) continue;
+    for (let k = 0; k < 5; k++){ const u = ((t * 0.25 + ph + k / 5) % 1), r = 1.5 + u * 7;
+      tracer(M.fumee, m4Mul(m4Translation(x + u * 4, y + u * 22, z), m4Echelle(r, r * 0.8, r)), [2.2 - u * 0.4, 2.2 - u * 0.4, 2.15 - u * 0.4], 0.9); }
+  }
+  if (!ev) return;
+  const proche = (x, z, d = 450) => (x - J.x) ** 2 + (z - J.z) ** 2 < d * d;
+  if (ev === "fiss"){
+    for (const fi of S.fiss){
+      const p = auPoint(piste, fi.s); if (!proche(p.x, p.z)) continue;
+      const o = ouverteF(fi), u = ((jeu.chrono + fi.ph) % PER_F + PER_F) % PER_F, k = o ? Math.min(1, u / 0.15, (OUVERT_F - u) / 0.2) : 0;
+      const larg = (DEMI_PISTE + 2) * 2, ep = o ? 1.0 + 0.8 * k : 0.55;
+      const coul = o ? [1.0, 0.45 + 0.3 * k, 0.08] : [0.32, 0.07, 0.03];
+      tracer(M.fissure, m4Mul(m4Mul(m4Translation(p.x, p.y + 0.07, p.z), m4RotY(p.cap)), m4Echelle(larg, 1, ep * 2.6)), coul, o ? 1.0 : undefined);
+    }
+  }
+  if (ev === "bombes" || ev === "eruption"){
+    const [liste, per] = ev === "bombes" ? [S.bombes, PER_B] : [S.eruption, PER_E];
+    for (const e of liste){
+      const p = auPoint(piste, e.s), x = p.x + p.nx * e.lat, z = p.z + p.nz * e.lat; if (!proche(x, z)) continue;
+      const st = etatBombe(e, per); if (!st) continue;
+      if (st.ph === "avert"){
+        const rr = e.r * (0.5 + 0.5 * st.u);
+        tracer(M.cible, m4Mul(m4Translation(x, p.y + 0.08, z), m4Echelle(rr, 1, rr)), [1, 1, 1], 0.6 + 0.4 * Math.abs(Math.sin(t * 12)));
+        tracer(M.avert, m4Mul(m4Translation(x, p.y + 0.1, z), m4Echelle(e.r + 1.2, 1, e.r + 1.2)), [1, 1, 1], 1.0);
+        // la bombe arrive du cratère
+        const o = V || { x: x + 400, y: 400, z }, u = st.u, bx = o.x + (x - o.x) * u, bz = o.z + (z - o.z) * u, by = o.y + (p.y + 1 - o.y) * u + 180 * Math.sin(Math.PI * u);
+        tracer(M.feu, m4Mul(m4Translation(bx, by, bz), m4Echelle(1.8, 1.8, 1.8)), [1, 1, 1], 1.0);
+        for (let k = 1; k <= 3; k++){ const u2 = Math.max(0, u - k * 0.03), b2x = o.x + (x - o.x) * u2, b2z = o.z + (z - o.z) * u2, b2y = o.y + (p.y + 1 - o.y) * u2 + 180 * Math.sin(Math.PI * u2);
+          tracer(M.fumee, m4Mul(m4Translation(b2x, b2y, b2z), m4Echelle(1.4 + k * 0.5, 1.4 + k * 0.5, 1.4 + k * 0.5)), [0.3, 0.28, 0.27]); }
+      } else {
+        const k = st.u, rr = e.r * (k < 0.08 ? 0.5 + k * 6 : 1);
+        tracer(M.flaque, m4Mul(m4Mul(m4Translation(x, p.y + 0.07, z), m4RotY(e.s)), m4Echelle(rr, 1, rr)), [1 - 0.55 * k, 1 - 0.75 * k, 1 - 0.8 * k], 1.0);
+        if (k < 0.12){ const b = 1 + k * 30; tracer(M.feu, m4Mul(m4Translation(x, p.y + b * 0.4, z), m4Echelle(b, b * 0.7, b)), [1, 1, 1], 1.0); }
+      }
+    }
+  }
+  if (ev === "coulee"){
+    const p2 = 0.85 + 0.15 * Math.sin(t * 3);
+    S.coulees.forEach((c, i) => { const p = auPoint(piste, c.s); if (!proche(p.x, p.z, 600)) return;
+      tracer(M.coulees[i].lave, m4Identite(), [p2, p2, p2], 1.0); tracer(M.coulees[i].croute, m4Identite(), [1, 1, 1]); });
+  }
+}
+// sur l'écran : l'éclair d'un choc, la lueur quand on roule dans la lave
+function dessinerEvenementsBaf(ctx2, W, H, E){
+  const J = jeu.joueur; if (!J || !estBaf()) return;
+  ctx2.save();
+  if (J.flashB && jeu.chrono - J.flashB.t < 0.5){ ctx2.globalAlpha = 0.4 * (1 - (jeu.chrono - J.flashB.t) / 0.5); ctx2.fillStyle = J.flashB.c; ctx2.fillRect(0, 0, W, H); }
+  if (J.laveB != null && jeu.chrono - J.laveB < 0.15){
+    const g = ctx2.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "rgba(255,90,10,0)"); g.addColorStop(1, "rgba(255,70,0,0.55)"); ctx2.globalAlpha = 1; ctx2.fillStyle = g; ctx2.fillRect(0, 0, W, H);
+  }
+  ctx2.restore();
+}
 function dessinerObstaclesK(){
   const J = jeu.joueur; if (!J) return;
   if (!meshK){
@@ -9173,7 +9493,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 16;      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 17;      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -11743,7 +12063,7 @@ function textureEnseigne(texte){
   if (texTextes[texte]) return texTextes[texte];
   const style = texte.slice(0, 3), mot = texte.slice(3);
   const c = document.createElement("canvas");
-  c.width = style === "§b:" || style === "§g:" || style === "§h:" || style === "§z:" ? 1024 : 256; c.height = style === "§b:" || style === "§h:" ? 128 : style === "§g:" || style === "§z:" ? 256 : 192;
+  c.width = style === "§m:" ? 2048 : style === "§b:" || style === "§g:" || style === "§h:" || style === "§z:" ? 1024 : 256; c.height = style === "§m:" ? 160 : style === "§b:" || style === "§h:" ? 128 : style === "§g:" || style === "§z:" ? 256 : 192;
   const g = c.getContext("2d"), W = c.width, H = c.height;
   g.textAlign = "center"; g.textBaseline = "middle";
   if (style === "§z:"){
@@ -11767,6 +12087,23 @@ function textureEnseigne(texte){
     g.fillStyle = gr; g.beginPath(); g.arc(W / 2, 74, 44, 0, Math.PI * 2); g.fill();
     g.strokeStyle = "#0b3b12"; g.lineWidth = 3; g.beginPath(); g.arc(W / 2, 74, 30, 0.4, 4.6); g.stroke();
     g.fillStyle = "#2a1a0c"; g.font = "900 40px Georgia, serif"; g.fillText(mot, W / 2, 152);
+  }
+  else if (style === "§m:"){
+    // le muret de Bafisson : des pierres de basalte, PREMIERESSON en grand, les noms autour
+    g.fillStyle = "#2b2927"; g.fillRect(0, 0, W, H);
+    g.strokeStyle = "#191817"; g.lineWidth = 3;
+    for (let y = 0; y < H; y += 40){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+      for (let x = (y / 40 % 2) * 64; x < W; x += 128){ g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 40); g.stroke(); } }
+    g.strokeStyle = "#ff7a1a"; g.lineWidth = 7; g.strokeRect(5, 5, W - 10, H - 10);
+    const [grand, ...noms] = mot.split("|");
+    g.font = "900 120px Impact, 'Arial Black', sans-serif"; g.lineJoin = "round";
+    g.strokeStyle = "#000"; g.lineWidth = 12; g.strokeText(grand, W / 2, H / 2 + 6);
+    g.fillStyle = "#ffd23a"; g.fillText(grand, W / 2, H / 2 + 6);
+    const wG = g.measureText(grand).width, moitie = Math.ceil(noms.length / 2);
+    g.font = "700 30px Arial, sans-serif"; g.fillStyle = "#f4efe6";
+    const bloc = (liste, x0, x1) => liste.forEach((n, k) => { const c = Math.floor(k / 3), r = k % 3; g.fillText(n, x0 + (x1 - x0) * (c + 0.5) / 2, H * (r + 0.5) / 3 + 2); });
+    bloc(noms.slice(0, moitie), 24, W / 2 - wG / 2 - 24);
+    bloc(noms.slice(moitie), W / 2 + wG / 2 + 24, W - 24);
   }
   else if (style === "§g:") dessinerTag(g, W, H, mot);
   else if (style === "§h:") dessinerHieroglyphes(g, W, H, mot);
