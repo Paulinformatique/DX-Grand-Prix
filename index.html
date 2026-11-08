@@ -3404,12 +3404,12 @@ function construireDecor(piste){
     if (a > 0){
       const p = P[a], q1 = P[(a - 15 + nb) % nb], q2 = P[(a + 15) % nb];
       const mx = (q1.x + q2.x) / 2 - p.x, mz = (q1.z + q2.z) / 2 - p.z, sIn = Math.sign(mx * p.nx + mz * p.nz) || 1;     // côté intérieur
-      const off = -sIn * (DEMI_PISTE + 4.2), x = p.x + p.nx * off, z = p.z + p.nz * off, y = p.y - 0.2;
+      const off = -sIn * (DEMI_PISTE + 5.5), x = p.x + p.nx * off, z = p.z + p.nz * off, y = p.y - 0.2;
       const c = Math.cos(0.42), s = Math.sin(0.42);
       let fx = sIn * p.nx * c - p.tx * s, fz = sIn * p.nz * c - p.tz * s; const fl = Math.hypot(fx, fz); fx /= fl; fz /= fl;   // vers la piste et vers ceux qui arrivent
       const loin = (x2, z2, r) => { for (const q of P) if ((q.x - x2) ** 2 + (q.z - z2) ** 2 < r * r) return false; return true; };
-      let Lm = 46; while (Lm > 16 && !(loin(x + fz * Lm / 2, z - fx * Lm / 2, DEMI_PISTE + 1.6) && loin(x - fz * Lm / 2, z + fx * Lm / 2, DEMI_PISTE + 1.6))) Lm -= 2;
-      const lp = Lm - 0.8, hp = lp * 320 / 2048, Hm = hp + 0.9, lac = Math.atan2(fx, fz);
+      let Lm = 56; while (Lm > 20 && !(loin(x + fz * Lm / 2, z - fx * Lm / 2, DEMI_PISTE + 1.6) && loin(x - fz * Lm / 2, z + fx * Lm / 2, DEMI_PISTE + 1.6))) Lm -= 2;
+      const lp = Lm - 0.8, hp = lp * 512 / 2048, Hm = hp + 0.9, lac = Math.atan2(fx, fz);
       boite(paysage, x, y + Hm / 2, z, Lm, Hm, 0.9, [0.17, 0.16, 0.15], lac);
       boite(paysage, x, y + Hm + 0.1, z, Lm + 0.5, 0.2, 1.2, [0.10, 0.10, 0.10], lac);                 // la margelle
       enseigne("§m:PREMIERESSON|Bafisson|Raphasson|Paulnaref|Josephsson|Almasson|Sososson|Gayasson|Elisson|Ellisson|Emiliesson|Livsson",
@@ -8182,8 +8182,40 @@ function maillagesBaf(){
         const k = al(), coul = k < 0.25 ? [1.0, 0.78, 0.22] : k < 0.65 ? [1.0, 0.42, 0.06] : [0.82, 0.18, 0.04];
         quad(lave, P4(a, l + 1.5), P4(b, l + 1.5), P4(b, l), P4(a, l), coul);
       }
-      const P5 = (p, ll) => [p.x + p.nx * ll, p.y + 0.12, p.z + p.nz * ll];
-      quad(croute, P5(a, c.lane + 1.7), P5(b, c.lane + 1.7), P5(b, c.lane - 1.7), P5(a, c.lane - 1.7), (Math.round(ds) % 3) ? [0.09, 0.08, 0.08] : [0.14, 0.12, 0.11]);
+    }
+    /* le pont de basalte : un tablier en dalles, des bordures, des parapets
+       éclairés par en dessous par la lave, des poteaux, et des piles dans la lave */
+    const W2 = 1.7, P5 = (p, ll, h) => [p.x + p.nx * ll, p.y + h, p.z + p.nz * ll];
+    for (let ds = -11; ds < 11; ds += 1.0){
+      const a = auPoint(piste, c.s + ds), b = auPoint(piste, c.s + ds + 1.0), k = Math.round(ds + 11);
+      // les dalles (une ligne de joint sombre toutes les deux)
+      quad(croute, P5(a, c.lane + W2, 0.13), P5(b, c.lane + W2, 0.13), P5(b, c.lane - W2, 0.13), P5(a, c.lane - W2, 0.13), k % 2 ? [0.26, 0.24, 0.22] : [0.21, 0.19, 0.18]);
+      quad(croute, P5(a, c.lane + W2, 0.135), P5(a, c.lane + W2, 0.135), P5(a, c.lane - W2, 0.135), P5(a, c.lane - W2, 0.135), [0.08, 0.07, 0.07]);
+      for (const sg of [1, -1]){
+        const l0 = c.lane + sg * W2, l1 = c.lane + sg * (W2 + 0.35);
+        // la bordure, puis le parapet (le bas rougeoie au-dessus de la lave)
+        quad(croute, P5(a, l0, 0.13), P5(b, l0, 0.13), P5(b, l1, 0.13), P5(a, l1, 0.13), [0.14, 0.13, 0.12]);
+        const bas = [0.75, 0.30, 0.08], haut = [0.24, 0.22, 0.21];
+        for (const l of [l0, l1]){
+          const A = P5(a, l, 0.13), B = P5(b, l, 0.13), C = P5(b, l, 0.95), D = P5(a, l, 0.95), base = croute.pos.length / 3, n = normale(A, B, C);
+          for (const [q, col] of [[A, bas], [B, bas], [C, haut], [D, haut]]){ croute.pos.push(...q); croute.nor.push(...n); croute.col.push(...col); }
+          croute.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        }
+        quad(croute, P5(a, l0, 0.95), P5(b, l0, 0.95), P5(b, l1, 0.95), P5(a, l1, 0.95), [0.30, 0.28, 0.26]);          // le dessus du parapet
+        // la tranche du pont, au-dessus de la lave
+        const lx = c.lane + sg * (W2 + 0.35), Ap = P5(a, lx, -0.6), Bp = P5(b, lx, -0.6);
+        quad(croute, Ap, Bp, P5(b, lx, 0.13), P5(a, lx, 0.13), [0.55, 0.22, 0.06]);
+        // un poteau tous les 3 m, et une pile dans la lave
+        if (k % 3 === 0){
+          const pc = P5(a, c.lane + sg * (W2 + 0.18), 0); boite(croute, pc[0], pc[1] + 0.75, pc[2], 0.42, 1.5, 0.42, [0.16, 0.15, 0.14], a.cap);
+          if (Math.abs(ds) < 9) { const pp = P5(a, c.lane + sg * (W2 + 0.6), 0); boite(croute, pp[0], pp[1] - 0.2, pp[2], 0.9, 0.7, 0.9, [0.12, 0.11, 0.10], a.cap); }
+        }
+      }
+    }
+    // une lueur orange sous les bords du pont
+    for (const sg of [1, -1]) for (let ds = -9; ds < 9; ds += 1.5){
+      const a = auPoint(piste, c.s + ds), b = auPoint(piste, c.s + ds + 1.5), l0 = c.lane + sg * (W2 + 0.35), l1 = c.lane + sg * (W2 + 1.6);
+      quad(croute, P5(a, l0, 0.09), P5(b, l0, 0.09), P5(b, l1, 0.09), P5(a, l1, 0.09), [1.0, 0.72, 0.25]);
     }
     coulees.push({ lave: televerser(lave), croute: televerser(croute) });
   }
@@ -8254,7 +8286,7 @@ function dessinerBaf(){
   if (ev === "coulee"){
     const p2 = 0.85 + 0.15 * Math.sin(t * 3);
     S.coulees.forEach((c, i) => { const p = auPoint(piste, c.s); if (!proche(p.x, p.z, 600)) return;
-      tracer(M.coulees[i].lave, m4Identite(), [p2, p2, p2], 1.0); tracer(M.coulees[i].croute, m4Identite(), [1, 1, 1]); });
+      tracer(M.coulees[i].lave, m4Identite(), [p2, p2, p2], 1.0); tracer(M.coulees[i].croute, m4Identite(), [1.1, 1.05, 1.0]); });
   }
 }
 // sur l'écran : l'éclair d'un choc, la lueur quand on roule dans la lave
@@ -12068,7 +12100,7 @@ function textureEnseigne(texte){
   if (texTextes[texte]) return texTextes[texte];
   const style = texte.slice(0, 3), mot = texte.slice(3);
   const c = document.createElement("canvas");
-  c.width = style === "§m:" ? 2048 : style === "§b:" || style === "§g:" || style === "§h:" || style === "§z:" ? 1024 : 256; c.height = style === "§m:" ? 320 : style === "§b:" || style === "§h:" ? 128 : style === "§g:" || style === "§z:" ? 256 : 192;
+  c.width = style === "§m:" ? 2048 : style === "§b:" || style === "§g:" || style === "§h:" || style === "§z:" ? 1024 : 256; c.height = style === "§m:" ? 512 : style === "§b:" || style === "§h:" ? 128 : style === "§g:" || style === "§z:" ? 256 : 192;
   const g = c.getContext("2d"), W = c.width, H = c.height;
   g.textAlign = "center"; g.textBaseline = "middle";
   if (style === "§z:"){
@@ -12101,14 +12133,23 @@ function textureEnseigne(texte){
       for (let x = (y / 40 % 2) * 64; x < W; x += 128){ g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 40); g.stroke(); } }
     g.strokeStyle = "#ff7a1a"; g.lineWidth = 7; g.strokeRect(5, 5, W - 10, H - 10);
     const [grand, ...noms] = mot.split("|");
-    let taille = 210; g.font = `900 ${taille}px Impact, 'Arial Black', sans-serif`;
-    while (g.measureText(grand).width > W - 80 && taille > 80){ taille -= 6; g.font = `900 ${taille}px Impact, 'Arial Black', sans-serif`; }
-    g.lineJoin = "round"; g.strokeStyle = "#000"; g.lineWidth = 16; g.strokeText(grand, W / 2, 118);
-    g.fillStyle = "#ffd23a"; g.fillText(grand, W / 2, 118);
-    g.fillStyle = "#ff7a1a"; g.fillRect(60, 222, W - 120, 4);
-    g.font = "700 40px Arial, sans-serif"; g.fillStyle = "#f4efe6";
-    const moitie = Math.ceil(noms.length / 2);
-    [noms.slice(0, moitie), noms.slice(moitie)].forEach((ligne, r) => ligne.forEach((n, k) => g.fillText(n, W * (k + 0.5) / ligne.length, 254 + r * 44)));
+    // PREMIERESSON au centre, les noms tout autour : 4 au-dessus, 3 en dessous, 2 de chaque côté
+    const cx0 = W / 2, cy0 = H / 2 + 6;
+    let taille = 230; g.font = `900 ${taille}px Impact, 'Arial Black', sans-serif`;
+    while (g.measureText(grand).width > W * 0.62 && taille > 80){ taille -= 6; g.font = `900 ${taille}px Impact, 'Arial Black', sans-serif`; }
+    const wG = g.measureText(grand).width;
+    g.fillStyle = "rgba(255,122,26,0.18)"; g.fillRect(cx0 - wG / 2 - 30, cy0 - taille * 0.55, wG + 60, taille * 1.05);
+    g.lineJoin = "round"; g.strokeStyle = "#000"; g.lineWidth = 18; g.strokeText(grand, cx0, cy0);
+    g.fillStyle = "#ffd23a"; g.fillText(grand, cx0, cy0);
+    g.strokeStyle = "#ff7a1a"; g.lineWidth = 5; g.strokeRect(cx0 - wG / 2 - 30, cy0 - taille * 0.55, wG + 60, taille * 1.05);
+    g.font = "800 66px Arial, sans-serif"; g.fillStyle = "#f4efe6"; g.strokeStyle = "#000"; g.lineWidth = 8;
+    const ecrire = (n, x, y) => { g.strokeText(n, x, y); g.fillText(n, x, y); };
+    const haut = noms.slice(0, 4), bas = noms.slice(4, 7), gauche = noms.slice(7, 9), droite = noms.slice(9);
+    haut.forEach((n, k) => ecrire(n, W * (k + 0.5) / haut.length, 62));
+    bas.forEach((n, k) => ecrire(n, W * (k + 0.5) / bas.length, H - 54));
+    const xG = (cx0 - wG / 2 - 30) / 2, xD = W - xG;
+    gauche.forEach((n, k) => ecrire(n, xG, H / 2 - 40 + k * 90));
+    droite.forEach((n, k) => ecrire(n, xD, H / 2 - 40 + k * 90));
   }
   else if (style === "§g:") dessinerTag(g, W, H, mot);
   else if (style === "§h:") dessinerHieroglyphes(g, W, H, mot);
