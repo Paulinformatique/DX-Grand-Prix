@@ -7719,7 +7719,7 @@ function dessinerZaWarudo(ctx2, W, H, E){
     if (k >= 1){ ctx2.globalAlpha = 1 - f * 0.7; ctx2.font = `900 ${(120 + f * 60) * E}px Bahnschrift, sans-serif`;
       ctx2.lineWidth = 8 * E; ctx2.strokeStyle = "#2a1a00"; ctx2.strokeText(String(k), W / 2, H * 0.52); ctx2.fillStyle = "#fff6d0"; ctx2.fillText(String(k), W / 2, H * 0.52); }
     ctx2.globalAlpha = 0.9; ctx2.fillStyle = "#fff"; ctx2.font = `700 ${18 * E}px Bahnschrift, sans-serif`;
-    ctx2.fillText((z.declencheur === jeu.joueur ? "Tu es en tête" : z.declencheur.nom + " est en tête") + " : le temps va s'arrêter…", W / 2, H * 0.26);
+    ctx2.fillText("Le temps va s'arrêter… qui deviendra DIO ?", W / 2, H * 0.26);
   } else if (z.etat === "roue"){
     dessinerStand(0.45, 1);
     ctx2.globalAlpha = 0.6; ctx2.fillStyle = "#000"; ctx2.fillRect(0, H * 0.30, W, H * 0.40); ctx2.globalAlpha = 1;
