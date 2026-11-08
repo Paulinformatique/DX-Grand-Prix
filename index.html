@@ -5148,7 +5148,7 @@ function creerConcurrent(livree, estJoueur, def, rang){
 }
 
 function preparerCourse(indexCircuit){
-  jeu.zw = null; jeu.lancerK = null; obstK = null; try { toile.style.filter = ""; } catch (e) {}          // (un arrêt du temps en cours ne survit pas à une nouvelle course)
+  jeu.zw = null; jeu.lancerK = null; jeu.obstK = null; try { toile.style.filter = ""; } catch (e) {}          // (un arrêt du temps en cours ne survit pas à une nouvelle course)
   fixerLargeur(CIRCUITS[indexCircuit]);
   jeu.circuit = indexCircuit;
   const def = CIRCUITS[indexCircuit];
@@ -7814,7 +7814,7 @@ function evenementsKujota(J){
    où elles restent plantées jusqu'à la fin de la course. On le voit de loin,
    quel que soit son tour. */
 function lancerEmeraudes(){
-  if (jeu.multi || jeu.lancerK || jeu.phase !== "course") return;
+  if (!obstaclesMultiK() || jeu.lancerK || jeu.phase !== "course" || !piste || !piste.def || piste.def.nom !== "Kujota") return;
   const T = leaderCourse(); if (!T || T.tour !== 3 || T.s == null) return;
   const O = obstaclesKujota(), L = piste.longueur, d = ((O.emeraudes[0].s - T.s) % L + L) % L;
   if (d > Math.max(700, T.v * 14) || d > L / 2) return;
@@ -7824,21 +7824,23 @@ function lancerEmeraudes(){
   for (let k = 0; k < 10; k++) setTimeout(() => bip(880 + (k % 5) * 140, 0.08, 0.15, "square"), 3200 + k * 800);
 }
 const VOL_E = 2.0;                                   // durée du vol d'une émeraude
-let obstK = null;
 function obstaclesKujota(){
-  if (obstK && obstK.piste === piste) return obstK;
+  if (jeu.obstK && jeu.obstK.piste === piste) return jeu.obstK;
   const dr = droitePrincipale(), P = piste.pts, nb = piste.nb, L = piste.longueur;
   const sDeb = P[dr.deb].d, sFin = P[(dr.deb + dr.long) % nb].d, a = sDeb + 70, b = (sFin < sDeb ? L : sFin) - 45;
   const pose = (s, lat, type, id, r) => { const p = auPoint(piste, s); return { s, lat, type, id, r, x: p.x + p.nx * lat, y: p.y, z: p.z + p.nz * lat, nx: p.nx, nz: p.nz }; };
   const em = [-0.55, 0.42, -0.1, 0.6, -0.42, 0.15, -0.6, 0.38, -0.2, 0.55], ge = [0.45, -0.45, 0.05, 0.5, -0.3, 0.25, -0.55, 0.35];
   const emeraudes = em.map((l, k) => pose(a + (k + 0.5) / em.length * (b - a), l * DEMI_PISTE, "emeraude", "e" + k, 2.8));
   const geysers = ge.map((l, k) => Object.assign(pose(a + (k + 0.5) / ge.length * (b - a), l * DEMI_PISTE, "geyser", "g" + k, 2.3), { ph: k * 0.83 }));
-  return (obstK = { piste, emeraudes, geysers });
+  return (jeu.obstK = { piste, emeraudes, geysers });
 }
 const PERIODE_G = 2.8, JET_G = 1.3;
 const etatGeyser = e => { const u = ((jeu.chrono + e.ph) % PERIODE_G) / JET_G; return u < 1 ? u : -1; };       // 0..1 pendant le jet
+// les obstacles de Kujota existent en solo, sur le serveur, et chez un joueur relié au serveur
+const obstaclesMultiK = () => !jeu.multi || typeof globalThis.__srv !== "undefined" || (typeof reseau !== "undefined" && !!reseau.serveur);
 function obstaclesPour(v){
-  if (jeu.multi || !piste || !piste.def || piste.def.nom !== "Kujota" || v.tempsFinal != null) return null;
+  if (!obstaclesMultiK() || !piste || !piste.def || piste.def.nom !== "Kujota" || v.tempsFinal != null) return null;
+  lancerEmeraudes();                                  // (le serveur ne passe pas par l'affichage : on vérifie ici aussi)
   const O = obstaclesKujota(), l = v.tour === 0 ? O.geysers.slice() : [];
   if (jeu.lancerK && v.tour === 3) for (const e of O.emeraudes) if (jeu.chrono >= e.tl && e.casse == null) l.push(e);     // seulement pendant le 4ᵉ tour     // plantées sur la piste
   return l.length ? l : null;
@@ -7944,7 +7946,7 @@ function dessinerObstaclesK(){
   }
   const t = performance.now() / 1000;
   // Hierophant Green et ses émeraudes (visibles de partout, quel que soit le tour)
-  if (jeu.lancerK && !jeu.multi && decor && decor.hieroK){
+  if (jeu.lancerK && obstaclesMultiK() && decor && decor.hieroK){
     const O = obstaclesKujota(), E0 = O.emeraudes, t0 = jeu.lancerK.t0, tc = jeu.chrono, fin = E0[E0.length - 1].tl;
     const mil = auPoint(piste, E0[2].s + 40), HH = 42, yH = mil.y + 12;          // au-dessus du début de la zone, côté pilotes qui arrivent
     const ap = Math.min(1, (tc - t0) / 1.2, (fin + 6 - tc) / 1.2);
@@ -9134,7 +9136,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 14;      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 15;      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -9357,8 +9359,18 @@ function serveurRecoit(d){
   if (d.t === "e"){ serveurEtat(d); return; }
 }
 // l'état de la course envoyé par le serveur
+function syncEmeraudesK(k, ch){
+  if (!Array.isArray(k) || !piste || !piste.def || piste.def.nom !== "Kujota") return;
+  const O = obstaclesKujota(), t0 = jeu.chrono - ((ch || 0) - k[0]);
+  if (!jeu.lancerK || Math.abs(jeu.lancerK.t0 - t0) > 0.25){
+    const neuf = !jeu.lancerK; jeu.lancerK = { t0, srv: true };
+    O.emeraudes.forEach((e, i) => { e.tl = t0 + 3.2 + i * 0.8; if (neuf) e.casse = null; });
+  }
+  for (const id of k[1] || []){ const e = O.emeraudes.find(x => x.id === id); if (e && e.casse == null){ e.casse = jeu.chrono; e.casseX = true; } }
+}
 function serveurEtat(d){
   if (!jeu.multi) return;
+  if (d.k) syncEmeraudesK(d.k, d.ch);
   if (jeu.multi.spectateur && d.ch != null) jeu.chrono = d.ch;      // le chrono de la course regardée
   const tr = performance.now();
   for (const c of d.c){
