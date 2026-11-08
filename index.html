@@ -10302,6 +10302,10 @@ function serveurEtat(d){
   if (d.k) syncEmeraudesK(d.k, d.ch);
   if (d.z) syncZaWarudoK(d.z);
   if (jeu.multi.spectateur && d.ch != null) jeu.chrono = d.ch;      // le chrono de la course regardée
+  else if (d.ch != null && jeu.phase === "course" && !(jeu.zw && jeu.zw.etat !== "fini")){
+    const cible = d.ch + Math.min(0.25, (reseau.rttMin || reseau.rtt || 80) / 2000), ecart = cible - jeu.chrono;
+    if (Math.abs(ecart) > 2) jeu.chrono = cible; else if (Math.abs(ecart) > 0.04) jeu.chrono += ecart * 0.1;
+  }
   const tr = performance.now();
   for (const c of d.c){
     const [id, x, y, z, cap, tg, rl, br, v, lat, dd, tour, m, tf, hp, , nP, dX, dZ, el, gc, gt] = c;
