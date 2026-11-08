@@ -101,6 +101,33 @@
   .actu-d{font-size:12px;color:#8b98ab}
   .actu-neuve{border-color:#3fe27a;box-shadow:0 0 0 1px rgba(63,226,122,.25)}
   .actu-neuve .actu-v{background:#3fe27a}
+  .acc-pastille{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:6px;font:800 11px Bahnschrift,sans-serif;color:#fff;background:#e0303c;border-radius:999px;padding:0 5px;vertical-align:1px;box-shadow:0 0 0 2px rgba(224,48,60,.25)}
+  #vote-popup{position:fixed;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(4,7,12,.78)}
+  #vote-popup .boite{position:relative;max-width:760px;width:100%;max-height:calc(100vh - 32px);overflow-y:auto;padding:22px 20px 18px;border-radius:16px;background:linear-gradient(160deg,#141c29,#0c121b);border:1px solid #2f3d52;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #vote-popup .croix{position:absolute;top:10px;right:12px;width:34px;height:34px;border-radius:50%;border:1px solid #2f3d52;background:#0f1620;color:#c9d3e0;font:700 18px/1 sans-serif;cursor:pointer}
+  #vote-popup .croix:hover{background:#1b2533;color:#fff}
+  .cv-tete{font:800 11px Bahnschrift,sans-serif;letter-spacing:.18em;color:var(--or);text-transform:uppercase}
+  .cv-titre{font:800 22px/1.2 Bahnschrift,sans-serif;color:#eef0f4;margin:6px 0 6px}
+  .cv-texte{color:#aeb9c9;font-size:14px;line-height:1.5;margin:0 0 12px}
+  .cv-grille{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  @media (min-width:700px){ .cv-grille{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  .cv-option{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px 10px;border-radius:12px;border:2px solid #2a3647;background:#111925;color:#eef0f4;font:inherit;text-align:center;cursor:default}
+  button.cv-option{cursor:pointer}
+  button.cv-option:hover{border-color:#5d7290;background:#16202e}
+  .cv-option.choisie{border-color:var(--or);background:#1d1a10;box-shadow:0 0 0 3px rgba(242,182,50,.18)}
+  .cv-option.gagnante{border-color:#3fe27a}
+  .cv-option svg{width:100%;max-width:150px;height:84px}
+  .cv-option .cv-nom{font:800 16px Bahnschrift,sans-serif;letter-spacing:.03em}
+  .cv-option .cv-pays{display:flex;align-items:center;gap:6px;font-size:12px;color:#9aa6b8}
+  .cv-option .cv-pays img{width:21px;height:14px;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+  .cv-barre{width:100%;height:6px;border-radius:3px;background:#0a0f16;overflow:hidden;margin-top:4px}
+  .cv-barre i{display:block;height:100%;background:linear-gradient(90deg,#f2b632,#ffd76a);transition:width .5s}
+  .cv-option.gagnante .cv-barre i{background:linear-gradient(90deg,#2fbf71,#3fe27a)}
+  .cv-pct{font:700 12px Bahnschrift,sans-serif;color:#c9d3e0}
+  .cv-coche{position:absolute;top:6px;right:8px;font-size:15px}
+  .cv-pied{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .cv-info{font-size:13px;color:#9aa6b8}
+  .cv-idees{margin-top:14px;padding:10px 12px;border-radius:10px;background:#101722;border:1px dashed #2f3d52;color:#c9d3e0;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .acc-nouveau{display:inline-block;margin-left:6px;font:800 10px Bahnschrift,sans-serif;letter-spacing:.06em;color:#06200f;background:#3fe27a;border-radius:4px;padding:1px 5px;vertical-align:2px}
   @media (max-width:640px){ .actu{flex-direction:column} .actu img{width:100%;max-width:none} }
   .pad-fiche{background:#141b26;border:1px solid var(--trait);border-left:4px solid var(--c,#3d4c63);border-radius:8px;padding:12px 14px}
@@ -268,6 +295,7 @@
           <button class="acc-lien" id="btn-maker">DX Maker</button>
           <button class="acc-lien" id="btn-monde">🌍 Classement</button>
           <button class="acc-lien" id="btn-actus">📰 Actualités<b class="acc-nouveau" id="actus-nouveau" hidden>NOUVEAU</b></button>
+          <button class="acc-lien" id="btn-vote">🗳️ Community Vote<b class="acc-pastille" id="vote-pastille" hidden>1</b></button>
           <button class="acc-lien" id="btn-idees">💡 Boîte à idées</button>
           <button class="acc-lien" id="btn-trapezoidu" style="display:none">🛡️ Trapezoidu</button>
           <button class="acc-lien" id="btn-atelier" style="display:none">Atelier</button>
@@ -545,6 +573,12 @@
     </article>
   </div>
   <div class="rangee"><button class="lien" id="btn-retour-actus">← Retour</button></div>
+</div>
+
+<div class="ecran cache" id="ecran-vote" style="justify-content:flex-start">
+  <div class="sstitre">Community Vote</div>
+  <div id="vote-contenu" style="width:min(780px,100%)"></div>
+  <div class="rangee"><button class="lien" id="btn-retour-vote">← Retour</button></div>
 </div>
 
 <div class="ecran cache" id="ecran-idees" style="justify-content:flex-start">
@@ -9039,9 +9073,11 @@ const dansMaree = (S, s) => S.maree.some(z => s > z.s0 && s < z.s1);
 // le vent de Morro relève ou abaisse la vitesse de pointe (±11 %)
 function boostEasy(v){ if (!estEasy() || v.s == null) return 0; const ev = evEasy(v.tour); if (ev === "oeil") return dansOeil(v) ? 0.05 : 0;      // dans l'œil : calme plat, on file
   if (ev !== "vent") return 0; const L = piste.longueur; return 0.11 * ventEasy(((v.s % L) + L) % L).long; }
+// le vent se lève sur le premier sixième du tour et retombe sur le dernier
+function rampeVent(s){ const u = (((s / piste.longueur) % 1) + 1) % 1, r = Math.max(0, Math.min(1, u / 0.16, (1 - u) / 0.16)); return r * r * (3 - 2 * r); }
 // le vent, le long de la piste : + dans le dos ; de côté : + vers la droite (n)
 function ventEasy(s){
-  const p = auPoint(piste, s), wx = Math.cos(VENT_A), wz = Math.sin(VENT_A), g = 0.65 + 0.35 * Math.sin(jeu.chrono * 0.9 + s * 0.004);
+  const p = auPoint(piste, s), wx = Math.cos(VENT_A), wz = Math.sin(VENT_A), g = (0.65 + 0.35 * Math.sin(jeu.chrono * 0.9 + s * 0.004)) * rampeVent(s);
   return { long: (wx * p.tx + wz * p.tz) * g, lat: (wx * p.nx + wz * p.nz) * g };
 }
 // les chars du Kanaval : ils avancent sur la grande ligne droite, chacun dans sa file
@@ -9073,9 +9109,12 @@ function etatTsunami(){
   if (jeu.tsunamiT == null) return null;
   if (jeu.tsunamiC == null) return { phase: "approche", u: Math.min(1, (jeu.chrono - jeu.tsunamiT) / 20) };
   const front = S.vague.s0 - 40 + (jeu.chrono - jeu.tsunamiC) * V_VAGUE;
-  return front > S.vague.s1 + 80 ? null : { phase: "deferle", front, s0: S.vague.s0 };
+  return front > S.vague.s1 + 80 ? { phase: "inonde", s0: S.vague.s0 } : { phase: "deferle", front, s0: S.vague.s0 };
 }
 function tsunami(){ const e = etatTsunami(); return e && e.phase === "deferle" ? e : null; }
+// derrière la vague (et après son passage, jusqu'à la fin), la dernière ligne droite est sous l'eau
+function inondeTsunami(v){ const e = etatTsunami(); if (!e || e.phase === "approche") return false; const S = sitesEasy(), L = piste.longueur, s = ((v.s % L) + L) % L;
+  return s > S.vague.s0 && s < S.vague.s1 && (e.phase === "inonde" || s < e.front - 70); }
 const dansVague = (v, w) => { if (!w) return false; const L = piste.longueur, s = ((v.s % L) + L) % L; return s > w.s0 - 50 && s < w.front && s > w.front - 70; };
 function capEasy(v){
   if (!estEasy() || v.s == null || v.tempsFinal != null) return 1;
@@ -9083,9 +9122,10 @@ function capEasy(v){
   let f = 1;
   if (ev === "maree" && dansMaree(S, s)) f = 0.8;
   if (ev === "ouragan") f = 0.93;
-  if (ev === "oeil" && !dansOeil(v)) f = 0.78;                              // hors de l'œil : la tempête
+  if (ev === "oeil" && !dansOeil(v)) f = 0.86;                              // hors de l'œil : la tempête
 
   if (dansVague(v, tsunami())) f = Math.min(f, 0.6);
+  else if (inondeTsunami(v)) f = Math.min(f, 0.82);
   return f;
 }
 function chocEasy(v, dt){
@@ -9094,7 +9134,7 @@ function chocEasy(v, dt){
   const S = sitesEasy(), L = piste.longueur, s = ((v.s % L) + L) % L, lat = v.lat || 0;
   const pousse = (dl, dv) => {                       // de côté (m/s) et le long (m/s²)
     if (v.joueur){ const p = auPoint(piste, s); v.x += p.nx * dl * dt; v.z += p.nz * dl * dt; }
-    else v.lat = lat + dl * dt * 0.7;
+    else v.lat = lat + dl * dt * 0.35;
     if (dv) v.v = Math.max(0, v.v + dv * dt);
   };
   const glisse = force => {                          // aquaplaning : le volant répond mal, la voiture dérive
@@ -9104,9 +9144,17 @@ function chocEasy(v, dt){
   };
   if (ev === "maree" && dansMaree(S, s)) glisse(1);
   if (ev === "vent"){ const g = ventEasy(s); pousse(g.lat * 4.2, g.long * 3.0); if (v.joueur && Math.abs(g.lat) > 0.5) v.ventE = jeu.chrono; }
-  if (ev === "ouragan"){ pousse(Math.sin(jeu.chrono * 0.7 + s * 0.01) * 1.4, 0); if (v.joueur && jeu.joueur === v && typeof cmd !== "undefined") cmd.dir *= 0.85; }
-  if (ev === "oeil" && !dansOeil(v)){ pousse(Math.sin(jeu.chrono * 1.1 + s * 0.02) * 4.5, 0); if (v.joueur && jeu.joueur === v && typeof cmd !== "undefined") cmd.dir *= 0.8; }
+  if (ev === "ouragan"){ pousse(Math.sin(jeu.chrono * 0.7 + s * 0.01) * 1.4, 0); if (v.joueur && jeu.joueur === v && typeof cmd !== "undefined") cmd.dir *= 0.9; }
+  if (ev === "oeil" && !dansOeil(v)){ pousse(Math.sin(jeu.chrono * 1.1 + s * 0.02) * 2.2, 0); if (v.joueur && jeu.joueur === v && typeof cmd !== "undefined") cmd.dir *= 0.9; }
   if (dansVague(v, w)) glisse(1.3);
+  else if (inondeTsunami(v)) glisse(0.8);
+  // les bots aussi galèrent dans les virages quand ça glisse : ils élargissent (sous-virage) et doivent lever le pied
+  if (!v.joueur){
+    const gl = (ev === "maree" && dansMaree(S, s)) || ev === "ouragan" || (ev === "oeil" && !dansOeil(v)) || dansVague(v, w) || inondeTsunami(v) ? 1 : ev === "vent" ? 0.3 * rampeVent(s) : 0;
+    const k = gl > 0 ? auPoint(piste, s).courbure : 0;
+    if (gl > 0) v.v = Math.max(0, v.v - v.v * 0.035 * gl * dt);
+    if (Math.abs(k) > 0.004){ v.lat = (v.lat || 0) - Math.sign(k) * gl * Math.min(2.5, v.v * v.v * Math.abs(k) * 0.025) * dt; v.capK = Math.min(v.capK || 1e9, v.R.vmax * (1 - 0.06 * gl)); }
+  }
   if (kanavalActif()){
     v._chocE = v._chocE || {};
     const ch = charsEasy(S);
@@ -9119,7 +9167,7 @@ function chocEasy(v, dt){
     if (!v.joueur && typeof planObstK === "function"){ const dv = ch.filter(c => c.s - s > -3 && c.s - s < 90); if (dv.length) planObstK(v, dv.sort((a, b) => a.s - b.s)); }
   }
 }
-let meshE = null;
+let meshE = null, meshInonde = null;
 function maillagesEasy(){
   if (meshE && meshE.piste === piste) return meshE;
   const S = sitesEasy(), L = piste.longueur;
@@ -9147,6 +9195,10 @@ function maillagesEasy(){
     for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) quad(m, pt(i, j), pt(i + 1, j), pt(i + 1, j + 1), pt(i, j + 1), j < 3 ? [0.62, 0.64, 0.68] : [0.40, 0.42, 0.46]); return televerser(m); })();
   const manche = (() => { const m = creerMaillage(); for (let k = 0; k < 8; k++){ const a0 = k / 8 * 6.28, a1 = (k + 1) / 8 * 6.28, r0 = 0.7, r1 = 0.35, c = k % 2 ? [1, 0.45, 0.1] : [0.96, 0.96, 0.96];
       quad(m, [Math.cos(a0) * r0, Math.sin(a0) * r0, 0], [Math.cos(a1) * r0, Math.sin(a1) * r0, 0], [Math.cos(a1) * r1, Math.sin(a1) * r1, 3.2], [Math.cos(a0) * r1, Math.sin(a0) * r1, 3.2], c); } return televerser(m); })();
+  const inonde = creerMaillage();
+  for (let s = S.vague.s0; s < S.vague.s1; s += 4){ const a = auPoint(piste, s), b = auPoint(piste, s + 4.02), P4 = (p, l) => [p.x + p.nx * l, p.y + 0.07, p.z + p.nz * l];
+    quad(inonde, P4(a, DEMI_PISTE + 3), P4(b, DEMI_PISTE + 3), P4(b, -DEMI_PISTE - 3), P4(a, -DEMI_PISTE - 3), (Math.round(s / 4) % 3) ? [0.30, 0.62, 0.72] : [0.46, 0.74, 0.82]); }
+  meshInonde = televerser(inonde);
   // le rideau de pluie au bord de l'œil : des centaines de fines traînées, sur toute la largeur et haut dans le ciel
   const rideau = (() => { const m = creerMaillage(); let g = 77; const al = () => (g = (g * 16807) % 2147483647) / 2147483647;
     for (let k = 0; k < 420; k++){ const x = (al() - 0.5) * (DEMI_PISTE * 2 + 60), z = (al() - 0.5) * 18, y = al() * 40, h = 3 + al() * 4, c = al() < 0.5 ? [0.72, 0.80, 0.88] : [0.60, 0.68, 0.78];
@@ -9165,9 +9217,10 @@ function dessinerEasy(){
     tracer(M.manche, m4Mul(m4Mul(m4Translation(x, p.y + 6, z), m4RotY(Math.atan2(Math.cos(VENT_A), Math.sin(VENT_A)) + Math.sin(t * 3) * 0.1)), m4RotX(chute)), [1, 1, 1]); }
   if (!ev) return;
   if (ev === "maree") tracer(M.eau, m4Identite(), [1, 1, 1], 0.95);
+  { const eT2 = etatTsunami(); if (eT2 && eT2.phase !== "approche") tracer(meshInonde, m4Identite(), [1, 1, 1], 0.95); }
   if (ev === "vent" && E && E.fantome){
     // Morro, fantôme géant, plane au-dessus du lagon, l'épée levée
-    const h = 120, x = E.cx + Math.cos(t * 0.15) * E.ext * 0.25, z = E.cz + Math.sin(t * 0.15) * E.ext * 0.25;
+    const mV = rampeVent(J.s || 0), h = 120 * (0.15 + 0.85 * mV), x = E.cx + Math.cos(t * 0.15) * E.ext * 0.25, z = E.cz + Math.sin(t * 0.15) * E.ext * 0.25;
     tracer(E.fantome, m4Mul(m4Mul(m4Translation(x, E.y + 60 + Math.sin(t) * 4, z), m4RotY(Math.atan2(J.x - x, J.z - z))), m4Echelle(h, h, h)), [0.65, 1.25, 0.75], 0.9);
   }
   if (kanavalActif() || forcer.ev === "kanaval") for (const c of charsEasy(S)){ const p = auPoint(piste, c.s), x = p.x + p.nx * c.lat, z = p.z + p.nz * c.lat; if (!proche(x, z)) continue;
@@ -9198,14 +9251,23 @@ function dessinerEvenementsEasy(ctx2, W, H, E){
   if (J.flaqueE != null && jeu.chrono - J.flaqueE < 0.2){ ctx2.globalAlpha = 0.5; ctx2.strokeStyle = "#d8f2ff"; ctx2.lineWidth = 2 * E;
     for (let k = 0; k < 24; k++){ const x = W * (0.2 + 0.6 * ((k * 0.37 + t * 1.3) % 1)), y = H * (0.75 + 0.2 * ((k * 0.61 + t * 2.1) % 1)); ctx2.beginPath(); ctx2.moveTo(x, y); ctx2.lineTo(x + (k % 2 ? 12 : -12) * E, y - 18 * E); ctx2.stroke(); } }
   if (ev === "vent"){
-    const sens = Math.sin(t * 0.3) > -2 ? 1 : 1;
-    for (let k = 0; k < 14; k++){                       // les feuilles de palmier qui volent en tournant
-      const a = (k * 0.137) % 1, x = W * ((k * 0.29 + t * (0.35 + a * 0.25)) % 1.2) - W * 0.1, y = H * (0.15 + 0.7 * a) + Math.sin(t * 2 + k) * 30 * E, rot = t * (2 + a * 3) + k;
-      ctx2.save(); ctx2.translate(x, y); ctx2.rotate(rot); ctx2.globalAlpha = 0.85; ctx2.fillStyle = k % 2 ? "#3f9a2c" : "#5cbf3a";
+    // le sens du vent vu par le pilote : de côté (à l'écran) et de face / dans le dos (les feuilles viennent vers toi ou s'éloignent)
+    const Lp = piste.longueur, wv = ventEasy(((J.s % Lp) + Lp) % Lp), cote = -wv.lat, face = -wv.long;          // cote > 0 : vers la droite de l'écran ; face > 0 : vent de face
+    const cx = W / 2, cy = H * 0.42, vx = cote * 900 * E, mV = rampeVent(((J.s % Lp) + Lp) % Lp);            // le vent se lève et retombe : les feuilles aussi
+    for (let k = 0; k < Math.round(16 * mV); k++){                       // les feuilles de palmier : elles filent dans le sens du vent en tournant
+      const a = ((k * 0.137) % 1), b = ((k * 0.613) % 1), ang = k * 2.39;
+      // de face : elles naissent au loin (au centre) et grossissent en venant vers toi ; dans le dos : l'inverse
+      let r = ((b + t * (0.25 + 0.2 * a) * Math.abs(face)) % 1); if (face < 0) r = 1 - r;
+      const rx = Math.cos(ang) * W * 0.55 * r, ry = Math.sin(ang) * H * 0.45 * r;
+      const x = ((cx + rx + a * W * 0.3 + t * vx * (0.6 + a * 0.5)) % (W + 80) + W + 80) % (W + 80) - 40, y = cy + ry + Math.sin(t * 2 + k) * 20 * E;
+      const sc = 0.5 + 1.2 * (Math.abs(face) > 0.15 ? r : 0.6), rot = t * (2 + a * 3) + k;
+      ctx2.save(); ctx2.translate(x, y); ctx2.rotate(rot); ctx2.scale(sc, sc); ctx2.globalAlpha = 0.85; ctx2.fillStyle = k % 2 ? "#3f9a2c" : "#5cbf3a";
       ctx2.beginPath(); ctx2.ellipse(0, 0, 18 * E, 5 * E, 0, 0, Math.PI * 2); ctx2.fill(); ctx2.strokeStyle = "#2a6a1c"; ctx2.lineWidth = 1 * E; ctx2.beginPath(); ctx2.moveTo(-18 * E, 0); ctx2.lineTo(18 * E, 0); ctx2.stroke(); ctx2.restore();
     }
-    ctx2.globalAlpha = 0.5; ctx2.fillStyle = "#f0dca8";               // le sable soulevé, au ras du sol
-    for (let k = 0; k < 120; k++){ const a = (Math.sin(k * 91.7) * 43758.5) % 1, b = (Math.sin(k * 12.3) * 9999) % 1, x = (Math.abs(a) * W + t * 700 * E) % W, y = H * (0.62 + 0.38 * Math.abs(b)); ctx2.fillRect(x, y, 3 * E, 1.5 * E); }
+    ctx2.globalAlpha = 0.5 * mV; ctx2.fillStyle = "#f0dca8";               // le sable soulevé, au ras du sol, poussé dans le sens du vent
+    for (let k = 0; k < 140; k++){ const a = Math.abs((Math.sin(k * 91.7) * 43758.5) % 1), b = Math.abs((Math.sin(k * 12.3) * 9999) % 1);
+      const x = ((a * W + t * (vx * (0.8 + a) + (face < 0 ? 0 : 0))) % W + W) % W, y = H * (0.62 + 0.38 * b) + (face > 0 ? ((t * 60 * E * face + b * 200) % 40) : 0);
+      ctx2.fillRect(x, y, (3 + Math.abs(cote) * 9) * E, 1.5 * E); }
   }
   ctx2.restore();
 }
@@ -10439,7 +10501,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 27;      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 28;      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -11511,6 +11573,179 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
   });
   document.getElementById("btn-idees").onclick = () => { majCompte(); statut.textContent = ""; btn.disabled = false; montrer("ecran-idees"); setTimeout(() => champ.focus(), 50); };
   document.getElementById("btn-retour-idees").onclick = () => { rafraichirMenu(); montrer("ecran-accueil"); };
+}
+
+/* ───── Community Vote : un vote à la fois, ouvert 48 h. Pour voter, avoir fini
+   les 3 premières courses (vérifié par le serveur). Une fenêtre s'ouvre la
+   première fois qu'on arrive pendant le vote ; fermée, le vote reste dans
+   l'onglet « Community Vote » (pastille « 1 »), avec les résultats en direct.
+   Quand les résultats tombent, ceux qui ont voté retrouvent la pastille. ───── */
+{
+  const zone = document.getElementById("vote-contenu"), pastille = document.getElementById("vote-pastille");
+  let E = null, decalage = 0, vue = "actuel", choixLocal = null, message = "", envoiEnCours = false, dernierEtat = 0;
+  const lire = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const ecrireLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const maintenant = () => Date.now() + decalage;
+  const connecte = () => !!(window.TCHAT_api && TCHAT_api.connecte());
+  const demander = () => { if (connecte()){ TCHAT_api.envoyer({ t: "c-vote-etat" }); dernierEtat = Date.now(); } };
+
+  // le tracé du circuit, vu d'en haut
+  const traces = {};
+  function trace(nom){
+    if (traces[nom]) return traces[nom];
+    const c = CIRCUITS.find(x => x.nom === nom);
+    if (!c || !c.points || c.points.length < 3) return (traces[nom] = "");
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const [x, y] of c.points){ x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const W = 150, H = 84, m = 8, k = Math.min((W - 2 * m) / (x1 - x0 || 1), (H - 2 * m) / (y1 - y0 || 1));
+    const ox = (W - (x1 - x0) * k) / 2, oy = (H - (y1 - y0) * k) / 2;
+    const P = ([x, y]) => (ox + (x - x0) * k).toFixed(1) + " " + (oy + (y - y0) * k).toFixed(1);
+    const d = "M" + c.points.map(P).join(" L") + " Z";
+    const [dx, dy] = P(c.points[0]).split(" ");
+    return (traces[nom] = `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="#0a0f16" stroke-width="7" stroke-linejoin="round"/>` +
+      `<path d="${d}" fill="none" stroke="#dfe6f0" stroke-width="3" stroke-linejoin="round"/>` +
+      `<circle cx="${dx}" cy="${dy}" r="4" fill="#f2b632" stroke="#0a0f16" stroke-width="1.5"/></svg>`);
+  }
+  const paysDe = nom => (CIRCUITS.find(x => x.nom === nom) || {}).pays || "";
+  function reste(fin){
+    const s = Math.max(0, (fin - maintenant()) / 1000), h = Math.floor(s / 3600), mn = Math.floor(s % 3600 / 60);
+    return h >= 1 ? `${h} h ${String(mn).padStart(2, "0")} min` : mn >= 1 ? `${mn} min` : "moins d'une minute";
+  }
+  const dateCourte = t => new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+
+  // une carte de vote : la question, les 4 circuits (tracé, nom, pays), les résultats
+  function carte(v, fini){
+    const total = v.res.reduce((a, b) => a + b, 0), max = Math.max(...v.res);
+    const peutVoter = !fini && E && E.eligible && v.monVote == null;
+    const options = v.options.map((nom, i) => {
+      const pct = total ? Math.round(100 * v.res[i] / total) : 0, url = vignetteDrapeau(paysDe(nom));
+      const cls = "cv-option" + ((v.monVote === i || (peutVoter && choixLocal === i)) ? " choisie" : "") + (fini && total && v.res[i] === max ? " gagnante" : "");
+      const corps = trace(nom) + `<div class="cv-nom">${esc(nom)}</div>` +
+        `<div class="cv-pays">${url ? `<img src="${url}" alt="">` : ""}${esc(paysDe(nom))}</div>` +
+        `<div class="cv-barre"><i style="width:${pct}%"></i></div><div class="cv-pct">${pct} % · ${v.res[i]} vote${v.res[i] > 1 ? "s" : ""}</div>` +
+        (v.monVote === i ? `<span class="cv-coche" title="Ton vote">✅</span>` : fini && total && v.res[i] === max ? `<span class="cv-coche">🏆</span>` : "");
+      return peutVoter ? `<button type="button" class="${cls}" data-choix="${i}">${corps}</button>` : `<div class="${cls}">${corps}</div>`;
+    }).join("");
+    let pied;
+    if (fini){
+      const gagnants = v.options.filter((_, i) => total && v.res[i] === max);
+      pied = `<span class="cv-info">Vote terminé le ${dateCourte(v.fin)} · ${total} vote${total > 1 ? "s" : ""}${gagnants.length ? " · gagnant : <b style='color:#3fe27a'>" + gagnants.map(esc).join(" et ") + "</b>" : ""}</span>`;
+    } else if (v.monVote != null){
+      pied = `<span class="cv-info">✅ Merci ! Tu as voté pour <b style="color:var(--or)">${esc(v.options[v.monVote])}</b>. Résultats en direct · fin du vote dans ${reste(v.fin)}</span>`;
+    } else if (!E.eligible){
+      pied = `<span class="cv-info">🔒 Pour voter, termine d'abord les 3 premières courses (${Math.min(3, E.finies || 0)}/3). Fin du vote dans ${reste(v.fin)}</span>`;
+    } else {
+      pied = `<span class="cv-info">${choixLocal == null ? "Choisis un circuit." : "Ton choix : <b style='color:var(--or)'>" + esc(v.options[choixLocal]) + "</b> (un seul vote, définitif)"} · fin du vote dans ${reste(v.fin)}</span>` +
+             `<button class="action" id="cv-voter"${choixLocal == null || envoiEnCours ? " disabled" : ""}>${envoiEnCours ? "Envoi…" : "Voter"}</button>`;
+    }
+    return `<div class="cv-tete">🗳️ Community Vote${fini ? " · terminé" : ""}</div><div class="cv-titre">${esc(v.titre)}</div><p class="cv-texte">${esc(v.texte)}</p>` +
+      `<div class="cv-grille">${options}</div><div class="cv-pied">${pied}</div>` +
+      (message ? `<p class="cv-info" style="color:#ff9a7a;margin:8px 0 0">${esc(message)}</p>` : "");
+  }
+  const blocIdees = `<div class="cv-idees"><span>💡 N'hésitez pas à envoyer vos idées dans la boîte à idées !</span><button class="lien" data-idees="1" style="margin:0">Boîte à idées →</button></div>`;
+
+  function contenu(dansFenetre){
+    if (!E) return `<p class="aide">${connecte() ? "Chargement du vote…" : "Connexion au serveur…"}</p>`;
+    if (vue === "passes" && !dansFenetre){
+      return `<div class="cv-tete">Past Community Votes</div>` +
+        (E.passes.length ? E.passes.map(v => `<div class="actu" style="flex-direction:column;align-items:stretch;margin:10px 0">${carte(v, true)}</div>`).join("")
+                         : `<p class="aide">Aucun vote terminé pour l'instant.</p>`) +
+        `<div class="rangee" style="justify-content:flex-start"><button class="lien" id="cv-retour-actuel">← Community Vote</button></div>`;
+    }
+    if (E.actif) return carte(E.actif, false) + blocIdees;
+    // pas de vote en cours : le message, les résultats tout frais (s'ils sont nouveaux pour moi), et les votes passés
+    const frais = E.passes.find(v => v.monVote != null && !lire("cv-res-" + v.id));
+    return `<div class="actu" style="flex-direction:column;align-items:center;text-align:center;gap:10px;padding:22px 16px">` +
+      `<div style="font-size:34px">🗳️</div><b style="font-size:17px">Pas de Community Vote actif pour le moment, reviens bientôt !</b>` +
+      `<button class="action" id="cv-passes">Past Community Votes</button></div>` +
+      (frais ? `<div class="cv-tete" style="margin-top:14px;color:#3fe27a">🏆 Les résultats sont tombés !</div><div class="actu" style="flex-direction:column;align-items:stretch;margin:8px 0">${carte(frais, true)}</div>` : "") +
+      blocIdees;
+  }
+  function brancher(racine){
+    racine.querySelectorAll("[data-choix]").forEach(b => b.onclick = () => { choixLocal = +b.dataset.choix; message = ""; rendreTout(); });
+    const bv = racine.querySelector("#cv-voter");
+    if (bv) bv.onclick = () => {
+      if (choixLocal == null || !E || !E.actif) return;
+      if (!connecte()){ message = "Pas de connexion au serveur : réessaie dans un instant."; rendreTout(); return; }
+      envoiEnCours = true; message = "";
+      TCHAT_api.envoyer({ t: "c-voter", id: E.actif.id, choix: choixLocal });
+      rendreTout();
+      setTimeout(() => { if (envoiEnCours){ envoiEnCours = false; message = "Pas de réponse du serveur : réessaie."; rendreTout(); } }, 8000);
+    };
+    const bp = racine.querySelector("#cv-passes"); if (bp) bp.onclick = () => { vue = "passes"; vuResultats(); rendreTout(); };
+    const br = racine.querySelector("#cv-retour-actuel"); if (br) br.onclick = () => { vue = "actuel"; rendreTout(); };
+    racine.querySelectorAll("[data-idees]").forEach(b => b.onclick = () => { fermerFenetre(); document.getElementById("btn-idees").click(); });
+  }
+  const fenetre = () => document.getElementById("vote-popup");
+  function rendreTout(){
+    const ecranOuvert = !document.getElementById("ecran-vote").classList.contains("cache");
+    if (ecranOuvert){ zone.innerHTML = contenu(false); brancher(zone); }
+    const f = fenetre();
+    if (f){ const b = f.querySelector(".cv-corps"); b.innerHTML = contenu(true); brancher(b); if (!E || !E.actif) fermerFenetre(); }
+    majPastille();
+  }
+  // les résultats d'un vote fini, vus : la pastille s'en va
+  function vuResultats(){ if (E) for (const v of E.passes) if (v.monVote != null) ecrireLS("cv-res-" + v.id, "1"); }
+  function majPastille(){
+    let n = 0;
+    if (E){
+      if (E.actif && E.actif.monVote == null && !(lire("cv-ouvert-" + E.actif.id) && !E.eligible)) n = 1;
+      if (E.passes.some(v => v.monVote != null && !lire("cv-res-" + v.id))) n = 1;
+    }
+    pastille.hidden = !n;
+  }
+  function fermerFenetre(){ const f = fenetre(); if (f) f.remove(); }
+  // la fenêtre : une seule fois par vote, quand on est sur l'accueil
+  function peutOuvrirFenetre(){
+    return E && E.actif && E.actif.monVote == null && !lire("cv-vu-" + E.actif.id) && !fenetre()
+      && !document.getElementById("ecran-accueil").classList.contains("cache") && !document.getElementById("gyro-annonce");
+  }
+  function ouvrirFenetre(){
+    ecrireLS("cv-vu-" + E.actif.id, "1");
+    const d = document.createElement("div"); d.id = "vote-popup";
+    d.innerHTML = `<div class="boite" role="dialog" aria-label="Community Vote"><button class="croix" title="Fermer (le vote reste dans l'onglet Community Vote)">✕</button><div class="cv-corps"></div></div>`;
+    d.querySelector(".croix").onclick = fermerFenetre;
+    d.addEventListener("click", e => { if (e.target === d) fermerFenetre(); });
+    document.body.appendChild(d);
+    rendreTout();
+  }
+
+  window.addEventListener("dx-chat", e => {
+    const d = e.detail;
+    if (d.t === "c-vote"){
+      const avant = E && E.actif ? E.actif.id : null;
+      E = d; decalage = d.maintenant - Date.now();
+      if (d.ok || d.refus) envoiEnCours = false;
+      if (d.ok) choixLocal = null;
+      message = d.refus || "";
+      if (!E.actif || E.actif.id !== avant) choixLocal = null;
+      if (!document.getElementById("ecran-vote").classList.contains("cache") && vue === "passes") vuResultats();
+      rendreTout();
+      if (peutOuvrirFenetre()) ouvrirFenetre();
+    }
+    if (d.t === "c-vote-res" && E && E.actif && E.actif.id === d.id){ E.actif.res = d.res; rendreTout(); }
+  });
+  // l'état du vote : à la connexion, puis toutes les 2 minutes ; et à la fin du vote (les votes se bloquent)
+  setInterval(() => {
+    if (!connecte()) return;
+    const fin = E && E.actif && maintenant() >= E.actif.fin;
+    if (!E ? Date.now() - dernierEtat > 5000 : fin ? Date.now() - dernierEtat > 3000 : Date.now() - dernierEtat > 120000) demander();
+    if (peutOuvrirFenetre()) ouvrirFenetre();
+  }, 1500);
+  // le compte à rebours
+  setInterval(() => { if (E && E.actif && (fenetre() || !document.getElementById("ecran-vote").classList.contains("cache"))){
+    const i = document.querySelector("#vote-popup .cv-pied .cv-info, #vote-contenu .cv-pied .cv-info"); if (i && !envoiEnCours) rendreTout(); } }, 30000);
+
+  document.getElementById("btn-vote").onclick = () => {
+    vue = "actuel"; message = "";
+    if (E && E.actif) ecrireLS("cv-ouvert-" + E.actif.id, "1");
+    montrer("ecran-vote"); demander(); rendreTout();
+    document.getElementById("ecran-vote").scrollTop = 0;
+  };
+  document.getElementById("btn-retour-vote").onclick = () => { vuResultatsSiVus(); rafraichirMenu(); montrer("ecran-accueil"); majPastille(); };
+  // en quittant l'onglet : les résultats tout frais qu'on y a vus ne reviennent plus en pastille
+  function vuResultatsSiVus(){ if (E && !E.actif) vuResultats(); }
 }
 
 /* ───── Espace Trapezoidu (administrateur) : qui est en ligne, les groupes,
@@ -13732,7 +13967,7 @@ requestAnimationFrame(boucle);
       if (S.ouvert && S.vue === "profil" && S.profil && !S.profil.moi) envoi({ t: "c-profil", id: S.profil.id });     // profil ouvert : à jour (en course ?)
       rendre(); badge(); joueurTchat(); return;
     }
-    if (d.t === "c-idee-ok" || d.t === "c-idee-refus" || d.t === "c-admin"){ try { window.dispatchEvent(new CustomEvent("dx-chat", { detail: d })); } catch (e) {} return; }
+    if (d.t === "c-idee-ok" || d.t === "c-idee-refus" || d.t === "c-admin" || d.t === "c-vote" || d.t === "c-vote-res"){ try { window.dispatchEvent(new CustomEvent("dx-chat", { detail: d })); } catch (e) {} return; }
     if (d.t === "c-refus"){
       if (!S.connecte){
         const ws = S.ws; S.ws = null; try { ws.close(); } catch (e) {}
