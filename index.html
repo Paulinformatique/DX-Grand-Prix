@@ -5800,7 +5800,7 @@ function majJoueur(v, dt){
   // dans le sillage, la voiture accélère en plus (ça se voit au compteur)
   if (v.aspi > 0.05 && v.v < vA) v.v += v.aspi * 0.9 * dt;
   // après le Gyro, on redescend en douceur à la vitesse normale (pas un mur)
-  if (v.v > vA) v.v = v.gyroFin > 0 ? Math.max(vA, v.v - 11 * dt) : vA;
+  if (v.v > vA) v.v = v.gyroFin > 0 ? Math.max(vA, v.v - 11 * dt) : Math.max(vA, v.v - 7 * dt);   // (en bas d'une descente : on retrouve sa vitesse en douceur)
   { const cB = capBaf(v); if (cB < 1){ const vS = R.vmax * cB; if (v.v > vS) v.v = Math.max(vS, v.v - 30 * dt); } }   // Bafisson : lave, cendre
   if (sableK > 0){ const vS = R.vmax * (sableK >= 1.5 ? 0.5 : Math.max(0.5, 1 - 0.5 * sableK)); if (v.v > vS) v.v = Math.max(vS, v.v - (sableK >= 1.5 ? 32 : 6 + 10 * sableK) * dt); }   // le sable retient
 
@@ -9752,7 +9752,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 19;      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 20;      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
