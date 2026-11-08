@@ -7768,7 +7768,7 @@ function sablesMouvants(){
   const res = []; for (let k = 0; k < n; k++) res.push({ s: a + 40 + (k + 0.5) / n * (b - a - 80), lat: (k % 2 ? -1 : 1) * DEMI_PISTE * 0.48, r: 5.2 });
   mouvantsK = { piste, L: res }; return res;
 }
-const dunesK = v => v.tour === 3;                        // le 4ᵉ tour
+const dunesK = v => v.tour === 3 && !!piste && !!piste.def && piste.def.nom === "Kujota";                        // le 4ᵉ tour
 function sableKujota(v){
   if (!piste || !piste.def || piste.def.nom !== "Kujota" || v.s == null) return 0;
   const L = piste.longueur, s = ((v.s % L) + L) % L, a = ZONE_SABLE_K.d0 * L, b = ZONE_SABLE_K.d1 * L;
