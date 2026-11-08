@@ -7661,40 +7661,77 @@ function imageTheWorld(){
   if (!imgTheWorld && typeof window !== "undefined" && window.ANIMS_DX && window.ANIMS_DX.theworld){ imgTheWorld = new Image(); imgTheWorld.src = "data:image/png;base64," + window.ANIMS_DX.theworld[0]; }
   return imgTheWorld && imgTheWorld.complete && imgTheWorld.naturalWidth ? imgTheWorld : null;
 }
+const surServeurK = () => typeof globalThis.__srv !== "undefined";
+const fxZW = f => { if (!surServeurK()) try { f(); } catch (e) {} };          // (sur le serveur : rien à montrer ni à faire sonner)
+// une voiture d'après l'identifiant que donne le serveur
+function voitureParIdK(id){
+  if (surServeurK()) return jeu.voitures.find(v => v.idJ === id) || null;
+  if (id === reseau.moi) return jeu.joueur;
+  return jeu.voitures.find(v => v.distant && v.idDistant === id) || null;
+}
 function zaWarudo(dt){
-  if (!piste || !piste.def || piste.def.nom !== "Kujota" || jeu.multi || !jeu.joueur) return null;
+  if (!piste || !piste.def || piste.def.nom !== "Kujota") return null;
+  const srv = surServeurK(), suiveur = !!jeu.multi && !srv;       // un joueur relié au serveur : il suit le serveur
+  if (suiveur && !(typeof reseau !== "undefined" && reseau.serveur)) return null;       // (pair-à-pair : pas d'arrêt du temps)
+  if (!srv && !jeu.joueur) return null;
   if (!jeu.zw){
+    if (suiveur) return null;
     const T = leaderCourse(), n = toursCourse(); if (!T || T.tempsFinal != null || T.tour !== n - 1 || jeu.chrono < 5) return null;
     const L = piste.longueur, reste = n * L - T.distance, vMoy = T.distance / Math.max(1, jeu.chrono);
     if (reste / Math.max(5, vMoy) > 20) return null;
     jeu.zw = { etat: "appel", t: 0, echelle: 1, declencheur: T, bipK: -1 };
-    bip(98, 1.6, 0.35, "sawtooth"); bip(147, 1.6, 0.2, "triangle");
+    fxZW(() => { bip(98, 1.6, 0.35, "sawtooth"); bip(147, 1.6, 0.2, "triangle"); });
     return "appel";
   }
   const z = jeu.zw; z.t += dt;
   if (z.etat === "appel"){
     // 3 s : The World monte derrière l'écran, décompte 3-2-1, le temps ralentit puis s'arrête
     z.echelle = z.t < 1.6 ? 1 : Math.max(0.04, 1 - (z.t - 1.6) / 1.4);
-    toile.style.filter = `grayscale(${Math.min(0.7, z.t / 3 * 0.7).toFixed(2)}) sepia(${Math.min(0.35, z.t / 3 * 0.35).toFixed(2)})`;
-    const k = Math.floor(z.t); if (k !== z.bipK && k < 3){ z.bipK = k; bip(330 - k * 60, 0.2, 0.35, "square"); }
-    if (z.t >= 3.0){
+    fxZW(() => { toile.style.filter = `grayscale(${Math.min(0.7, z.t / 3 * 0.7).toFixed(2)}) sepia(${Math.min(0.35, z.t / 3 * 0.35).toFixed(2)})`;
+      const k = Math.floor(z.t); if (k !== z.bipK && k < 3){ z.bipK = k; bip(330 - k * 60, 0.2, 0.35, "square"); } });
+    if (z.t >= 3.0 && !suiveur){                       // (le joueur attend que le serveur annonce la roue)
       const vs = jeu.voitures.filter(v => !v.parti && v.tempsFinal == null && !v.elimine), iElu = Math.floor(Math.random() * vs.length);
       Object.assign(z, { etat: "roue", t: 0, vs, iElu, elu: vs[iElu], pas: 3 * vs.length + iElu });
-      toile.style.filter = "invert(0.8)"; bip(110, 0.9, 0.45, "sawtooth"); bip(55, 1.4, 0.45, "square");
+      fxZW(() => { toile.style.filter = "invert(0.8)"; bip(110, 0.9, 0.45, "sawtooth"); bip(55, 1.4, 0.45, "square"); });
       return "roue";
     }
     return "appel";
   }
   if (z.etat === "roue"){
-    if (z.t > 0.2 && !z.flash){ z.flash = true; toile.style.filter = "grayscale(0.85) sepia(0.45)"; }
-    if (z.t >= 3.0){ z.etat = "arret"; z.t = 0; z.placeAvant = classer().indexOf(z.elu) + 1; toile.style.filter = "grayscale(1) sepia(0.6) contrast(1.15)"; bip(70, 0.6, 0.4, "triangle"); }
+    if (z.t > 0.2 && !z.flash){ z.flash = true; fxZW(() => toile.style.filter = "grayscale(0.85) sepia(0.45)"); }
+    if (z.t >= 3.0){ z.etat = "arret"; z.t = 0; z.placeAvant = classer().indexOf(z.elu) + 1; fxZW(() => { toile.style.filter = "grayscale(1) sepia(0.6) contrast(1.15)"; bip(70, 0.6, 0.4, "triangle"); }); }
     return "roue";
   }
   if (z.etat === "arret"){
-    if (z.t >= 3.0){ z.etat = "fini"; z.t = 0; z.placeApres = classer().indexOf(z.elu) + 1; toile.style.filter = ""; bip(440, 0.25, 0.3); }
+    if (z.t >= 3.0){ z.etat = "fini"; z.t = 0; z.placeApres = classer().indexOf(z.elu) + 1; fxZW(() => { toile.style.filter = ""; bip(440, 0.25, 0.3); }); }
     return "arret";
   }
   return null;
+}
+// ce que le serveur annonce : [état, temps dans l'état, élu, pilotes de la roue]
+function etatZaWarudoK(){
+  const z = jeu.zw; if (!z || z.etat === "fini") return null;
+  return [z.etat, Math.round(z.t * 100) / 100, z.elu ? z.elu.idJ : null, z.etat === "roue" ? z.vs.map(v => v.idJ) : null, z.iElu == null ? null : z.iElu];
+}
+function syncZaWarudoK(a){
+  if (!Array.isArray(a) || !jeu.multi || !piste || !piste.def || piste.def.nom !== "Kujota") return;
+  const [etat, tS, eluId, vsIds, iElu] = a;
+  let z = jeu.zw;
+  if (!z){ z = jeu.zw = { etat: "appel", t: 0, echelle: 1, declencheur: null, bipK: -1 }; fxZW(() => { bip(98, 1.6, 0.35, "sawtooth"); bip(147, 1.6, 0.2, "triangle"); }); }
+  if (z.etat === "fini") return;
+  if (etat === "roue" && z.etat === "appel" && vsIds){
+    const vs = vsIds.map(voitureParIdK).filter(Boolean), elu = voitureParIdK(eluId);
+    if (!elu || !vs.length) return;
+    let k = vs.indexOf(elu); if (k < 0){ vs.push(elu); k = vs.length - 1; }
+    Object.assign(z, { etat: "roue", t: tS, vs, iElu: k, elu, pas: 3 * vs.length + k });
+    fxZW(() => { toile.style.filter = "invert(0.8)"; bip(110, 0.9, 0.45, "sawtooth"); bip(55, 1.4, 0.45, "square"); });
+    return;
+  }
+  const ordre = { appel: 0, roue: 1, arret: 2 };
+  if (ordre[etat] > ordre[z.etat] && z.etat !== "appel"){             // on a pris du retard : on saute à l'état du serveur
+    if (etat === "arret"){ z.placeAvant = z.placeAvant || (classer().indexOf(z.elu) + 1); fxZW(() => toile.style.filter = "grayscale(1) sepia(0.6) contrast(1.15)"); }
+    z.etat = etat; z.t = tS;
+  } else if (etat === z.etat && Math.abs(z.t - tS) > 0.25) z.t = tS;
 }
 // dessin de l'arrêt du temps (par-dessus le jeu)
 function dessinerZaWarudo(ctx2, W, H, E){
@@ -9136,7 +9173,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 15;      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 16;      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -9371,6 +9408,7 @@ function syncEmeraudesK(k, ch){
 function serveurEtat(d){
   if (!jeu.multi) return;
   if (d.k) syncEmeraudesK(d.k, d.ch);
+  if (d.z) syncZaWarudoK(d.z);
   if (jeu.multi.spectateur && d.ch != null) jeu.chrono = d.ch;      // le chrono de la course regardée
   const tr = performance.now();
   for (const c of d.c){
