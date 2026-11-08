@@ -7884,7 +7884,9 @@ function chocObstaclesK(v, dt){
     const sg = Math.sign(dl) || 1;
     if (e.type === "emeraude"){
       v.v *= 0.5;
-      if (v.joueur){ e.casse = jeu.chrono; e.casseX = true; v.flashK = { c: "#38ff8a", t: jeu.chrono }; bip(1200, 0.12, 0.35, "square"); bip(700, 0.25, 0.3, "triangle"); }
+      e.casse = jeu.chrono; e.casseX = true;
+      const J = jeu.joueur; if (!v.joueur && J && Math.hypot(e.x - J.x, e.z - J.z) < 120) bip(1100, 0.1, 0.18, "square");
+      if (v.joueur){ v.flashK = { c: "#38ff8a", t: jeu.chrono }; bip(1200, 0.12, 0.35, "square"); bip(700, 0.25, 0.3, "triangle"); }
     } else {
       v.v *= 0.6;                                                   // le jet d'eau : il freine et pousse de côté
       if (v.joueur){ v.deriveX = (v.deriveX || 0) + e.nx * sg * 7; v.deriveZ = (v.deriveZ || 0) + e.nz * sg * 7; v.flashK = { c: "#9ad8ff", t: jeu.chrono }; bip(160, 0.4, 0.35, "sawtooth"); }
@@ -7942,7 +7944,11 @@ function dessinerObstaclesK(){
       tracer(decor.hieroK, m4Mul(m4Mul(m4Translation(mil.x, yH + (1 - k) * 12 + Math.sin(t * 1.5) * 0.8, mil.z), m4RotY(mil.cap + Math.PI)), m4Echelle(HH * k, HH * k, HH * k)), [1, 1, 1], 0.8); }
     const main = [mil.x, yH + HH * 0.6, mil.z];
     for (const e of E0){
-      const u = (tc - (e.tl - VOL_E)) / VOL_E; if (u < 0 || e.casseX) continue;
+      const u = (tc - (e.tl - VOL_E)) / VOL_E; if (u < 0) continue;
+      if (e.casseX){                                   // éclatée : une gerbe verte qui retombe, puis plus rien
+        const ui = (tc - e.casse) / 0.7; if (ui >= 0 && ui < 1){ const sz = 1.5 + ui * 3.5; tracer(meshK.eclat, m4Mul(m4Translation(e.x, e.y + ui * 1.6, e.z), m4Echelle(sz * (1 - 0.5 * ui), (1.4 + ui * 1.5) * (1 - ui) + 0.05, sz * (1 - 0.5 * ui))), [1, 1, 1], 0.9); }
+        continue;
+      }
       if (u < 1){                                      // en vol : un arc de la main de Hierophant jusqu'à la piste
         const x = main[0] + (e.x - main[0]) * u, z = main[2] + (e.z - main[2]) * u, y = main[1] + (e.y - 0.9 - main[1]) * u + 10 * Math.sin(Math.PI * u);
         tracer(meshK.em, m4Mul(m4Mul(m4Mul(m4Translation(x, y, z), m4RotY(t * 6 + e.s)), m4RotX(u * 5)), m4Echelle(1.9, 1.9, 1.9)), [1, 1, 1], 0.7);
