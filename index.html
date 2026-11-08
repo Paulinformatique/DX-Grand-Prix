@@ -9909,14 +9909,14 @@ function rafraichirAccueil(){
 }
 
 function rafraichirMenu(){
-  for (const id of ["banque-menu","banque-accueil"])
-    document.getElementById(id).textContent = berries(carriere.argent);
-  for (const id of ["voiture-menu","voiture-accueil"])
-    document.getElementById(id).textContent = VOITURES[carriere.voiture].nom;
+  try { for (const id of ["banque-menu","banque-accueil"])
+    document.getElementById(id).textContent = berries(carriere.argent); } catch (e) { console.warn("menu (banque)", e); }
+  try { for (const id of ["voiture-menu","voiture-accueil"])
+    document.getElementById(id).textContent = (VOITURES[carriere.voiture] || VOITURES[0]).nom; } catch (e) { console.warn("menu (voiture)", e); }
   // protégé : au tout premier affichage, la photo n'est pas encore possible
   try { rafraichirAccueil(); } catch (e) {}
 
-  dessinerCarte();
+  try { dessinerCarte(); } catch (e) { console.warn("menu (carte)", e); }
 }
 
 /* ───────────────────────── CARTE DE CARRIÈRE ─────────────────────────
@@ -11743,7 +11743,7 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
     montrer("ecran-vote"); demander(); rendreTout();
     document.getElementById("ecran-vote").scrollTop = 0;
   };
-  document.getElementById("btn-retour-vote").onclick = () => { vuResultatsSiVus(); rafraichirMenu(); montrer("ecran-accueil"); majPastille(); };
+  document.getElementById("btn-retour-vote").onclick = () => { montrer("ecran-accueil"); try { vuResultatsSiVus(); majPastille(); rafraichirMenu(); } catch (e) { console.warn("vote", e); } };
   // en quittant l'onglet : les résultats tout frais qu'on y a vus ne reviennent plus en pastille
   function vuResultatsSiVus(){ if (E && !E.actif) vuResultats(); }
 }
