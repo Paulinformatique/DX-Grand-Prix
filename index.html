@@ -5498,7 +5498,7 @@ function creerConcurrent(livree, estJoueur, def, rang){
 }
 
 function preparerCourse(indexCircuit){
-  jeu.zw = null; jeu.lancerK = null; jeu.obstK = null; jeu.effondreT = null; try { toile.style.filter = ""; } catch (e) {}          // (un arrêt du temps en cours ne survit pas à une nouvelle course)
+  jeu.zw = null; jeu.lancerK = null; jeu.obstK = null; jeu.effondreT = null; jeu.jetsPris = null; try { toile.style.filter = ""; } catch (e) {}          // (un arrêt du temps en cours ne survit pas à une nouvelle course)
   fixerLargeur(CIRCUITS[indexCircuit]);
   jeu.circuit = indexCircuit;
   const def = CIRCUITS[indexCircuit];
@@ -8539,18 +8539,23 @@ function evThor(tour){
   if (tour === toursCourse() - 1) return "ragnarok";
   return ["drakkars", "blizzard", "mjollnir", "troll", "jormun"][tour] || null;
 }
+const PER_J = 3.4, VOL_J = 2.2, PORTEE_J = 60;      // une lance part toutes les 3,4 s de chaque endroit, vole 2,2 s
 const PER_M = 6, AVERT_M = 1.5, FRAPPE_M = 0.35, PER_R = 4.5, PER_Q = 3.6, AVERT_Q = 1.3, FRAPPE_Q = 0.45, CYCLE_T = 9;
 let thorCache = null;
 function sitesThor(){
   if (thorCache && thorCache.piste === piste) return thorCache;
   const L = piste.longueur, D = DEMI_PISTE; let g = 4411; const al = () => (g = (g * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  const boucliers = []; for (let k = 0; k < 10; k++) boucliers.push({ s: (PONT_THOR[0] + 0.004 + k * 0.0028) * L, lat: (k % 2 ? 1 : -1) * (0.8 + al() * 2.4), r: 1.0, id: "u" + k, a: al() * 6 });
+  // les lances et les boucliers lancés des drakkars : ils traversent le pont et retombent dans la rivière
+  const jets = []; for (let k = 0; k < 14; k++) jets.push({ s: (PONT_THOR[0] + 0.003 + k * 0.0021) * L, sens: k % 2 ? 1 : -1, ph: al() * PER_J, id: "j" + k, type: k % 3 === 1 ? "bouclier" : "lance" });
   const site = (d, per) => ({ s: d * L, lat: (al() < 0.5 ? -1 : 1) * D * (0.4 + al() * 0.2), ph: al() * per, r: 2.8 });
   const eclairs = []; for (let k = 0; k < 30; k++) eclairs.push(site(0.06 + k * 0.029, PER_M));
   const ragnarok = []; for (let k = 0; k < 40; k++) ragnarok.push(site(0.05 + k * 0.022, PER_R));
   const queue = [0.245, 0.265, 0.285].map((d, k) => ({ s: d * L, ph: k * 1.2 }));
-  return (thorCache = { piste, boucliers, eclairs, ragnarok, queue, troll: 0.468 * L, glace: [0.36 * L, 0.46 * L] });
+  return (thorCache = { piste, jets, eclairs, ragnarok, queue, troll: 0.468 * L, glace: [0.36 * L, 0.46 * L] });
 }
+// où en est un jet : u de 0 à 1 pendant le vol (null sinon), sa position de côté et sa hauteur au-dessus du pont
+const etatJet = j => { const c = Math.floor((jeu.chrono + j.ph) / PER_J), u = ((jeu.chrono + j.ph) % PER_J + PER_J) % PER_J / VOL_J; if (u >= 1) return null;
+  const lat = j.sens * (-PORTEE_J + 2 * PORTEE_J * u), h = 1.0 - 24 * (lat / PORTEE_J) ** 2; return { u, lat, h, cle: j.id + ":" + c }; };
 const etatEclair = (e, per) => { const u = ((jeu.chrono + e.ph) % per + per) % per; return u < AVERT_M ? { ph: "avert", u: u / AVERT_M } : u < AVERT_M + FRAPPE_M ? { ph: "frappe", u: (u - AVERT_M) / FRAPPE_M } : u < AVERT_M + 2.5 ? { ph: "brule", u: (u - AVERT_M - FRAPPE_M) / (2.5 - FRAPPE_M) } : null; };
 const etatQueue = q => { const u = ((jeu.chrono + q.ph) % PER_Q + PER_Q) % PER_Q; return u < AVERT_Q ? { ph: "leve", u: u / AVERT_Q } : u < AVERT_Q + FRAPPE_Q ? { ph: "frappe", u: (u - AVERT_Q) / FRAPPE_Q } : { ph: "repos", u: 0 }; };
 // le troll change de côté toutes les 4,5 s (en 0,8 s)
@@ -8581,9 +8586,16 @@ function chocThor(v, dt){
   // le pont effondré : les bots prennent la voie qui reste
   if (!v.joueur && jeu.effondreT != null){ const d0 = PONT_THOR[0] * L - s; if (d0 < 120 && s < PONT_THOR[1] * L){ v.viseSableK = -DEMI_PISTE * 0.45; v.evitK = 0.4; } }
   if (!ev) return;
-  if (ev === "drakkars"){
-    for (const b of S.boucliers){ if ((s - b.s) ** 2 + (lat - b.lat) ** 2 < (b.r + 1.0) ** 2 && touche(b.id + ":" + v.tour, 0.93, 0, "#c9a24a", 0.6) && v.joueur) bip(520, 0.08, 0.2, "square"); }
-    if (!v.joueur && typeof planObstK === "function"){ const dv = S.boucliers.filter(b => b.s - s > -2 && b.s - s < 70); if (dv.length) planObstK(v, dv); }
+  if (ev === "drakkars" && surPontThor(v.s)){
+    // une lance ou un bouclier qui passe à hauteur de voiture : il s'arrête sur elle (−5 km/h)
+    jeu.jetsPris = jeu.jetsPris || {};
+    for (const j of S.jets){
+      if (Math.abs(s - j.s) > 1.8) continue;
+      const st = etatJet(j); if (!st || st.h < -0.2 || st.h > 1.8 || Math.abs(lat - st.lat) > 1.3 || jeu.jetsPris[st.cle]) continue;
+      jeu.jetsPris[st.cle] = { t: jeu.chrono, lat: st.lat, h: st.h };
+      v.v = Math.max(0, v.v - 5 / 3.6);
+      if (v.joueur){ v.flashT = { c: "#c9a24a", t: jeu.chrono }; if (v === jeu.joueur && typeof secousse !== "undefined") secousse = Math.max(secousse, 0.5); bip(j.type === "lance" ? 900 : 420, 0.08, 0.25, "square"); }
+    }
   }
   if (ev === "mjollnir" || ev === "ragnarok"){
     const [liste, per] = ev === "mjollnir" ? [S.eclairs, PER_M] : [S.ragnarok, PER_R], danger = [];
@@ -8644,7 +8656,9 @@ function maillagesThor(){
     quad(trou, P4(a, DEMI_PISTE + BORDURE + 1.3, 0.16), P4(b, DEMI_PISTE + BORDURE + 1.3, 0.16), P4(b, j, 0.16), P4(a, j, 0.16), [0.05, 0.10, 0.14]);
     boite(trou, a.x + a.nx * j, a.y + 0.35, a.z + a.nz * j, 0.9, 0.7, 1.6, [0.42, 0.40, 0.37], a.cap + s);
     boite(trou, a.x + a.nx * (j - 0.4), a.y + 0.25, a.z + a.nz * (j - 0.4), 0.6, 0.5, 0.8, [0.34, 0.33, 0.31], a.cap - s); }
-  return (meshT = { piste, bouclier, eclair, glace: televerser(glace), trou: televerser(trou),
+  // la lance : un long manche de bois et une pointe de fer (le long de +z)
+  const lance = (() => { const m = creerMaillage(); boite(m, 0, 0, -0.3, 0.16, 0.16, 3.8, [0.50, 0.36, 0.20]); boite(m, 0, 0, 1.9, 0.30, 0.08, 0.8, [0.80, 0.82, 0.86]); boite(m, 0, 0, 1.9, 0.08, 0.30, 0.8, [0.80, 0.82, 0.86]); return televerser(m); })();
+  return (meshT = { piste, lance, bouclier, eclair, glace: televerser(glace), trou: televerser(trou),
                     cible: disque([0.75, 0.88, 1.0], [0.35, 0.55, 0.95]), avert: anneau([0.6, 0.85, 1.0]), brule: disque([0.12, 0.11, 0.12], [0.20, 0.18, 0.18]),
                     ecaille: boule([0.16, 0.42, 0.30], [0.30, 0.55, 0.28]), ombre: disque([0.08, 0.10, 0.09], [0.12, 0.14, 0.12]) });
 }
@@ -8681,8 +8695,17 @@ function dessinerEvenementsThor3D(B, t){
       if (!proche(x, z, 1100)) continue;
       tracer(B.drakkar, m4Mul(m4Translation(x, B.y - 0.6 + 0.2 * Math.sin(t + k), z), m4RotY(Math.atan2(-B.nx, -B.nz))), [1, 1, 1]);
     }
-    for (const b of S.boucliers){ if (J._chocT && J._chocT[b.id + ":" + J.tour]) continue; const p = auPoint(piste, b.s); if (!proche(p.x, p.z)) continue;
-      tracer(M.bouclier, m4Mul(m4Mul(m4Translation(p.x + p.nx * b.lat, p.y + 0.02, p.z + p.nz * b.lat), m4RotY(b.a)), m4Echelle(b.r, b.r, b.r)), [1, 1, 1]); }
+    // les lances et les boucliers en vol (ou plantés sur la voiture qui les a pris, une seconde)
+    const pris = jeu.jetsPris || {};
+    for (const j of S.jets){
+      const p = auPoint(piste, j.s); if (!proche(p.x, p.z, 500)) continue;
+      const st = etatJet(j); if (!st) continue;
+      const pr = pris[st.cle]; if (pr && jeu.chrono - pr.t > 0.25) continue;
+      const lat = pr ? pr.lat : st.lat, h = pr ? pr.h : st.h, x = p.x + p.nx * lat, z = p.z + p.nz * lat, y = p.y + h;
+      const pente = -48 * lat / (PORTEE_J * PORTEE_J) * j.sens, aY = Math.atan2(p.nx * j.sens, p.nz * j.sens);
+      if (j.type === "lance") tracer(M.lance, m4Mul(m4Mul(m4Translation(x, y, z), m4RotY(aY)), m4RotX(-Math.atan(pente))), [1, 1, 1]);
+      else tracer(M.bouclier, m4Mul(m4Mul(m4Mul(m4Translation(x, y, z), m4RotY(aY)), m4RotX(Math.PI / 2 + t * 9)), m4Echelle(1.3, 1.3, 1.3)), [1, 1, 1]);
+    }
   }
   if (ev === "blizzard") tracer(M.glace, m4Identite(), [1, 1, 1]);
   if (ev === "mjollnir" || ev === "ragnarok"){
@@ -9957,7 +9980,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 21;      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 22;      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
