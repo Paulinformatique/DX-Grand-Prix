@@ -9861,10 +9861,11 @@ function basculerPause(){
 
 /* ───────────────────────── 16. LES MENUS ──────────────────────────── */
 
-const ECRANS = ["ecran-actus", "ecran-multi", "ecran-paddock", "ecran-accueil","ecran-menu","ecran-garage","ecran-fin","ecran-pause","ecran-atelier", "ecran-joueur", "ecran-maker", "ecran-idees", "ecran-trapezoidu"];
+const ECRANS = ["ecran-actus", "ecran-multi", "ecran-paddock", "ecran-accueil","ecran-menu","ecran-garage","ecran-fin","ecran-pause","ecran-atelier", "ecran-joueur", "ecran-maker", "ecran-idees", "ecran-trapezoidu", "ecran-vote"];
 
 function cacherTout(){
   for (const id of ECRANS) document.getElementById(id).classList.add("cache");
+  document.querySelectorAll("body > .ecran").forEach(e => e.classList.add("cache"));
 }
 function montrer(id){
   cacherTout();
