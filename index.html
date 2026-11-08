@@ -1277,13 +1277,14 @@ function ambianceSBS(){
   if (piste && piste.def && piste.def.nom === "Kujota" && !NUIT && decor){
     SABLE_ACT = SABLE_KUJOTA;
     const J = jeu.joueur; if (!J || !/compte|course|pause|arrivee/.test(jeu.phase)) return;
-    const forcer = typeof window !== "undefined" && window.ESSAI_SBS || {}, D = 30;
+    const forcer = typeof window !== "undefined" && window.ESSAI_SBS || {}, D = 40;
     if (J.tour === 1 && J.tempeteTour !== 1 && jeu.phase === "course" && (J.distance % piste.longueur) / piste.longueur > 0.25){ J.tempeteTour = 1; J.tempeteA = jeu.chrono; sonVent(); }
     if (J.tempeteA != null){
       const t = jeu.chrono - J.tempeteA;
-      if (t >= 0 && t < D){ const u = Math.min(1, t / 5); TEMPETE = Math.max(0, Math.min(u * u * (3 - 2 * u), (D - t) / 4)); }
+      if (t >= 0 && t < D){ const u = Math.min(1, t / 4); TEMPETE = Math.max(0, Math.min(u * u * (3 - 2 * u), (D - t) / 4)); }
       if (t > 11 && !J.vent2){ J.vent2 = true; sonVent(); }
       if (t > 21 && !J.vent3){ J.vent3 = true; sonVent(); }
+      if (t > 31 && !J.vent4){ J.vent4 = true; sonVent(); }
     }
     // dernier tour : le soleil se couche sur les pyramides (doré, puis orangé — jamais la nuit)
     const n = toursCourse(), prog = forcer.prog != null ? forcer.prog : Math.max(0, (J.distance || 0) / piste.longueur);
@@ -3039,6 +3040,7 @@ function construireDecor(piste){
   const kujota = piste.def.nom === "Kujota" && typeof MODELES_KUJOTA !== "undefined";
   const planesK = [];          // images à plat (le cadre photo), faites avec les écrans
   if (kujota){
+    objetsAnimes.poussiere = true;                        // (la poussière du sable)
     const MK = MODELES_KUJOTA, HK = MK._hauteurs || {};
     let mD = 0, mL = 0, d0 = -1;
     for (let i = 0; i < nb * 2; i++){ if (Math.abs(P[i % nb].courbure) < 0.0028){ if (d0 < 0) d0 = i; if (i - d0 > mL){ mL = i - d0; mD = d0; } } else d0 = -1; }
@@ -3098,9 +3100,9 @@ function construireDecor(piste){
       const y = solEn(x, z)[0] - 0.4;
       boite(paysage, x, y + 0.4, z, 0.75 * h, 1.6, 1.95 * h, pierreF, Math.atan2(dx, dz));     // la dalle
       poser("sphinx", x, y + 1.0, z, -dx, -dz, h);                       // (le modèle regarde vers −z)
-      const a = Math.atan2(-dx, -dz), ca = Math.cos(a), sa = Math.sin(a), lx = -0.045, lz = -0.165;
-      const hx = x + (lx * ca + lz * sa) * h, hz = z + (-lx * sa + lz * ca) * h, hy = y + 1.0 + 0.885 * h;
-      const at = Math.atan2(dx, dz), c2 = Math.cos(at), s2 = Math.sin(at), sc = 0.235 * h;
+      const a = Math.atan2(-dx, -dz), ca = Math.cos(a), sa = Math.sin(a), lx = -0.045, lz = -0.20;      // (le haut de la tête ; la calotte du chapeau est un peu en arrière de son centre)
+      const hx = x + (lx * ca + lz * sa) * h, hz = z + (-lx * sa + lz * ca) * h, hy = y + 1.0 + 0.755 * h;      // (le bord du chapeau est à 0,85 de sa hauteur : les cheveux pendent dessous)
+      const at = Math.atan2(dx, dz), c2 = Math.cos(at), s2 = Math.sin(at), sc = 0.25 * h;
       incruster(paysage, MODELE_CHAPEAU.chapeau, MODELE_CHAPEAU.pal, (px, py, pz) => [hx + (px * c2 + pz * s2) * sc, hy + py * sc, hz + (-px * s2 + pz * c2) * sc]);
       rectReserver(x, z, dx, dz, 0.75 * h, 1.95 * h);
       for (let o = DEMI_PISTE + ACCOTEMENT + 4; o < DEMI_PISTE + ACCOTEMENT + 30; o += 6) for (let d = -8; d <= 8; d += 4){ const q = P[(i + d + nb) % nb]; reserver(q.x + q.nx * ci * o, q.z + q.nz * ci * o, 4); }   // rien devant
@@ -3269,9 +3271,14 @@ function construireDecor(piste){
       }
       for (const m of sablesMouvants()){
         const p = auPoint(piste, m.s), x = p.x + p.nx * m.lat, z = p.z + p.nz * m.lat;
-        cylindreY(paysage, x, p.y + 0.02, z, m.r, m.r * 0.96, 0.08, 14, [0.42, 0.29, 0.16]);
-        cylindreY(paysage, x, p.y + 0.03, z, m.r * 0.7, m.r * 0.66, 0.09, 12, [0.80, 0.63, 0.38]);
-        cylindreY(paysage, x, p.y + 0.04, z, m.r * 0.38, m.r * 0.3, 0.10, 10, [0.30, 0.20, 0.11]);
+        // du sable bien plus foncé, humide, en cuvette (le bord clair, le fond sombre), à plat sur le sable
+        const disque = (r, dy, c, n = 22) => { for (let k = 0; k < n; k++){ const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2, w = 0.88 + 0.12 * Math.sin(k * 2.7);
+          const C = [x, p.y + dy, z], A = [x + Math.cos(a0) * r * w, p.y + dy, z + Math.sin(a0) * r * w], B = [x + Math.cos(a1) * r * (0.88 + 0.12 * Math.sin((k + 1) * 2.7)), p.y + dy, z + Math.sin(a1) * r * (0.88 + 0.12 * Math.sin((k + 1) * 2.7))];
+          triangle(paysage, C, A, B, c); triangle(paysage, C, B, A, c); } };
+        disque(m.r + 0.6, 0.10, [0.70, 0.54, 0.33]);
+        disque(m.r, 0.12, [0.46, 0.33, 0.19]);
+        disque(m.r * 0.66, 0.14, [0.37, 0.26, 0.15]);
+        disque(m.r * 0.32, 0.16, [0.27, 0.18, 0.10]);
       }
       // de petites dunes au bord de la route, pour qu'on comprenne d'où vient le sable
       for (let i = i0; i < i1; i += 3) for (const sg of [-1, 1]){
@@ -5355,6 +5362,7 @@ function majGyro(v, dt){
   cmd.gyro = 0;
 }
 function majJoueur(v, dt){
+  chocObstaclesK(v, dt);                                  // Kujota : geysers, émeraudes
   majRetour(v, dt);
   majGyro(v, dt);
   // Dérive latérale après un coup sur le côté : la voiture glisse, puis la
@@ -5398,7 +5406,7 @@ function majJoueur(v, dt){
   if (v.aspi > 0.05 && v.v < vA) v.v += v.aspi * 0.9 * dt;
   // après le Gyro, on redescend en douceur à la vitesse normale (pas un mur)
   if (v.v > vA) v.v = v.gyroFin > 0 ? Math.max(vA, v.v - 11 * dt) : vA;
-  if (sableK > 0){ const vS = R.vmax * Math.max(0.32, 1 - 0.5 * sableK); if (v.v > vS) v.v = Math.max(vS, v.v - (6 + 10 * sableK) * dt); }   // le sable retient
+  if (sableK > 0){ const vS = R.vmax * (sableK >= 1.5 ? 0.5 : Math.max(0.5, 1 - 0.5 * sableK)); if (v.v > vS) v.v = Math.max(vS, v.v - (sableK >= 1.5 ? 32 : 6 + 10 * sableK) * dt); }   // le sable retient
 
   const part = Math.min(1, v.v / R.vmax);
 
@@ -5551,6 +5559,7 @@ function replacer(v){
 
 function majIA(v, dt){
   const R = v.R;
+  chocObstaclesK(v, dt);
 
   // Poussé dans l'herbe : il y roule lentement (voir plus bas pour le retour)
   const dehors = Math.abs(v.lat) > DEMI_PISTE + BORDURE * 0.7;
@@ -5589,7 +5598,7 @@ function majIA(v, dt){
   // l'herbe freine franchement (il y roulait encore à 120-130 km/h, le long
   // de la piste, comme sur une voie de dégagement)
   if (dehors) cible = Math.min(cible, v.crashe ? 0 : R.vmax * 0.18);   // contre le mur : arrêté
-  { const fS = sableKujota(v); if (fS > 0) cible = Math.min(cible, R.vmax * Math.max(0.32, 1 - 0.5 * fS)); }   // Kujota : le sable
+  { const fS = sableKujota(v); if (fS > 0) cible = Math.min(cible, R.vmax * (fS >= 1.5 ? 0.5 : Math.max(0.5, 1 - 0.5 * fS))); }   // Kujota : le sable
 
   /* Erreurs de pilotage, rares : un virage pris trop large, ou un blocage
      de roues au freinage. Plus fréquentes aux premières courses (une par
@@ -5952,7 +5961,7 @@ function majIA(v, dt){
   const p = auPoint(piste, v.s);
   v.x = p.x + p.nx * v.lat;
   v.z = p.z + p.nz * v.lat;
-  v.y = p.y;
+  v.y = p.y + bosseKujota(v);                          // (Kujota, 4ᵉ tour : les dunes bougent)
   const vLat = (v.lat - latAvant) / Math.max(dt, 1e-4) + v.vlat;
   v.capLisse = (v.capLisse || 0) + (Math.atan(vLat / Math.max(6, v.v)) - (v.capLisse || 0)) * Math.min(1, dt * 8);
   v.cap = p.cap + v.capLisse + v.lacetChoc;
@@ -7123,6 +7132,7 @@ function rendre(){
     dessinerVoiture(v);
   }
   dessinerAir();                       // traînées d'air de l'aspiration
+  gl.disable(gl.CULL_FACE); dessinerObstaclesK(); gl.enable(gl.CULL_FACE);   // Kujota : geysers, émeraudes (après la route)
   dessinerPoussiere(decor);
 }
 
@@ -7671,37 +7681,41 @@ function dessinerZaWarudo(ctx2, W, H, E){
   ctx2.restore();
 }
 /* ───── Kujota : les événements de la grande ligne droite ─────
-   Fin du 1ᵉʳ tour : Hol Horse (Emperor) tire sur la ligne droite.
-   Fin du 3ᵉ tour : THE SUN, le faux soleil d'Arabia Fats, chauffe tout.
-   Fin du 4ᵉ tour : EMERALD SPLASH de Kakyoin, des émeraudes plein l'écran.
+   Fin du 1ᵉʳ tour : les geysers de N'Doul jaillissent de la piste.
+   Fin du 3ᵉ tour : le faux soleil d'Arabia Fats chauffe tout.
+   Fin du 4ᵉ tour : de grosses émeraudes de Kakyoin plantées sur la piste.
    (Et au 5ᵉ tour, le vrai soleil se couche sur les pyramides.) */
 /* ───── Kujota : la piste ensablée ─────
    Une portion du circuit (le virage du bas à droite et ses abords) est
    recouverte de sable : tout le monde y va moins vite. Des ronds de sables
    mouvants y freinent très fort. Et au 4ᵉ tour, les dunes bougent : la piste
    fait des bosses (la voiture tape) et le sable freine encore plus. */
-const ZONE_SABLE_K = { d0: 0.392, d1: 0.470 };
+const ZONE_SABLE_K = { d0: 0.365, d1: 0.535 };
 let mouvantsK = null;
 function sablesMouvants(){
   if (mouvantsK && mouvantsK.piste === piste) return mouvantsK.L;
-  const L = piste.longueur, a = ZONE_SABLE_K.d0 * L, b = ZONE_SABLE_K.d1 * L, lat = [-4, 3, -1, 5, -5, 1, 4, -2], n = 8;
-  const res = []; for (let k = 0; k < n; k++) res.push({ s: a + 40 + (k + 0.5) / n * (b - a - 80), lat: lat[k] * DEMI_PISTE / 6.5, r: 3.6 });
+  const L = piste.longueur, a = ZONE_SABLE_K.d0 * L, b = ZONE_SABLE_K.d1 * L, n = 14;
+  // de grands ronds, un à droite de la piste, puis un à gauche…
+  const res = []; for (let k = 0; k < n; k++) res.push({ s: a + 40 + (k + 0.5) / n * (b - a - 80), lat: (k % 2 ? -1 : 1) * DEMI_PISTE * 0.48, r: 5.2 });
   mouvantsK = { piste, L: res }; return res;
 }
 const dunesK = v => v.tour === 3;                        // le 4ᵉ tour
 function sableKujota(v){
   if (!piste || !piste.def || piste.def.nom !== "Kujota" || v.s == null) return 0;
   const L = piste.longueur, s = ((v.s % L) + L) % L, a = ZONE_SABLE_K.d0 * L, b = ZONE_SABLE_K.d1 * L;
-  if (s < a || s > b) return 0;
+  if (s < a || s > b) return v._englue > jeu.chrono ? 1.6 : 0;
   let f = 0.5 * Math.min(1, (s - a) / 25, (b - s) / 25);     // le sable s'épaissit à l'entrée
-  for (const q of sablesMouvants()) if ((s - q.s) ** 2 + ((v.lat || 0) - q.lat) ** 2 < q.r * q.r) f = Math.max(f, 1.6);
+  for (const q of sablesMouvants()) if ((s - q.s) ** 2 + ((v.lat || 0) - q.lat) ** 2 < q.r * q.r) v._englue = jeu.chrono + 1.8;
+  if (v._englue > jeu.chrono) f = Math.max(f, 1.6);
   if (dunesK(v)) f += 0.3;
   return f;
 }
+const ONDE_K = 9, VIT_DUNE = 7, HAUT_DUNE = 0.75;           // les vagues : ~56 m entre deux, elles avancent vers les pilotes
+const dune = (s, t) => { const L = piste.longueur, a = ZONE_SABLE_K.d0 * L, b = ZONE_SABLE_K.d1 * L; if (s < a || s > b) return 0;
+  const m = Math.max(0, Math.min(1, (s - a) / 30, (b - s) / 30)), q = Math.sin((s + VIT_DUNE * t) / ONDE_K); return q > 0 ? m * HAUT_DUNE * q * q : 0; };
 function bosseKujota(v){
-  if (!dunesK(v) || !sableKujota(v)) return 0;
-  const L = piste.longueur, s = ((v.s % L) + L) % L, a = ZONE_SABLE_K.d0 * L, b = ZONE_SABLE_K.d1 * L, m = Math.min(1, (s - a) / 30, (b - s) / 30);
-  return m * (0.38 * Math.max(0, Math.sin(s / 7.5)) + 0.22 * Math.max(0, Math.sin(s / 3.1 + 1.3)));
+  if (!dunesK(v) || !piste || !piste.def || piste.def.nom !== "Kujota" || v.s == null) return 0;
+  const L = piste.longueur; return dune(((v.s % L) + L) % L, jeu.chrono || 0);
 }
 let droiteK = null;
 function droitePrincipale(){
@@ -7710,79 +7724,134 @@ function droitePrincipale(){
   for (let i = 0; i < nb * 2; i++){ if (Math.abs(P[i % nb].courbure) < 0.0028){ if (d0 < 0) d0 = i; if (i - d0 > lg){ lg = i - d0; deb = d0; } } else d0 = -1; }
   return (droiteK = { piste, deb: deb % nb, long: Math.min(lg, nb - 1) });
 }
-const EVK = { 0: ["emperor", "EMPEROR !", "Hol Horse tire sur la ligne droite"], 2: ["sun", "THE SUN", "Arabia Fats allume un deuxième soleil"], 3: ["emerald", "EMERALD SPLASH !", "Kakyoin et Hierophant Green"] };
+/* fin du 1er tour : les geysers de N'Doul (Geb) jaillissent de la piste, par
+   intermittence ; fin du 3e : The Sun ; fin du 4e : de grosses émeraudes
+   (Emerald Splash) plantées sur la piste, à éviter. Les adversaires les
+   évitent aussi (ou les prennent). En solo. */
+const EVK = { 0: "geyser", 2: "sun", 3: "emeraude" };
 function evenementsKujota(J){
   if (jeu.phase !== "course" || jeu.chrono < 6 || J.s == null) return;
   const dr = droitePrincipale(), L = piste.longueur, i = Math.floor((((J.s % L) + L) % L) / piste.pas), r = ((i - dr.deb) % piste.nb + piste.nb) % piste.nb;
   const ev = EVK[J.tour];
   if (ev && J.evKTour !== J.tour && r > 3 && r < dr.long * 0.35){
-    J.evKTour = J.tour; J.evK = { nom: ev[0], titre: ev[1], sous: ev[2], t0: jeu.chrono, graine: Math.random() * 1000 };
-    if (ev[0] === "sun"){ bip(196, 1.2, 0.25, "sawtooth"); bip(262, 1.2, 0.18, "triangle"); }
-    else if (ev[0] === "emerald"){ for (let k = 0; k < 6; k++) setTimeout(() => bip(880 + k * 140, 0.08, 0.18, "square"), k * 70); }
+    J.evKTour = J.tour; J.evK = { nom: ev, t0: jeu.chrono };
+    if (ev === "sun"){ bip(196, 1.2, 0.25, "sawtooth"); bip(262, 1.2, 0.18, "triangle"); }
+    else if (ev === "geyser"){ bip(70, 1.4, 0.35, "sawtooth"); bip(52, 1.8, 0.3, "triangle"); }
+    else if (ev === "emeraude"){ for (let k = 0; k < 6; k++) setTimeout(() => bip(880 + k * 140, 0.08, 0.18, "square"), k * 70); }
   }
-  if (J.evK && J.evK.nom === "emperor"){                    // les coups de feu
-    const t = jeu.chrono - J.evK.t0, k = Math.floor(t / 0.55);
-    if (t < 7 && k !== J.evK.coup){ J.evK.coup = k; bip(1400, 0.05, 0.3, "square"); bip(180, 0.12, 0.3, "sawtooth"); }
+}
+let obstK = null;
+function obstaclesKujota(){
+  if (obstK && obstK.piste === piste) return obstK;
+  const dr = droitePrincipale(), P = piste.pts, nb = piste.nb, L = piste.longueur;
+  const sDeb = P[dr.deb].d, sFin = P[(dr.deb + dr.long) % nb].d, a = sDeb + 70, b = (sFin < sDeb ? L : sFin) - 45;
+  const pose = (s, lat, type, id, r) => { const p = auPoint(piste, s); return { s, lat, type, id, r, x: p.x + p.nx * lat, y: p.y, z: p.z + p.nz * lat, nx: p.nx, nz: p.nz }; };
+  const em = [-0.55, 0.42, -0.1, 0.6, -0.42, 0.15, -0.6, 0.38, -0.2, 0.55], ge = [0.45, -0.45, 0.05, 0.5, -0.3, 0.25, -0.55, 0.35];
+  const emeraudes = em.map((l, k) => pose(a + (k + 0.5) / em.length * (b - a), l * DEMI_PISTE, "emeraude", "e" + k, 2.0));
+  const geysers = ge.map((l, k) => Object.assign(pose(a + (k + 0.5) / ge.length * (b - a), l * DEMI_PISTE, "geyser", "g" + k, 2.3), { ph: k * 0.83 }));
+  return (obstK = { piste, emeraudes, geysers });
+}
+const PERIODE_G = 2.8, JET_G = 1.3;
+const etatGeyser = e => { const u = ((jeu.chrono + e.ph) % PERIODE_G) / JET_G; return u < 1 ? u : -1; };       // 0..1 pendant le jet
+function obstaclesPour(v){
+  if (jeu.multi || !piste || !piste.def || piste.def.nom !== "Kujota" || v.tempsFinal != null) return null;
+  const O = obstaclesKujota(); return v.tour === 3 ? O.emeraudes : v.tour === 0 ? O.geysers : null;
+}
+function chocObstaclesK(v, dt){
+  const liste = obstaclesPour(v); if (!liste || v.s == null) return;
+  const L = piste.longueur, s = ((v.s % L) + L) % L, lat = v.lat || 0;
+  v._chocsK = v._chocsK || {};
+  for (const e of liste){
+    const u = e.type === "geyser" ? etatGeyser(e) : 1; if (e.type === "geyser" && u < 0.05) continue;
+    const ds = s - e.s, dl = lat - e.lat;
+    // les adversaires voient l'obstacle venir et s'écartent
+    if (!v.joueur && ds > -50 && ds < -3 && Math.abs(dl) < e.r + 1.8) v.vlat = (v.vlat || 0) + (Math.sign(dl) || (e.lat > 0 ? -1 : 1)) * 16 * dt;
+    if (ds * ds + dl * dl > (e.r + 1.1) ** 2) continue;
+    const cle = e.id + ":" + v.tour + (e.type === "geyser" ? ":" + Math.floor((jeu.chrono + e.ph) / PERIODE_G) : "");
+    if (v._chocsK[cle] || (v.joueur && e.casse)) continue;
+    v._chocsK[cle] = true;
+    const sg = Math.sign(dl) || 1;
+    if (e.type === "emeraude"){
+      v.v *= 0.5;
+      if (v.joueur){ e.casse = jeu.chrono; v.flashK = { c: "#38ff8a", t: jeu.chrono }; bip(1200, 0.12, 0.35, "square"); bip(700, 0.25, 0.3, "triangle"); }
+    } else {
+      v.v *= 0.6;                                                   // le jet d'eau : il freine et pousse de côté
+      if (v.joueur){ v.deriveX = (v.deriveX || 0) + e.nx * sg * 7; v.deriveZ = (v.deriveZ || 0) + e.nz * sg * 7; v.flashK = { c: "#9ad8ff", t: jeu.chrono }; bip(160, 0.4, 0.35, "sawtooth"); }
+      else v.vlat = (v.vlat || 0) + sg * 9;
+    }
+  }
+}
+// les obstacles, en 3D (une émeraude qui tourne, un geyser qui jaillit, sa flaque)
+let meshK = null;
+function dessinerObstaclesK(){
+  const J = jeu.joueur; if (!J) return;
+  if (!meshK){
+    const em = creerMaillage(), jet = creerMaillage(), flaque = creerMaillage();
+    const H1 = 3.4, Rm = 1.35, yM = 1.3, n = 6;
+    for (let k = 0; k < n; k++){
+      const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2, A = [Math.cos(a0) * Rm, yM, Math.sin(a0) * Rm], B = [Math.cos(a1) * Rm, yM, Math.sin(a1) * Rm];
+      triangle(em, [0, H1, 0], A, B, k % 2 ? [0.12, 0.78, 0.38] : [0.40, 0.98, 0.60]);
+      triangle(em, [0, 0, 0], B, A, k % 2 ? [0.05, 0.50, 0.24] : [0.10, 0.66, 0.32]);
+    }
+    cylindreY(jet, 0, 0, 0, 1.3, 0.8, 1, 9, [0.72, 0.86, 0.98]);
+    cylindreY(jet, 0, 1, 0, 1.7, 0.3, 0.18, 9, [0.95, 0.98, 1.0]);
+    for (let k = 0; k < 16; k++){ const a0 = k / 16 * Math.PI * 2, a1 = (k + 1) / 16 * Math.PI * 2;      // la flaque mouillée, à plat
+      triangle(flaque, [0, 0, 0], [Math.cos(a0) * 2.8, 0, Math.sin(a0) * 2.8], [Math.cos(a1) * 2.8, 0, Math.sin(a1) * 2.8], [0.24, 0.31, 0.37]);
+      triangle(flaque, [0, 0, 0], [Math.cos(a1) * 2.8, 0, Math.sin(a1) * 2.8], [Math.cos(a0) * 2.8, 0, Math.sin(a0) * 2.8], [0.24, 0.31, 0.37]); }
+    // une vague de sable : en travers de la piste, profil en sin² (hauteur 1), longueur π × ONDE_K, face avant plus claire
+    const vague = creerMaillage(), Lw = Math.PI * ONDE_K, nS = 10, nL = 6, Wd = DEMI_PISTE + 1.5;
+    const hP = u => { const q = Math.sin(u * Math.PI); return q * q; };
+    for (let i = 0; i < nS; i++) for (let j = 0; j < nL; j++){
+      const u0 = i / nS, u1 = (i + 1) / nS, x0 = -Wd + 2 * Wd * j / nL, x1 = -Wd + 2 * Wd * (j + 1) / nL, bord = w => 1 - Math.pow(Math.abs(w) / Wd, 6);
+      const P_ = (u, x) => [x, hP(u) * bord(x), (u - 0.5) * Lw];
+      const c = u0 < 0.5 ? [0.80, 0.64, 0.40] : [0.92, 0.79, 0.54];
+      triangle(vague, P_(u0, x0), P_(u1, x0), P_(u1, x1), c); triangle(vague, P_(u0, x0), P_(u1, x1), P_(u0, x1), c);
+    }
+    meshK = { em: televerser(em), jet: televerser(jet), flaque: televerser(flaque), vague: televerser(vague) };
+  }
+  if (dunesK(J)){                                                    // les dunes : on dessine les vagues de la zone (sommets là où la bosse est la plus haute)
+    const L = piste.longueur, a = ZONE_SABLE_K.d0 * L, b = ZONE_SABLE_K.d1 * L, tt = jeu.chrono || 0, per = 2 * Math.PI * ONDE_K;
+    for (let n = Math.floor((a + VIT_DUNE * tt - ONDE_K * Math.PI / 2) / per); ; n++){
+      const sc = ONDE_K * (Math.PI / 2 + 2 * Math.PI * n) - VIT_DUNE * tt; if (sc > b) break;
+      const m = Math.max(0, Math.min(1, (sc - a) / 30, (b - sc) / 30)); if (m <= 0.02 || sc < a || sc > b) continue;
+      const p = auPoint(piste, sc); if (Math.hypot(p.x - J.x, p.z - J.z) > 700) continue;
+      tracer(meshK.vague, m4Mul(m4Mul(m4Translation(p.x, p.y + 0.05, p.z), m4RotY(p.cap)), m4Echelle(1, HAUT_DUNE * m + 0.02, 1)), [1, 1, 1], 0.9);
+    }
+  }
+  const liste = obstaclesPour(J); if (!liste) return;
+  const t = performance.now() / 1000;
+  for (const e of liste){
+    if (Math.hypot(e.x - J.x, e.z - J.z) > 700 && !(typeof window !== "undefined" && window.__camP)) continue;
+    if (e.type === "emeraude"){
+      if (e.casse != null) continue;
+      const k = +e.id.slice(1);
+      tracer(meshK.em, m4Mul(m4Mul(m4Translation(e.x, e.y + 0.4 + 0.25 * Math.sin(t * 2 + k), e.z), m4RotY(t * 0.9 + k)), m4Echelle(1.1, 1.1, 1.1)), [1, 1, 1], 0.75);
+    } else {
+      tracer(meshK.flaque, m4Translation(e.x, e.y + 0.09, e.z), [1, 1, 1], 0.9);
+      const u = etatGeyser(e);
+      if (u >= 0){ const h = 11 * Math.sin(Math.PI * Math.min(1, u * 1.15)) + 0.3, l = 0.8 + 0.25 * Math.sin(t * 20);
+        tracer(meshK.jet, m4Mul(m4Translation(e.x, e.y, e.z), m4Echelle(l, h, l)), [1, 1, 1], 0.85); }
+    }
   }
 }
 function dessinerEvenementsK(ctx2, W, H, E){
   const J = jeu.joueur; if (!J || !piste || !piste.def || piste.def.nom !== "Kujota") return;
-  const fS = jeu.phase === "course" ? sableKujota(J) : 0;
-  if (fS > 0){
-    const mouv = fS >= 1.5, dun = dunesK(J), txt = mouv ? "SABLES MOUVANTS !" : dun ? "LES DUNES BOUGENT !" : "SABLE";
-    ctx2.save(); ctx2.textAlign = "center"; ctx2.textBaseline = "middle"; ctx2.lineJoin = "round";
-    ctx2.globalAlpha = mouv ? 0.9 : 0.75; ctx2.font = `italic 900 ${(mouv ? 34 : dun ? 30 : 22) * E}px Bahnschrift, sans-serif`;
-    ctx2.lineWidth = 5 * E; ctx2.strokeStyle = "#3a2508"; ctx2.fillStyle = mouv ? "#ff6a3a" : "#f3d27a";
-    ctx2.strokeText(txt, W / 2, H * 0.72); ctx2.fillText(txt, W / 2, H * 0.72);
-    if (mouv){ ctx2.globalAlpha = 0.16; ctx2.fillStyle = "#b8862e"; ctx2.fillRect(0, 0, W, H); }
-    ctx2.restore();
-  }
-  const ev = J.evK; if (!ev) return;
-  const t = jeu.chrono - ev.t0, D = 8; if (t < 0 || t > D) return;
-  const a = Math.min(1, t / 0.6, (D - t) / 1.2), al = (k) => { const x = Math.sin(ev.graine + k * 12.9898) * 43758.5453; return x - Math.floor(x); };
-  ctx2.save(); ctx2.textAlign = "center"; ctx2.textBaseline = "middle"; ctx2.lineJoin = "round";
-  if (ev.nom === "sun"){
-    // le faux soleil : un disque brûlant qui pulse, sa couronne, la chaleur sur tout l'écran
-    const cx = W * 0.5, cy = H * 0.2, R = Math.min(W, H) * (0.13 + 0.015 * Math.sin(t * 6)) * Math.min(1, t / 1.2 + 0.3);
-    ctx2.globalAlpha = 0.28 * a; ctx2.fillStyle = "#ff8a1e"; ctx2.fillRect(0, 0, W, H);
-    const g = ctx2.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 3.2); g.addColorStop(0, "rgba(255,250,210,1)"); g.addColorStop(0.3, "rgba(255,190,60,0.85)"); g.addColorStop(1, "rgba(255,120,20,0)");
-    ctx2.globalAlpha = a; ctx2.fillStyle = g; ctx2.beginPath(); ctx2.arc(cx, cy, R * 3.2, 0, Math.PI * 2); ctx2.fill();
-    ctx2.fillStyle = "#fff8d8"; ctx2.beginPath(); ctx2.arc(cx, cy, R, 0, Math.PI * 2); ctx2.fill();
-    ctx2.strokeStyle = "rgba(255,200,80,0.8)"; ctx2.lineWidth = 3 * E;
-    for (let k = 0; k < 16; k++){ const b = k / 16 * Math.PI * 2 + t * 0.6, l = R * (1.35 + 0.35 * Math.sin(t * 5 + k)); ctx2.beginPath(); ctx2.moveTo(cx + Math.cos(b) * R * 1.1, cy + Math.sin(b) * R * 1.1); ctx2.lineTo(cx + Math.cos(b) * l, cy + Math.sin(b) * l); ctx2.stroke(); }
-    ctx2.strokeStyle = "rgba(255,240,200,0.18)"; ctx2.lineWidth = 2 * E;   // l'air qui ondule
-    for (let k = 0; k < 9; k++){ const y = H * (0.45 + k * 0.06); ctx2.beginPath(); for (let x = 0; x <= W; x += 20 * E) ctx2.lineTo(x, y + Math.sin(x / (40 * E) + t * 7 + k) * 4 * E); ctx2.stroke(); }
-  } else if (ev.nom === "emerald"){
-    // les émeraudes : des losanges verts qui traversent l'écran en tournant
-    for (let k = 0; k < 46; k++){
-      const t0 = al(k) * 3.5, u = (t - t0) / 1.6; if (u < 0 || u > 1) continue;
-      const cote = al(k + 100) < 0.5 ? -1 : 1, y0 = H * (0.15 + al(k + 200) * 0.6), x = W / 2 + cote * (W * 0.62 - u * W * (0.9 + al(k + 300) * 0.4)), y = y0 + (al(k + 400) - 0.5) * H * 0.3 * u;
-      const s = (10 + al(k + 500) * 16) * E * (0.6 + u), rot = t * 8 + k;
-      ctx2.save(); ctx2.translate(x, y); ctx2.rotate(rot); ctx2.globalAlpha = a * (1 - u * 0.4);
-      ctx2.fillStyle = k % 3 ? "#1fd16a" : "#7dffb0"; ctx2.strokeStyle = "#0a5a2a"; ctx2.lineWidth = 1.5 * E;
-      ctx2.beginPath(); ctx2.moveTo(0, -s); ctx2.lineTo(s * 0.55, 0); ctx2.lineTo(0, s); ctx2.lineTo(-s * 0.55, 0); ctx2.closePath(); ctx2.fill(); ctx2.stroke();
-      ctx2.globalAlpha *= 0.6; ctx2.fillStyle = "#eafff2"; ctx2.beginPath(); ctx2.moveTo(0, -s * 0.7); ctx2.lineTo(s * 0.2, -s * 0.1); ctx2.lineTo(0, 0); ctx2.closePath(); ctx2.fill();
-      ctx2.restore();
-    }
-    ctx2.globalAlpha = 0.12 * a; ctx2.fillStyle = "#2cff8a"; ctx2.fillRect(0, 0, W, H);
-  } else if (ev.nom === "emperor"){
-    // Emperor : des balles traçantes qui filent à travers l'écran, un éclair à chaque coup
-    const k = Math.floor(t / 0.55), f = (t % 0.55) / 0.25;
-    if (t < 7 && f < 1){
-      const y0 = H * (0.3 + al(k) * 0.4), y1 = H * (0.3 + al(k + 50) * 0.4), dir = al(k + 70) < 0.5 ? 1 : -1;
-      const x = W / 2 + dir * (-W * 0.6 + f * W * 1.2), y = y0 + (y1 - y0) * f;
-      ctx2.globalAlpha = a; ctx2.strokeStyle = "#fff3a0"; ctx2.lineWidth = 3 * E; ctx2.beginPath(); ctx2.moveTo(x, y); ctx2.lineTo(x - dir * 160 * E, y - (y1 - y0) * 0.15); ctx2.stroke();
-      ctx2.fillStyle = "#ffe066"; ctx2.beginPath(); ctx2.arc(x, y, 4 * E, 0, Math.PI * 2); ctx2.fill();
-      if (f < 0.25){ ctx2.globalAlpha = a * (1 - f * 4) * 0.25; ctx2.fillStyle = "#fff6c0"; ctx2.fillRect(0, 0, W, H);
-        ctx2.globalAlpha = a * (1 - f * 4); ctx2.font = `italic 900 ${34 * E}px Bahnschrift, sans-serif`; ctx2.fillStyle = "#ffd23a"; ctx2.strokeStyle = "#2a1a00"; ctx2.lineWidth = 5 * E;
-        const bx = W * (0.25 + al(k + 90) * 0.5), by = H * (0.3 + al(k + 95) * 0.25); ctx2.strokeText("BANG !", bx, by); ctx2.fillText("BANG !", bx, by); }
-    }
-  }
-  // le titre : nom du stand et de son manieur
-  ctx2.globalAlpha = a; ctx2.font = `italic 900 ${48 * E}px Bahnschrift, sans-serif`; ctx2.lineWidth = 6 * E; ctx2.strokeStyle = "#2a1a00";
-  ctx2.fillStyle = ev.nom === "emerald" ? "#5dff9a" : ev.nom === "sun" ? "#fff2b0" : "#ffd23a";
-  ctx2.strokeText(ev.titre, W / 2, H * 0.36); ctx2.fillText(ev.titre, W / 2, H * 0.36);
-  ctx2.font = `700 ${18 * E}px Bahnschrift, sans-serif`; ctx2.fillStyle = "#fff"; ctx2.lineWidth = 4 * E; ctx2.strokeText(ev.sous, W / 2, H * 0.36 + 38 * E); ctx2.fillText(ev.sous, W / 2, H * 0.36 + 38 * E);
+  // un éclair de couleur quand on prend un obstacle (vert : émeraude, bleu : geyser)
+  if (J.flashK && jeu.chrono - J.flashK.t < 0.45){ ctx2.save(); ctx2.globalAlpha = 0.35 * (1 - (jeu.chrono - J.flashK.t) / 0.45); ctx2.fillStyle = J.flashK.c; ctx2.fillRect(0, 0, W, H); ctx2.restore(); }
+  const ev = J.evK; if (!ev || ev.nom !== "sun") return;
+  const t = jeu.chrono - ev.t0, D = 9; if (t < 0 || t > D) return;
+  const a = Math.min(1, t / 0.6, (D - t) / 1.2);
+  ctx2.save();
+  // le faux soleil : un disque brûlant qui pulse, sa couronne, la chaleur sur tout l'écran
+  const cx = W * 0.5, cy = H * 0.2, R = Math.min(W, H) * (0.075 + 0.008 * Math.sin(t * 6)) * Math.min(1, t / 1.2 + 0.3);
+  ctx2.globalAlpha = 0.11 * a; ctx2.fillStyle = "#ff8a1e"; ctx2.fillRect(0, 0, W, H);
+  const g = ctx2.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 3.2); g.addColorStop(0, "rgba(255,250,210,1)"); g.addColorStop(0.3, "rgba(255,190,60,0.85)"); g.addColorStop(1, "rgba(255,120,20,0)");
+  ctx2.globalAlpha = 0.6 * a; ctx2.fillStyle = g; ctx2.beginPath(); ctx2.arc(cx, cy, R * 3.2, 0, Math.PI * 2); ctx2.fill();
+  ctx2.globalAlpha = 0.85 * a; ctx2.fillStyle = "#fff8d8"; ctx2.beginPath(); ctx2.arc(cx, cy, R, 0, Math.PI * 2); ctx2.fill(); ctx2.globalAlpha = 0.5 * a;
+  ctx2.strokeStyle = "rgba(255,200,80,0.8)"; ctx2.lineWidth = 3 * E;
+  for (let k = 0; k < 16; k++){ const b = k / 16 * Math.PI * 2 + t * 0.6, l = R * (1.35 + 0.35 * Math.sin(t * 5 + k)); ctx2.beginPath(); ctx2.moveTo(cx + Math.cos(b) * R * 1.1, cy + Math.sin(b) * R * 1.1); ctx2.lineTo(cx + Math.cos(b) * l, cy + Math.sin(b) * l); ctx2.stroke(); }
+  ctx2.strokeStyle = "rgba(255,240,200,0.08)"; ctx2.lineWidth = 2 * E;   // l'air qui ondule
+  for (let k = 0; k < 9; k++){ const y = H * (0.45 + k * 0.06); ctx2.beginPath(); for (let x = 0; x <= W; x += 20 * E) ctx2.lineTo(x, y + Math.sin(x / (40 * E) + t * 7 + k) * 4 * E); ctx2.stroke(); }
   ctx2.restore();
 }
 function toursCourse(){ return (jeu.multi && jeu.multi.tours) || CIRCUITS[jeu.circuit].tours || 1; }
@@ -9497,7 +9566,7 @@ function majDistant(v, dt){
     v.affDer += Math.atan2(Math.sin(c.derive - v.affDer), Math.cos(c.derive - v.affDer)) * Math.min(1, dt * 7);
   }
   const p = auPoint(piste, mod(v.affD));
-  v.x = p.x + p.nx * v.affLat; v.z = p.z + p.nz * v.affLat; v.y = p.y;
+  v.x = p.x + p.nx * v.affLat; v.z = p.z + p.nz * v.affLat; v.y = p.y + bosseKujota(v);
   // pour les chocs : où il est vraiment maintenant (sans le lissage d'affichage)
   { const q = auPoint(piste, mod(c.d)); v.xChoc = q.x + q.nx * c.lat; v.zChoc = q.z + q.nz * c.lat; v.capChoc = q.cap + c.derive; }
   v.cap = p.cap + v.affDer; v.capVit = v.cap;
@@ -11738,7 +11807,8 @@ function dessinerPoussiere(decor){
     // freinage et virage : perte de vitesse et accélération latérale, lissées
     const dv = Math.max(0, ((v._vP ?? v.v) - v.v) / dt), dcap = Math.abs(Math.atan2(Math.sin(v.cap - (v._capP ?? v.cap)), Math.cos(v.cap - (v._capP ?? v.cap)))) / dt;
     v._vP = v.v; v._capP = v.cap;
-    const brut = Math.min(1, Math.max(0, (dv - 4) / 14 + (dcap * v.v - 9) / 22));
+    const sabV = sableKujota(v), brut = Math.max(Math.min(1, Math.max(0, (dv - 4) / 14 + (dcap * v.v - 9) / 22)),
+      sabV > 0 ? Math.min(1, v.v / 35) * (sabV >= 1.5 ? 1 : 0.7) : 0);     // (Kujota : on soulève le sable)
     v._pI = (v._pI || 0) + (brut - (v._pI || 0)) * Math.min(1, dt * 6);
     const H = v._traceP || (v._traceP = []);
     if (H.length && Math.hypot(v.x - H[H.length - 1].x, v.z - H[H.length - 1].z) > 25) H.length = 0;
