@@ -3397,20 +3397,25 @@ function construireDecor(piste){
      grand et les noms de la bande autour. */
   let bafLaveM = null, bafVolcan = null;
   if (T.volcan){
+    /* Au bord de la piste, à l'extérieur du virage (devant les panneaux),
+       un peu tourné vers les pilotes qui arrivent : on le voit en freinant. */
     let a = -1;
     for (let i = 3; i < nb && a < 0; i++) if (Math.abs(P[i].courbure) > 1 / 160){ let b = i, k = Math.abs(P[i].courbure); for (let j = i; j < Math.min(nb, i + 30); j++) if (Math.abs(P[j].courbure) > k){ k = Math.abs(P[j].courbure); b = j; } a = b; }
     if (a > 0){
       const p = P[a], q1 = P[(a - 15 + nb) % nb], q2 = P[(a + 15) % nb];
-      const mx = (q1.x + q2.x) / 2 - p.x, mz = (q1.z + q2.z) / 2 - p.z, sIn = Math.sign(mx * p.nx + mz * p.nz) || 1;   // côté intérieur du virage
-      const off = -sIn * (DEMI_PISTE + ACCOTEMENT + 2.0), x = p.x + p.nx * off, z = p.z + p.nz * off, y = p.y - 0.35;
-      const Lm = 42, Hm = 5.0, lacet = Math.atan2(-p.tz, p.tx);
-      boite(paysage, x, y + Hm / 2, z, Lm, Hm, 1.1, [0.17, 0.16, 0.15], lacet);
-      boite(paysage, x, y + Hm + 0.12, z, Lm + 0.6, 0.24, 1.4, [0.10, 0.10, 0.10], lacet);          // la margelle
-      const fx = sIn * p.nx, fz = sIn * p.nz;                                                        // vers la piste
+      const mx = (q1.x + q2.x) / 2 - p.x, mz = (q1.z + q2.z) / 2 - p.z, sIn = Math.sign(mx * p.nx + mz * p.nz) || 1;     // côté intérieur
+      const off = -sIn * (DEMI_PISTE + 4.2), x = p.x + p.nx * off, z = p.z + p.nz * off, y = p.y - 0.2;
+      const c = Math.cos(0.42), s = Math.sin(0.42);
+      let fx = sIn * p.nx * c - p.tx * s, fz = sIn * p.nz * c - p.tz * s; const fl = Math.hypot(fx, fz); fx /= fl; fz /= fl;   // vers la piste et vers ceux qui arrivent
+      const loin = (x2, z2, r) => { for (const q of P) if ((q.x - x2) ** 2 + (q.z - z2) ** 2 < r * r) return false; return true; };
+      let Lm = 46; while (Lm > 16 && !(loin(x + fz * Lm / 2, z - fx * Lm / 2, DEMI_PISTE + 1.6) && loin(x - fz * Lm / 2, z + fx * Lm / 2, DEMI_PISTE + 1.6))) Lm -= 2;
+      const lp = Lm - 0.8, hp = lp * 320 / 2048, Hm = hp + 0.9, lac = Math.atan2(fx, fz);
+      boite(paysage, x, y + Hm / 2, z, Lm, Hm, 0.9, [0.17, 0.16, 0.15], lac);
+      boite(paysage, x, y + Hm + 0.1, z, Lm + 0.5, 0.2, 1.2, [0.10, 0.10, 0.10], lac);                 // la margelle
       enseigne("§m:PREMIERESSON|Bafisson|Raphasson|Paulnaref|Josephsson|Almasson|Sososson|Gayasson|Elisson|Ellisson|Emiliesson|Livsson",
-               x + fx * 0.58, y + 1.45, z + fz * 0.58, -fx, -fz, Lm - 0.6, (Lm - 0.6) * 160 / 2048);
-      reserver(x, z, 24);
-      reperes.push(["premieresson", x, y + 2, z, fx, fz]);
+               x + fx * 0.48, y + 0.5, z + fz * 0.48, -fx, -fz, lp, hp);
+      reserver(x, z, 22);
+      reperes.push(["premieresson", x, y + Hm / 2, z, fx, fz]);
     }
   }
 
@@ -12063,7 +12068,7 @@ function textureEnseigne(texte){
   if (texTextes[texte]) return texTextes[texte];
   const style = texte.slice(0, 3), mot = texte.slice(3);
   const c = document.createElement("canvas");
-  c.width = style === "§m:" ? 2048 : style === "§b:" || style === "§g:" || style === "§h:" || style === "§z:" ? 1024 : 256; c.height = style === "§m:" ? 160 : style === "§b:" || style === "§h:" ? 128 : style === "§g:" || style === "§z:" ? 256 : 192;
+  c.width = style === "§m:" ? 2048 : style === "§b:" || style === "§g:" || style === "§h:" || style === "§z:" ? 1024 : 256; c.height = style === "§m:" ? 320 : style === "§b:" || style === "§h:" ? 128 : style === "§g:" || style === "§z:" ? 256 : 192;
   const g = c.getContext("2d"), W = c.width, H = c.height;
   g.textAlign = "center"; g.textBaseline = "middle";
   if (style === "§z:"){
@@ -12096,14 +12101,14 @@ function textureEnseigne(texte){
       for (let x = (y / 40 % 2) * 64; x < W; x += 128){ g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 40); g.stroke(); } }
     g.strokeStyle = "#ff7a1a"; g.lineWidth = 7; g.strokeRect(5, 5, W - 10, H - 10);
     const [grand, ...noms] = mot.split("|");
-    g.font = "900 120px Impact, 'Arial Black', sans-serif"; g.lineJoin = "round";
-    g.strokeStyle = "#000"; g.lineWidth = 12; g.strokeText(grand, W / 2, H / 2 + 6);
-    g.fillStyle = "#ffd23a"; g.fillText(grand, W / 2, H / 2 + 6);
-    const wG = g.measureText(grand).width, moitie = Math.ceil(noms.length / 2);
-    g.font = "700 30px Arial, sans-serif"; g.fillStyle = "#f4efe6";
-    const bloc = (liste, x0, x1) => liste.forEach((n, k) => { const c = Math.floor(k / 3), r = k % 3; g.fillText(n, x0 + (x1 - x0) * (c + 0.5) / 2, H * (r + 0.5) / 3 + 2); });
-    bloc(noms.slice(0, moitie), 24, W / 2 - wG / 2 - 24);
-    bloc(noms.slice(moitie), W / 2 + wG / 2 + 24, W - 24);
+    let taille = 210; g.font = `900 ${taille}px Impact, 'Arial Black', sans-serif`;
+    while (g.measureText(grand).width > W - 80 && taille > 80){ taille -= 6; g.font = `900 ${taille}px Impact, 'Arial Black', sans-serif`; }
+    g.lineJoin = "round"; g.strokeStyle = "#000"; g.lineWidth = 16; g.strokeText(grand, W / 2, 118);
+    g.fillStyle = "#ffd23a"; g.fillText(grand, W / 2, 118);
+    g.fillStyle = "#ff7a1a"; g.fillRect(60, 222, W - 120, 4);
+    g.font = "700 40px Arial, sans-serif"; g.fillStyle = "#f4efe6";
+    const moitie = Math.ceil(noms.length / 2);
+    [noms.slice(0, moitie), noms.slice(moitie)].forEach((ligne, r) => ligne.forEach((n, k) => g.fillText(n, W * (k + 0.5) / ligne.length, 254 + r * 44)));
   }
   else if (style === "§g:") dessinerTag(g, W, H, mot);
   else if (style === "§h:") dessinerHieroglyphes(g, W, H, mot);
