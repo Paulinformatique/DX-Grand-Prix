@@ -1305,10 +1305,11 @@ function ambianceSBS(){
       else if (ev === "blizzard") sonVent();
       else if (ev === "troll"){ bip(55, 1.5, 0.4, "square"); secousse = Math.max(secousse, 1.2); }
       else if (ev === "jormun"){ bip(40, 2.4, 0.4, "sawtooth"); secousse = Math.max(secousse, 1.5); }
-      else if (ev === "ragnarok"){ bip(36, 3, 0.45, "sawtooth"); bip(73, 3, 0.3, "square"); secousse = Math.max(secousse, 2); }
+      else if (ev === "ragnarok"){ bip(36, 4, 0.3, "sawtooth"); secousse = Math.max(secousse, 0.6); }      // un grondement lointain : ça monte ensuite
     }
     if (ev === "blizzard"){ const m = Math.max(0, Math.min(1, (u - 0.24) / 0.06, (0.56 - u) / 0.06)); TEMPETE = 0.25 + 0.5 * m; }
-    if (ev === "ragnarok"){ CREP = 0.42; CREP_T = melange3([1, 1, 1], [1.0, 0.55, 0.50], CREP * 2); CREP_C = melange3([1, 1, 1], [1.25, 0.36, 0.30], CREP * 2); TEMPETE = 0.22; }
+    if (ev === "ragnarok"){ const k = Math.min(1, u / 0.3), m = k * k * (3 - 2 * k);           // le ciel rougit petit à petit sur le premier tiers du tour
+      CREP = 0.06 + 0.36 * m; CREP_T = melange3([1, 1, 1], [1.0, 0.55, 0.50], CREP * 2); CREP_C = melange3([1, 1, 1], [1.25, 0.36, 0.30], CREP * 2); TEMPETE = 0.22 * m; }
     if (forcer.tempete != null) TEMPETE = forcer.tempete;
     return;
   }
@@ -8549,7 +8550,8 @@ function sitesThor(){
   const jets = []; for (let k = 0; k < 14; k++) jets.push({ s: (PONT_THOR[0] + 0.003 + k * 0.0021) * L, sens: k % 2 ? 1 : -1, ph: al() * PER_J, id: "j" + k, type: k % 3 === 1 ? "bouclier" : "lance" });
   const site = (d, per) => ({ s: d * L, lat: (al() < 0.5 ? -1 : 1) * D * (0.4 + al() * 0.2), ph: al() * per, r: 2.8 });
   const eclairs = []; for (let k = 0; k < 30; k++) eclairs.push(site(0.06 + k * 0.029, PER_M));
-  const ragnarok = []; for (let k = 0; k < 40; k++) ragnarok.push(site(0.05 + k * 0.022, PER_R));
+  // au dernier tour, les éclairs se font de plus en plus nombreux à mesure qu'on avance (rares au début du tour)
+  const ragnarok = []; for (let k = 0; k < 36; k++){ const d = 0.12 + k * 0.024, e = site(d, PER_R); e.per = PER_R * (1.9 - 1.2 * d); e.ph = e.ph * e.per / PER_R; ragnarok.push(e); }
   const queue = [0.245, 0.265, 0.285].map((d, k) => ({ s: d * L, ph: k * 1.2 }));
   return (thorCache = { piste, jets, eclairs, ragnarok, queue, troll: 0.468 * L, glace: [0.36 * L, 0.46 * L] });
 }
@@ -8601,10 +8603,10 @@ function chocThor(v, dt){
     const [liste, per] = ev === "mjollnir" ? [S.eclairs, PER_M] : [S.ragnarok, PER_R], danger = [];
     for (const e of liste){
       const ds = e.s - s; if (ds < -6 || ds > 110) continue;
-      const st = etatEclair(e, per); if (st && st.ph !== "brule") danger.push(e);
+      const st = etatEclair(e, e.per || per); if (st && st.ph !== "brule") danger.push(e);
       if (!st || st.ph !== "frappe") continue;
       if ((s - e.s) ** 2 + (lat - e.lat) ** 2 > (e.r + 1.0) ** 2) continue;
-      if (touche("e" + Math.round(e.s) + ":" + Math.floor((jeu.chrono + e.ph) / per), 0.75, 1.6, "#cfe6ff", 1.6) && v.joueur){ bip(1800, 0.05, 0.4, "square"); bip(60, 0.9, 0.45, "sawtooth"); }
+      if (touche("e" + Math.round(e.s) + ":" + Math.floor((jeu.chrono + e.ph) / (e.per || per)), 0.75, 1.6, "#cfe6ff", 1.6) && v.joueur){ bip(1800, 0.05, 0.4, "square"); bip(60, 0.9, 0.45, "sawtooth"); }
     }
     if (!v.joueur && danger.length && typeof planObstK === "function") planObstK(v, danger.sort((a, b) => a.s - b.s));
   }
@@ -8658,9 +8660,75 @@ function maillagesThor(){
     boite(trou, a.x + a.nx * (j - 0.4), a.y + 0.25, a.z + a.nz * (j - 0.4), 0.6, 0.5, 0.8, [0.34, 0.33, 0.31], a.cap - s); }
   // la lance : un long manche de bois et une pointe de fer (le long de +z)
   const lance = (() => { const m = creerMaillage(); boite(m, 0, 0, -0.3, 0.16, 0.16, 3.8, [0.50, 0.36, 0.20]); boite(m, 0, 0, 1.9, 0.30, 0.08, 0.8, [0.80, 0.82, 0.86]); boite(m, 0, 0, 1.9, 0.08, 0.30, 0.8, [0.80, 0.82, 0.86]); return televerser(m); })();
-  return (meshT = { piste, lance, bouclier, eclair, glace: televerser(glace), trou: televerser(trou),
+  // le côté bloqué par le troll : des chevrons rouges et blancs sur sa moitié de route, sur 45 m devant lui
+  const zoneT = sg => { const m = creerMaillage(), s0 = S.troll;
+    for (let d = -45; d < 3; d += 3){ const a = auPoint(piste, s0 + d), b = auPoint(piste, s0 + d + 3.02), c = Math.round(d / 3) % 2 ? [0.95, 0.12, 0.10] : [0.96, 0.96, 0.96];
+      const P4 = (p, l) => [p.x + p.nx * l, p.y + 0.06, p.z + p.nz * l];
+      quad(m, P4(a, sg * 0.2), P4(b, sg * 0.2), P4(b, sg * DEMI_PISTE), P4(a, sg * DEMI_PISTE), c); quad(m, P4(b, sg * 0.2), P4(a, sg * 0.2), P4(a, sg * DEMI_PISTE), P4(b, sg * DEMI_PISTE), c); }
+    return televerser(m); };
+  return (meshT = { piste, zoneP: zoneT(1), zoneM: zoneT(-1), lance, bouclier, eclair, glace: televerser(glace), trou: televerser(trou),
                     cible: disque([0.75, 0.88, 1.0], [0.35, 0.55, 0.95]), avert: anneau([0.6, 0.85, 1.0]), brule: disque([0.12, 0.11, 0.12], [0.20, 0.18, 0.18]),
                     ecaille: boule([0.16, 0.42, 0.30], [0.30, 0.55, 0.28]), ombre: disque([0.08, 0.10, 0.09], [0.12, 0.14, 0.12]) });
+}
+/* Jörmungandr : un tube écailleux (dos vert sombre, rayures, ventre clair),
+   une tête aux mâchoires ouvertes, une queue effilée. Bâtis une fois. */
+let meshS = null;
+function maillagesSerpent(B){
+  if (meshS && meshS.piste === piste) return meshS;
+  const tube = (m, pts, rads, nS = 10) => {
+    const ring = [];
+    for (let k = 0; k < pts.length; k++){
+      const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)];
+      let T = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const lt = Math.hypot(...T) || 1; T = T.map(x => x / lt);
+      let N = [T[2], 0, -T[0]]; let ln = Math.hypot(...N); if (ln < 1e-3){ N = [1, 0, 0]; ln = 1; } N = N.map(x => x / ln);
+      const Bn = [T[1] * N[2] - T[2] * N[1], T[2] * N[0] - T[0] * N[2], T[0] * N[1] - T[1] * N[0]];
+      const r = rads[k], R2 = [];
+      for (let j = 0; j <= nS; j++){ const an = j / nS * Math.PI * 2, c = Math.cos(an), s = Math.sin(an), d = [N[0] * c + Bn[0] * s, N[1] * c + Bn[1] * s, N[2] * c + Bn[2] * s];
+        R2.push({ p: [pts[k][0] + d[0] * r, pts[k][1] + d[1] * r, pts[k][2] + d[2] * r], dy: d[1] }); }
+      ring.push(R2);
+    }
+    for (let k = 0; k < pts.length - 1; k++) for (let j = 0; j < nS; j++){
+      const A = ring[k][j], Bq = ring[k][j + 1], C = ring[k + 1][j + 1], D = ring[k + 1][j], dy = (A.dy + C.dy) / 2;
+      const col = dy < -0.35 ? [0.66, 0.68, 0.44] : (Math.floor(k / 2) % 2 ? [0.12, 0.34, 0.24] : [0.20, 0.46, 0.30]);
+      quad(m, A.p, Bq.p, C.p, D.p, col);
+      if (j === Math.round(nS / 4) && k % 3 === 0){ const top = [(A.p[0] + D.p[0]) / 2, (A.p[1] + D.p[1]) / 2 + rads[k] * 0.55, (A.p[2] + D.p[2]) / 2];      // les épines du dos
+        triangle(m, A.p, D.p, top, [0.08, 0.20, 0.14]); triangle(m, D.p, A.p, top, [0.08, 0.20, 0.14]); }
+    }
+  };
+  if (!B) return null;
+  const L = piste.longueur, pc = auPoint(piste, (PONT_THOR[0] + PONT_THOR[1]) / 2 * L), yP = pc.y - 1;
+  const W = (lon, lat, y) => [B.x + B.tx * lon + B.nx * lat, y, B.z + B.tz * lon + B.nz * lat];
+  const pts = [], rads = [];
+  // il sort de la rivière, en amont…
+  for (let k = 0; k <= 16; k++){ const u = k / 16, lat = 70 - 70 * u + 13 * Math.sin(u * Math.PI) * 0, lon = -36 + 6 * u, y = B.y - 2 + (yP - 13 - (B.y - 2)) * Math.sin(u * Math.PI / 2);
+    pts.push(W(lon, lat * (1 - u) + 0.01, y)); rads.push(3.2); }
+  // … s'enroule deux fois autour du tablier…
+  const nH = 70;
+  for (let k = 1; k <= nH; k++){ const w = k / nH, a = -Math.PI / 2 + w * 2.2 * Math.PI * 2, lon = -30 + 60 * w;
+    pts.push(W(lon, 13 * Math.cos(a), yP + 13 * Math.sin(a))); rads.push(3.2 - 0.4 * w); }
+  // … et dresse la tête au-dessus de la route, face aux pilotes qui arrivent
+  const fin = pts[pts.length - 1];
+  for (let k = 1; k <= 12; k++){ const u = k / 12, hd = W(40, 15, yP + 19); pts.push([fin[0] + (hd[0] - fin[0]) * u, fin[1] + (hd[1] - fin[1]) * Math.sin(u * Math.PI / 2), fin[2] + (hd[2] - fin[2]) * u]); rads.push(2.8 - 0.3 * u); }
+  const corps = creerMaillage(); tube(corps, pts, rads, 12);
+  // la tête
+  const h = pts[pts.length - 1], dx = -B.tx, dz = -B.tz, lac = Math.atan2(dx, dz), sx = dz, sz = -dx;
+  const at = (f, y, s) => [h[0] + dx * f + sx * s, h[1] + y, h[2] + dz * f + sz * s];
+  const vert = [0.14, 0.38, 0.26], fonce = [0.08, 0.22, 0.15], ventre = [0.66, 0.68, 0.44];
+  { const c = at(1.5, 0.4, 0); boite(corps, c[0], c[1], c[2], 4.2, 2.6, 5.5, vert, lac); }                    // le crâne
+  { const c = at(5.2, 0.9, 0); boite(corps, c[0], c[1], c[2], 3.0, 1.3, 4.5, vert, lac); }                    // la mâchoire du haut
+  { const c = at(4.6, -1.5, 0); boite(corps, c[0], c[1], c[2], 2.6, 0.9, 4.0, ventre, lac); }                 // la mâchoire du bas, ouverte
+  { const c = at(4.2, -0.3, 0); boite(corps, c[0], c[1], c[2], 2.4, 1.3, 3.4, [0.55, 0.08, 0.08], lac); }     // la gueule
+  for (const s of [-1, 1]){
+    const e = at(2.4, 1.5, s * 1.6); boite(corps, e[0], e[1], e[2], 0.5, 0.6, 0.8, [1.0, 0.82, 0.10], lac);   // les yeux
+    const f1 = at(6.6, 0.0, s * 0.9); boite(corps, f1[0], f1[1], f1[2], 0.25, 1.1, 0.25, [0.95, 0.95, 0.90], lac);   // les crocs
+    const c1 = at(-0.6, 2.1, s * 1.4); boite(corps, c1[0], c1[1], c1[2], 0.5, 2.2, 0.5, fonce, lac);         // les cornes
+  }
+  // la queue : couchée le long de x (à travers la route), effilée, qui remonte côté rivière
+  const qp = [], qr = [];
+  for (let k = 0; k <= 26; k++){ const x = -DEMI_PISTE - 5 + k * ((DEMI_PISTE * 2 + 30) / 26), r = 0.5 + 2.1 * (k / 26);
+    qp.push([x, r * 0.9 + Math.max(0, x - DEMI_PISTE - 2) * 0.35, Math.sin(k * 0.5) * 0.6]); qr.push(r); }
+  const queue = creerMaillage(); tube(queue, qp, qr, 10);
+  return (meshS = { piste, corps: televerser(corps), queue: televerser(queue) });
 }
 // sur l'écran : l'éclair d'un choc
 function dessinerEvenementsThor(ctx2, W, H, E){
@@ -8712,7 +8780,7 @@ function dessinerEvenementsThor3D(B, t){
     const [liste, per] = ev === "mjollnir" ? [S.eclairs, PER_M] : [S.ragnarok, PER_R];
     for (const e of liste){
       const p = auPoint(piste, e.s), x = p.x + p.nx * e.lat, z = p.z + p.nz * e.lat; if (!proche(x, z)) continue;
-      const st = etatEclair(e, per); if (!st) continue;
+      const st = etatEclair(e, e.per || per); if (!st) continue;
       if (st.ph === "avert"){
         const rr = e.r * (0.5 + 0.5 * st.u);
         tracer(M.cible, m4Mul(m4Translation(x, p.y + 0.08, z), m4Echelle(rr, 1, rr)), [1, 1, 1], 0.6 + 0.4 * Math.abs(Math.sin(t * 14)));
@@ -8725,28 +8793,22 @@ function dessinerEvenementsThor3D(B, t){
   }
   if (ev === "troll" && B.troll){
     const p = auPoint(piste, S.troll), tl = latTroll(), x = p.x + p.nx * tl, z = p.z + p.nz * tl;
-    if (proche(x, z, 600)){ const pas = Math.abs(Math.sin(t * 6)) * 0.4;
-      tracer(B.troll, m4Mul(m4Translation(x, p.y + pas, z), m4RotY(Math.atan2(-p.tx, -p.tz))), [1, 1, 1]);
+    if (proche(x, z, 600)){ const pas = Math.abs(Math.sin(t * 6)) * 0.4, ch = Math.abs(tl) < DEMI_PISTE * 0.45;     // ch : il est en train de changer de côté
+      if (!ch || Math.sin(t * 20) > 0) tracer(tl > 0 ? M.zoneP : M.zoneM, m4Identite(), [1, 1, 1], 1.0);
+      tracer(B.troll, m4Mul(m4Mul(m4Translation(x, p.y + pas, z), m4RotY(Math.atan2(-p.tx, -p.tz))), m4Echelle(1.35, 1.35, 1.35)), [1, 1, 1]);
       tracer(M.ombre, m4Mul(m4Translation(x, p.y + 0.05, z), m4Echelle(3.4, 1, 3.4)), [1, 1, 1]); }
   }
   if (ev === "jormun"){
-    // le serpent sort de la rivière et s'enroule autour du pont
-    const R0 = 26;
-    for (let k = 0; k < 46; k++){
-      const u = k / 45, a = u * Math.PI * 3.2 + t * 0.4, la = Math.cos(a) * R0, lo = Math.sin(a) * 14, y = B.y - 3 + u * 34 + Math.sin(t * 1.3 + k * 0.3) * 1.2;
-      const x = B.x + B.nx * la + B.tx * lo, z = B.z + B.nz * la + B.tz * lo, r = 4.2 - u * 1.6;
-      if (!proche(x, z, 900)) continue;
-      tracer(M.ecaille, m4Mul(m4Translation(x, y, z), m4Echelle(r, r, r)), [1, 1, 1]);
-    }
+    // le serpent sort de la rivière et s'enroule autour du pont (son corps ondule un peu)
+    const SP = maillagesSerpent(B);
+    if (SP && proche(B.x, B.z, 1000)) tracer(SP.corps, m4Mul(m4Translation(0, Math.sin(t * 1.1) * 0.6, 0), m4Identite()), [1, 1, 1]);
     // sa queue s'abat sur la ligne droite
     for (const q of S.queue){
-      const p = auPoint(piste, q.s); if (!proche(p.x, p.z)) continue;
-      const st = etatQueue(q), h = st.ph === "leve" ? 2 + 9 * Math.sin(st.u * Math.PI * 0.5) : st.ph === "frappe" ? 2 * (1 - st.u) + 0.6 : 0.6 - 0.2;
+      const p = auPoint(piste, q.s); if (!proche(p.x, p.z) || !SP) continue;
+      const st = etatQueue(q), h = st.ph === "leve" ? 1 + 10 * Math.sin(st.u * Math.PI * 0.5) : st.ph === "frappe" ? 11 * (1 - st.u) * (1 - st.u) : 0;
       if (st.ph === "leve") tracer(M.ombre, m4Mul(m4Mul(m4Translation(p.x, p.y + 0.06, p.z), m4RotY(p.cap)), m4Echelle(DEMI_PISTE + 2, 1, 2.6 * st.u + 0.4)), [1, 1, 1]);
-      for (let l = st.ph === "repos" ? DEMI_PISTE + 3 : -DEMI_PISTE - 4; l <= DEMI_PISTE + 22; l += 1.6){
-        const r = 1.5 - Math.max(0, -l) * 0.08, hy = h + Math.max(0, l - DEMI_PISTE - 2) * (st.ph === "repos" ? 0.6 : 0.15);
-        tracer(M.ecaille, m4Mul(m4Translation(p.x + p.nx * l, p.y + hy + r * 0.6, p.z + p.nz * l), m4Echelle(r, r, r)), [1, 1, 1]);
-      }
+      const off = st.ph === "repos" ? DEMI_PISTE + 14 : 0, yR = st.ph === "repos" ? 6 : h;
+      tracer(SP.queue, m4Mul(m4Mul(m4Translation(p.x + p.nx * off, p.y + yR, p.z + p.nz * off), m4RotY(p.cap)), m4RotZ(st.ph === "leve" ? -0.12 * st.u : 0)), [1, 1, 1]);
     }
   }
 }
@@ -9980,7 +10042,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 22;      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 23;      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
