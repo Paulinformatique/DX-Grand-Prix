@@ -8043,6 +8043,9 @@ const MULTI_VERSION = 12;
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
+// dès l'ouverture du site, on réveille le serveur (l'offre gratuite s'endort) : le temps
+// d'arriver au multijoueur ou au classement, il est souvent déjà prêt
+try { if (!navigator.webdriver) fetch(SERVEUR_URL.replace(/^ws/, "http") + "/?reveil=" + Date.now(), { mode: "no-cors" }).catch(() => {}); } catch (e) {}
 function adresseServeur(){
   try { const q = new URLSearchParams(location.search).get("serveur"); if (q) return q; } catch (e) {}
   return SERVEUR_URL;
