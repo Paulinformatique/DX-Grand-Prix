@@ -9337,9 +9337,11 @@ function rafraichirPaddock(){
   const mien = VOITURES[carriere.voiture];
   fiches.push({ nom: (carriere.prenom || "").trim() || "Toi", cle: "__joueur", ecurie: mien.nom, coul: maCouleurVoiture(), moi: true });
   for (const f of fiches) f.st = statsPaddock(f.cle, h);
-  // classement du paddock : victoires, puis podiums, puis résultat moyen
+  // classement du paddock : victoires, puis podiums, puis meilleure place, puis place moyenne, puis dernière place
   fiches.sort((a, b) => b.st.victoires - a.st.victoires || b.st.podiums - a.st.podiums
-    || (a.st.moyenne ?? 99) - (b.st.moyenne ?? 99) || a.nom.localeCompare(b.nom));
+    || (a.st.meilleur ? a.st.meilleur.p : 99) - (b.st.meilleur ? b.st.meilleur.p : 99)
+    || (a.st.moyenne ?? 99) - (b.st.moyenne ?? 99)
+    || (a.st.dernier ? a.st.dernier.p : 99) - (b.st.dernier ? b.st.dernier.p : 99) || a.nom.localeCompare(b.nom));
   const echap = t => String(t).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
   const case_ = (lib, val, det, or) => `<div><span>${lib}</span><b${or ? ' class="pad-or"' : ""}>${val}</b>${det ? `<small title="${echap(det)}">${echap(det)}</small>` : "<small>&nbsp;</small>"}</div>`;
   document.getElementById("paddock-liste").innerHTML = fiches.map((f, i) => {
