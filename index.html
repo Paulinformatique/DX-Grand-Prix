@@ -7687,18 +7687,18 @@ function zaWarudo(dt){
   }
   if (z.etat === "roue"){
     if (z.t > 0.2 && !z.flash){ z.flash = true; toile.style.filter = "grayscale(0.85) sepia(0.45)"; }
-    if (z.t >= 3.0){ z.etat = "arret"; z.t = 0; toile.style.filter = "grayscale(1) sepia(0.6) contrast(1.15)"; bip(70, 0.6, 0.4, "triangle"); }
+    if (z.t >= 3.0){ z.etat = "arret"; z.t = 0; z.placeAvant = classer().indexOf(z.elu) + 1; toile.style.filter = "grayscale(1) sepia(0.6) contrast(1.15)"; bip(70, 0.6, 0.4, "triangle"); }
     return "roue";
   }
   if (z.etat === "arret"){
-    if (z.t >= 3.0){ z.etat = "fini"; z.t = 0; toile.style.filter = ""; bip(440, 0.25, 0.3); }
+    if (z.t >= 3.0){ z.etat = "fini"; z.t = 0; z.placeApres = classer().indexOf(z.elu) + 1; toile.style.filter = ""; bip(440, 0.25, 0.3); }
     return "arret";
   }
   return null;
 }
 // dessin de l'arrêt du temps (par-dessus le jeu)
 function dessinerZaWarudo(ctx2, W, H, E){
-  const z = jeu.zw; if (!z || (z.etat === "fini" && z.t > 1.6)) return;
+  const z = jeu.zw; if (!z || (z.etat === "fini" && z.t > 3.4)) return;
   const nomDe = v => v === jeu.joueur ? "TOI" : (v.nom || "?");
   const titre = (txt, y, taille, a = 1) => { ctx2.globalAlpha = a; ctx2.font = `italic 900 ${taille * E}px Bahnschrift, sans-serif`;
     ctx2.lineWidth = 6 * E; ctx2.strokeStyle = "#2a1a00"; ctx2.strokeText(txt, W / 2, y); ctx2.fillStyle = "#ffd23a"; ctx2.fillText(txt, W / 2, y); };
@@ -7737,7 +7737,15 @@ function dessinerZaWarudo(ctx2, W, H, E){
     ctx2.globalAlpha = 0.95; ctx2.font = `900 ${64 * E}px Bahnschrift, sans-serif`; ctx2.lineWidth = 6 * E; ctx2.strokeStyle = "#2a1a00";
     ctx2.strokeText(k.toFixed(1), W / 2, H * 0.31); ctx2.fillStyle = "#ffd23a"; ctx2.fillText(k.toFixed(1), W / 2, H * 0.31);
   } else {
-    ctx2.globalAlpha = 1 - z.t / 1.6; ctx2.fillStyle = "#fff"; ctx2.font = `italic 800 ${30 * E}px Bahnschrift, sans-serif`; ctx2.fillText("Toki wa ugokidasu… le temps reprend son cours", W / 2, H * 0.24);
+    const a = Math.min(1, (3.4 - z.t) / 0.8);
+    ctx2.globalAlpha = Math.max(0, 1 - z.t / 1.6); ctx2.fillStyle = "#fff"; ctx2.font = `italic 800 ${30 * E}px Bahnschrift, sans-serif`; ctx2.fillText("Toki wa ugokidasu… le temps reprend son cours", W / 2, H * 0.24);
+    if (z.placeAvant && z.placeApres){
+      const g = z.placeAvant - z.placeApres, moi = z.elu === jeu.joueur, qui = moi ? "Tu" : z.elu.nom;
+      const txt = g > 0 ? `${qui} ${moi ? "as" : "a"} gagné ${g} place${g > 1 ? "s" : ""} !` : g < 0 ? `${qui} ${moi ? "as" : "a"} perdu ${-g} place${g < -1 ? "s" : ""}…` : `${qui} n'${moi ? "as" : "a"} gagné aucune place`;
+      titre(txt, H * 0.33, 40, a * Math.min(1, z.t * 4));
+      ctx2.globalAlpha = a; ctx2.fillStyle = "#fff"; ctx2.font = `700 ${20 * E}px Bahnschrift, sans-serif`;
+      if (g) ctx2.fillText(`${z.placeAvant}ᵉ → ${z.placeApres === 1 ? "1ᵉʳ" : z.placeApres + "ᵉ"}`.replace(/^1ᵉ /, "1ᵉʳ "), W / 2, H * 0.40);
+    }
   }
   ctx2.restore();
 }
@@ -7809,13 +7817,13 @@ function lancerEmeraudes(){
   if (jeu.multi || jeu.lancerK || jeu.phase !== "course") return;
   const T = leaderCourse(); if (!T || T.tour !== 3 || T.s == null) return;
   const O = obstaclesKujota(), L = piste.longueur, d = ((O.emeraudes[0].s - T.s) % L + L) % L;
-  if (d > Math.max(380, T.v * 12) || d > L / 2) return;
+  if (d > Math.max(700, T.v * 14) || d > L / 2) return;
   const t0 = jeu.chrono; jeu.lancerK = { t0 };
-  O.emeraudes.forEach((e, k) => { e.tl = t0 + 2.4 + k * 0.38; e.casse = null; });
+  O.emeraudes.forEach((e, k) => { e.tl = t0 + 3.2 + k * 0.8; e.casse = null; });
   bip(330, 0.5, 0.25, "triangle");
-  for (let k = 0; k < 10; k++) setTimeout(() => bip(880 + (k % 5) * 140, 0.08, 0.15, "square"), 1800 + k * 380);
+  for (let k = 0; k < 10; k++) setTimeout(() => bip(880 + (k % 5) * 140, 0.08, 0.15, "square"), 3200 + k * 800);
 }
-const VOL_E = 1.4;                                   // durée du vol d'une émeraude
+const VOL_E = 2.0;                                   // durée du vol d'une émeraude
 let obstK = null;
 function obstaclesKujota(){
   if (obstK && obstK.piste === piste) return obstK;
@@ -7832,7 +7840,7 @@ const etatGeyser = e => { const u = ((jeu.chrono + e.ph) % PERIODE_G) / JET_G; r
 function obstaclesPour(v){
   if (jeu.multi || !piste || !piste.def || piste.def.nom !== "Kujota" || v.tempsFinal != null) return null;
   const O = obstaclesKujota(), l = v.tour === 0 ? O.geysers.slice() : [];
-  if (jeu.lancerK) for (const e of O.emeraudes) if (jeu.chrono >= e.tl && e.casse == null) l.push(e);     // plantées sur la piste
+  if (jeu.lancerK && v.tour === 3) for (const e of O.emeraudes) if (jeu.chrono >= e.tl && e.casse == null) l.push(e);     // seulement pendant le 4ᵉ tour     // plantées sur la piste
   return l.length ? l : null;
 }
 // les adversaires évitent les sables mouvants (le centre sombre)
@@ -7939,7 +7947,7 @@ function dessinerObstaclesK(){
   if (jeu.lancerK && !jeu.multi && decor && decor.hieroK){
     const O = obstaclesKujota(), E0 = O.emeraudes, t0 = jeu.lancerK.t0, tc = jeu.chrono, fin = E0[E0.length - 1].tl;
     const mil = auPoint(piste, E0[2].s + 40), HH = 42, yH = mil.y + 12;          // au-dessus du début de la zone, côté pilotes qui arrivent
-    const ap = Math.min(1, (tc - t0) / 0.8, (fin + 1.4 - tc) / 0.8);
+    const ap = Math.min(1, (tc - t0) / 1.2, (fin + 6 - tc) / 1.2);
     if (ap > 0){ const k = ap * ap * (3 - 2 * ap);
       tracer(decor.hieroK, m4Mul(m4Mul(m4Translation(mil.x, yH + (1 - k) * 12 + Math.sin(t * 1.5) * 0.8, mil.z), m4RotY(mil.cap + Math.PI)), m4Echelle(HH * k, HH * k, HH * k)), [1, 1, 1], 0.8); }
     const main = [mil.x, yH + HH * 0.6, mil.z];
@@ -7952,7 +7960,7 @@ function dessinerObstaclesK(){
       if (u < 1){                                      // en vol : un arc de la main de Hierophant jusqu'à la piste
         const x = main[0] + (e.x - main[0]) * u, z = main[2] + (e.z - main[2]) * u, y = main[1] + (e.y - 0.9 - main[1]) * u + 10 * Math.sin(Math.PI * u);
         tracer(meshK.em, m4Mul(m4Mul(m4Mul(m4Translation(x, y, z), m4RotY(t * 6 + e.s)), m4RotX(u * 5)), m4Echelle(1.9, 1.9, 1.9)), [1, 1, 1], 0.7);
-      } else {                                         // plantée : enfoncée dans la route, un peu penchée
+      } else if (J.tour === 3) {                       // plantée (seulement pendant ton 4ᵉ tour) : enfoncée dans la route, un peu penchée
         const k2 = +e.id.slice(1);
         tracer(meshK.em, m4Mul(m4Mul(m4Mul(m4Translation(e.x, e.y - 0.9, e.z), m4RotY(k2 * 1.7)), m4RotX(((k2 % 3) - 1) * 0.16)), m4Echelle(1.9, 1.9, 1.9)), [1, 1, 1], 0.75);
         const ui = (tc - e.tl) / 0.6; if (ui < 1){ const sz = 1 + ui * 2.6; tracer(meshK.eclat, m4Mul(m4Translation(e.x, e.y + ui * 1.2, e.z), m4Echelle(sz, 1 + ui, sz)), [1, 1, 1], 0.9); }
