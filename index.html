@@ -11698,12 +11698,14 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
   }
   function fermerFenetre(){ const f = fenetre(); if (f) f.remove(); }
   // la fenêtre : une seule fois par vote, quand on est sur l'accueil
+  let montreeIci = null;                         // le vote déjà montré depuis le chargement de la page
   function peutOuvrirFenetre(){
-    return E && E.actif && E.actif.monVote == null && !lire("cv-vu-" + E.actif.id) && !fenetre()
+    return E && E.actif && E.actif.monVote == null && !fenetre() && montreeIci !== E.actif.id
+      && (E.eligible || !lire("cv-vu-" + E.actif.id))
       && !document.getElementById("ecran-accueil").classList.contains("cache") && !document.getElementById("gyro-annonce");
   }
   function ouvrirFenetre(){
-    ecrireLS("cv-vu-" + E.actif.id, "1");
+    ecrireLS("cv-vu-" + E.actif.id, "1"); montreeIci = E.actif.id;
     const d = document.createElement("div"); d.id = "vote-popup";
     d.innerHTML = `<div class="boite" role="dialog" aria-label="Community Vote"><button class="croix" title="Fermer (le vote reste dans l'onglet Community Vote)">✕</button><div class="cv-corps"></div></div>`;
     d.querySelector(".croix").onclick = fermerFenetre;
