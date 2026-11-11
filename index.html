@@ -2734,7 +2734,7 @@ function construireDecor(piste){
   let graineP = 777;
   const aleaP = () => (graineP = (graineP*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
   for (let i = 0; i < nb; i += 3){
-    if (dansTunnel(i, 1) || dansPontI(i, 3)) continue;          // pas de pub dans le tunnel (ni sur le pont)
+    if (dansTunnel(i, 1) || dansPontI(i, 3) || odyP) continue;          // pas de pub dans le tunnel (ni sur le pont, ni sur l'Odyssée : elles cachaient tout le décor)
     const a = P[i], b = P[(i+3) % nb];
     for (const s of [1, -1]){
       const e = s * (DEMI_PISTE + ACCOTEMENT + 0.4);
@@ -2767,7 +2767,7 @@ function construireDecor(piste){
   };
   /* --- réverbères --- */
   for (let i = 4; i < nb; i += 11){
-    if (dansTunnel(i, 3) || dansPontI(i, 2)) continue;
+    if (dansTunnel(i, 3) || dansPontI(i, 2) || dansBateauI(i)) continue;
     const p = P[i];
     const s = (Math.floor(i/11) % 2) ? 1 : -1;
     const e = s * (DEMI_PISTE + ACCOTEMENT + 1.6);
@@ -4296,6 +4296,12 @@ function construireDecor(piste){
       for (let s = ODY.B0 + 35; s < ODY.B1; s += 70){ const sg = s % 140 < 70 ? 1 : -1, [x, y, z, q] = enPiste(s, sg * (DEMI_PISTE + ACCOTEMENT + 12));
         for (let k = 0; k < 4; k++) poser(paysage, MO.vase, x + (k % 2) * 1.6, y - 0.2, z + Math.floor(k / 2) * 1.6, q.tx, q.tz, 2.2);
         cylindreY(paysage, x + q.tx * 6, y - 0.2, z + q.tz * 6, 1.6, 1.6, 0.6, 10, [0.70, 0.62, 0.42]); }
+      // le pavois : une haute muraille de planches de chaque côté du pont, couverte de boucliers ronds (comme sur les vraies trières)
+      for (let s = ODY.B0 + 4; s < ODY.B1 - 4; s += 4) for (const sg of [1, -1]){ const [x, y, z, q] = enPiste(s, sg * (DEMI_PISTE + ACCOTEMENT + 1.2));
+        boite(paysage, x, y + 0.6, z, 0.5, 2.6, 4.1, Math.floor(s / 4) % 2 ? [0.42, 0.27, 0.13] : [0.38, 0.24, 0.12], q.cap + Math.PI / 2);
+        if (Math.floor(s / 4) % 2 === 0){ const xs = x - q.nx * sg * 0.35, zs = z - q.nz * sg * 0.35, cb = Math.floor(s / 8) % 3 === 0 ? [0.70, 0.16, 0.10] : Math.floor(s / 8) % 3 === 1 ? [0.80, 0.60, 0.22] : [0.16, 0.24, 0.50];
+          for (let j = -3; j <= 3; j++){ const d = j * 0.3, h = 2.1 * Math.sqrt(Math.max(0.05, 1 - (d / 1.05) ** 2)); boite(paysage, xs + q.tx * d, y + 1.1, zs + q.tz * d, 0.12, h, 0.31, cb, q.cap + Math.PI / 2); }
+          boite(paysage, xs - q.nx * sg * 0.08, y + 1.1, zs - q.nz * sg * 0.08, 0.12, 0.5, 0.5, [0.86, 0.78, 0.50], q.cap + Math.PI / 2); } }
       // les quais de pierre aux deux bouts des passerelles
       for (const [s0, sens] of [[ODY.R0, -1], [ODY.R1, 1]]){ const [x, y, z, q] = enPiste(s0 + sens * 14, 0), W = 2 * (DEMI_PISTE + ACCOTEMENT) + 14;
         boite(paysage, x, (y - 0.45 + SOL) / 2, z, W, y - 0.45 - SOL, 30, [0.66, 0.62, 0.55], q.cap); reserver(x, z, 18); }
@@ -4307,7 +4313,7 @@ function construireDecor(piste){
       poser(paysage, alO() < 0.5 ? MO.rocher : MO.rochers, x, y - 1.2, z, alO() - 0.5, alO() - 0.5, 3 + alO() * 6); reserver(x, z, 6); }
     for (let s = ODY.COTE0; s < ODY.COTE1; s += 14){ const [x, y, z, q] = enPiste(s, sMer * (DEMI_PISTE + ACCOTEMENT + 6 + alO() * 4));
       poser(paysage, MO.rocher, x, EAU - 1.5, z, q.nx, q.nz, 2.5 + alO() * 3, MO.rocher.pal.map(c => c.map(v => v * 0.8))); }
-    odyD.ecrans.push(["ody_giannis", 150, coteExt(150), 20], ["ody_giannis", 4180, -coteExt(4180), 18], ["ody_mat", ODY.R1 + 160, coteExt(ODY.R1 + 160), 22]);
+    odyD.ecrans.push(["ody_giannis", 150, coteExt(150), 20], ["ody_mat", ODY.R1 + 160, coteExt(ODY.R1 + 160), 22]);
     // la basket géante du Greek Freak, sur son socle, à côté de l'écran du départ
     { const sg = -coteExt(90), [x, y, z, q] = enPiste(90, sg * (DEMI_PISTE + ACCOTEMENT + 14));
       boite(paysage, x, y + 0.6, z, 16, 1.6, 9, [0.92, 0.90, 0.86], q.cap); poser(paysage, MO.basket, x, y + 1.4, z, q.tx, q.tz, 6.5); reserver(x, z, 12); reperes.push(["basket", x, y + 4, z, -q.nx * sg, -q.nz * sg]); }
@@ -4318,7 +4324,7 @@ function construireDecor(piste){
     const libreI = (k, x, z, r) => libreD(x, z, r) && occ[k].every(o => (o.x - x) ** 2 + (o.z - z) ** 2 > (o.r + r) ** 2) && terre(x, z);
     const resI = (k, x, z, r) => occ[k].push({ x, z, r });
     // n essais sur l'île : à s au hasard, d'un côté ou de l'autre, entre d0 et d1 du bord
-    const semer = (k, n, d0, d1, r, f) => { for (let e = 0, f2 = 0; e < n * 6 && f2 < n; e++){ const s = alO() * L; if (!surIle(s)) continue; const sg = alO() < 0.5 ? 1 : -1;
+    const semer = (k, n, d0, d1, r, f, essais = 6) => { for (let e = 0, f2 = 0; e < n * essais && f2 < n; e++){ const s = alO() * L; if (!surIle(s)) continue; const sg = alO() < 0.5 ? 1 : -1;
       const [x, , z, q] = enPiste(s, sg * (DEMI_PISTE + ACCOTEMENT + d0 + alO() * (d1 - d0))); if (!libreI(k, x, z, r)) continue; resI(k, x, z, r); f(x, solEn(x, z)[0], z, q, sg, s); f2++; } };
     const feux = [[], [], [], [], [], []];
     { const COUL_I = [[0.44, 0.36, 0.25], [0.19, 0.29, 0.13], [0.64, 0.66, 0.42], [0.38, 0.26, 0.46], [0.31, 0.32, 0.33], [0.76, 0.64, 0.30]];
@@ -4328,6 +4334,18 @@ function construireDecor(piste){
             A[1] -= 0.04; D2[1] -= 0.04; B[1] -= 0.30; C[1] -= 0.30; if (sg > 0) quad(iles[k], B, A, D2, C, c2); else quad(iles[k], A, B, C, D2, c2); } } } }
     odyD.feux = feux;
 
+    // ── garde-fou : un objet d'une île qui mord sur une portion de piste (l'intérieur d'un virage,
+    //    une autre ligne droite qui passe derrière) est retiré tout entier ──
+    const surPisteO = (x, y, z) => { const ix = Math.floor(x / CASE), iz = Math.floor(z / CASE), lim = (DEMI_PISTE + 1.2) ** 2;
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++){ const Lp = grillePiste.get((ix + a) + "," + (iz + b));
+        if (Lp) for (const p of Lp) if ((p.x - x) ** 2 + (p.z - z) ** 2 < lim && y > p.y - 0.6 && y < p.y + 40) return true; } return false; };
+    const garde = (m, f) => { if (m === paysage) return f(); const n0 = m.pos.length, c0 = m.col.length, o0 = m.nor.length, i0 = m.idx.length, r = f();
+      for (let k = n0; k < m.pos.length; k += 3) if (surPisteO(m.pos[k], m.pos[k + 1], m.pos[k + 2])){ m.pos.length = n0; m.col.length = c0; m.nor.length = o0; m.idx.length = i0; odyD.retires = (odyD.retires || 0) + 1; return false; }
+      return r; };
+    const boiteG = boite, cylG = cylindreY, arbreG = arbre;
+    {
+    const boite = (m, ...a) => garde(m, () => boiteG(m, ...a)), cylindreY = (m, ...a) => garde(m, () => cylG(m, ...a)), arbre = (m, ...a) => garde(m, () => arbreG(m, ...a));
+    const poser = (m, M, x, y, z, fx, fz, H, pal) => garde(m, () => poserM(m, M, x, y, z, fx, fz, H, H, H, pal));
     // 0. Troie : la ville en flammes derrière ses remparts, le cheval de bois au départ, le camp grec
     { const m = iles[0];
       { const sg = coteExt(40), [x, y, z, q] = enPiste(40, sg * (DEMI_PISTE + ACCOTEMENT + 20));
@@ -4364,7 +4382,7 @@ function construireDecor(piste){
       { const ex = x - q.nx * sg * 2, ez = z - q.nz * sg * 2; for (let k = 0; k < 10; k++){ const a0 = k / 10 * Math.PI, a1 = (k + 1) / 10 * Math.PI, R = 13;
         const P2 = a => [ex + q.tx * Math.cos(a) * R, y + Math.sin(a) * R * 1.2, ez + q.tz * Math.cos(a) * R]; triangle(m, [ex, y, ez], P2(a0), P2(a1), [0.03, 0.03, 0.03]); triangle(m, [ex, y, ez], P2(a1), P2(a0), [0.03, 0.03, 0.03]); } }
       resI(1, x, z, 40); odyD.cyc = { x: x - q.nx * sg * 22, y: solEn(x - q.nx * sg * 22, z - q.nz * sg * 22)[0], z: z - q.nz * sg * 22, fx: -q.nx * sg, fz: -q.nz * sg, sg };
-      semer(1, 90, 2, 90, 5, (x2, y2, z2) => poser(m, alO() < 0.7 ? MO.rocher : MO.rochers, x2, y2 - 0.8, z2, alO() - 0.5, alO() - 0.5, 2 + alO() * 5, MO.rocher.pal.map(c => c.map(v => v * 0.55))));
+      semer(1, 90, 2, 90, 5, (x2, y2, z2) => poser(m, alO() < 0.7 ? MO.rocher : MO.rochers, x2, y2 - 1.6, z2, alO() - 0.5, alO() - 0.5, 2 + alO() * 5, MO.rocher.pal.map(c => c.map(v => v * 0.55))));
       semer(1, 40, 10, 150, 12, (x2, y2, z2) => tache(m, x2, z2, 9 + alO() * 14, alO() < 0.5 ? [0.16, 0.15, 0.14] : [0.30, 0.46, 0.20]));
       semer(1, 12, 4, 60, 10, (x2, y2, z2, q2) => { for (let k = 0; k < 6; k++){ const a = alO() * 6.28, r = alO() * 7; poser(m, alO() < 0.5 ? MO.mouton1 : MO.mouton2, x2 + Math.cos(a) * r, solEn(x2 + Math.cos(a) * r, z2 + Math.sin(a) * r)[0], z2 + Math.sin(a) * r, Math.cos(a * 3), Math.sin(a * 3), 2.0); } });
       semer(1, 10, 10, 80, 5, (x2, y2, z2) => poser(m, MO.olivier, x2, y2 - 0.3, z2, alO() - 0.5, alO() - 0.5, 6 + alO() * 3));
@@ -4430,6 +4448,25 @@ function construireDecor(piste){
       // Argos, le vieux chien d'Ulysse, attend sur la ligne d'arrivée
       { const sg = coteExt(L - 6), [x, y, z, q] = enPiste(L - 6, sg * (DEMI_PISTE + ACCOTEMENT - 2)); poser(m, MO.chien, x, y - 0.3, z, -q.tx, -q.tz, 1.1); }
     }
+    // ── les grands bâtiments antiques, bien en vue au bord de la piste, sur chaque île ──
+    { const PAL = { pierre: M => teinte(M, c => [c[0] * 0.95 + 0.05, c[1] * 0.92 + 0.04, c[2] * 0.85]), dore: M => teinte(M, c => [Math.min(1, c[0] * 1.05 + 0.1), c[1] * 0.95 + 0.05, c[2] * 0.7]),
+        brule: M => teinte(M, c => c.map(v => v * 0.55)), violet: M => teinte(M, c => [c[0] * 0.95 + 0.06, c[1] * 0.85, c[2] * 1.05 + 0.1]), gris: M => teinte(M, c => c.map(v => v * 0.75 + 0.05)) };
+      // [île, modèle, nombre, distance min, distance max, rayon, hauteur, couleur, posé en long (le long de la piste)]
+      const BAT = [[0, "ruines", 14, 6, 30, 11, 17, "brule"], [0, "arche", 6, 6, 30, 14, 20, "brule"], [0, "butrint", 2, 30, 60, 30, 14, "pierre", 1], [0, "chapiteau", 16, 3, 16, 3, 2.4, "pierre"],
+        [1, "ruines", 8, 6, 30, 11, 16, "gris"], [1, "arches", 3, 20, 50, 24, 13, "gris", 1],
+        [2, "arches", 6, 6, 30, 26, 17, "dore", 1], [2, "palais", 2, 30, 60, 34, 24, "dore"], [2, "ruines", 8, 6, 30, 11, 17, "dore"], [2, "chapiteau", 14, 3, 16, 3, 2.4, "dore"],
+        [3, "arche", 5, 6, 30, 14, 20, "violet"], [3, "ruines", 10, 6, 30, 11, 17, "violet"], [3, "kiosque", 4, 8, 30, 10, 14, "violet"],
+        [4, "ruines", 6, 6, 30, 11, 16, "gris"], [4, "arche", 3, 6, 30, 14, 18, "gris"],
+        [5, "butrint", 3, 25, 60, 30, 14, "dore", 1], [5, "arches", 4, 6, 30, 26, 17, "pierre", 1], [5, "ruines", 8, 6, 30, 11, 17, "pierre"], [5, "arche", 4, 6, 30, 14, 20, "pierre"], [5, "chapiteau", 16, 3, 16, 3, 2.4, "pierre"]];
+      odyD.bat = []; for (const [k, nom, n, d0, d1, r, H, pal, long] of BAT){ const M = MO[nom]; if (!M){ odyD.bat.push(nom + ' absent'); continue; } const m = iles[k]; let ok = 0, ko = 0;
+        semer(k, n, d0 + r * 0.6, d1 + r * 0.6, r, (x, y, z, q, sg) => { const fx = long ? q.nx : -q.nx * sg + (alO() - 0.5) * 0.4, fz = long ? q.nz : -q.nz * sg + (alO() - 0.5) * 0.4;
+          if (poser(m, M, x, y - 0.4, z, fx, fz, H * (0.85 + alO() * 0.3), PAL[pal](M))) ok++; else ko++; }, 60); odyD.bat.push(k + nom + ':' + ok + '/' + ko); } }
+    }
+    // les montagnes qui poussent sur l'île du Cyclope (dessinées à part, elles montent et redescendent)
+    odyD.monts = []; for (let e = 0; e < 400 && odyD.monts.length < 34; e++){ const s = alO() * L; if (!surIle(s)) continue; const sg = alO() < 0.5 ? 1 : -1, proche = alO() < 0.45;
+      const r = proche ? 22 + alO() * 18 : 45 + alO() * 60, l = sg * (DEMI_PISTE + ACCOTEMENT + (proche ? 28 : 70) + r * 0.7 + alO() * (proche ? 30 : 160)), [x, , z] = enPiste(s, l);
+      if (!libre(x, z, r * 1.05) || !terre(x, z, 0)) continue; if (odyD.monts.some(o => (o.x - x) ** 2 + (o.z - z) ** 2 < ((o.r + r) * 0.6) ** 2)) continue;
+      odyD.monts.push({ x, z, y: solEn(x, z)[0], r, h: proche ? 30 + alO() * 30 : 70 + alO() * 110, a: alO() * 6.28 }); }
     odyD.iles = iles.map(m => televerser(m));
   }
 
@@ -8228,7 +8265,7 @@ function placerCamera(v, dt){
 }
 
 function modeleVoiture(v){
-  let M = m4Mul(m4Translation(v.x, v.y, v.z), m4RotY(v.cap));
+  let M = m4Mul(m4Translation(v.x, v.y + (v.tornH || 0) + (v.scyH || 0), v.z), m4RotY(v.cap));
   M = m4Mul(M, m4RotX(v.tangage));
   M = m4Mul(M, m4RotZ(v.roulis));
   return M;
@@ -10563,7 +10600,7 @@ function ileO(v){
 // la traversée en cours (1 les rameurs … 5 la tempête)
 function traverseeO(v){ const t = Math.max(0, v.tour || 0), tc = toursCourse(); return t >= tc - 1 ? 5 : Math.min(t + 1, 4); }
 // où en est l'épreuve n à l'instant présent : les rochers (Cyclope, Lestrygons), les coups de Scylla, les colonnes de Poséidon, les flèches
-const ROCS_CYC = [2860, 3010, 3150, 3290, 3440, 3600, 700, 780, 890, 980];
+const ROCS_CYC = [2860, 3010, 3150, 3290, 3440, 3600, 700, 780, 890, 980, 2300, 2380, 2470, 2560, 2650];
 function lancersO(type){
   // chaque type : une période, un temps de vol, une durée au sol, des cibles
   const ch = chO(), out = [];
@@ -10577,30 +10614,41 @@ function lancersO(type){
     if (type === "cyc") s = ROCS_CYC[n % ROCS_CYC.length] + (h1 - 0.5) * 40;
     else if (type === "les" || type === "pos") s = ODY.B0 + 25 + h1 * (ODY.B1 - ODY.B0 - 50);
     else if (type === "scy") s = ODY.COTE0 + 20 + h1 * (ODY.COTE1 - ODY.COTE0 - 40);
-    else { const z = h1 < 0.55 ? [3200, 3500] : [4150, 4290]; s = z[0] + hC(n, 9) * (z[1] - z[0]); }
+    else { const z = h1 < 0.4 ? [3200, 3500] : h1 < 0.7 ? [2280, 2650] : [4150, 4290]; s = z[0] + hC(n, 9) * (z[1] - z[0]); }
     const lat = type === "fle" ? 0 : (h2 - 0.5) * 2 * (DEMI_PISTE - 1.2);
     out.push({ n, s, lat, age, vol, sol, type, tombe: age >= vol, sens: hC(n, 11) < 0.5 ? 1 : -1 });
   }
   return out;
 }
 // le troupeau de moutons (île du Cyclope) : il traverse la piste toutes les 16 s
-function moutonsO(){ const u = chO() % 16; if (u > 10) return []; const c = -20 + 40 * (u / 10), out = [];
-  for (let k = 0; k < 7; k++) out.push({ s: ODY.TROUPEAU + (k % 4) * 3.2 - 5, lat: c + (k % 3 - 1) * 2.2 + (k > 3 ? -1.5 : 0), r: 1.1, id: "m" + k, f: 0.78, mouton: k }); return out; }
+// trois grands troupeaux traversent la piste sans arrêt, dans un sens puis dans l'autre (12 moutons chacun)
+const TROUPEAUX_O = [815, 2420, 3150];
+function moutonsO(){ const out = [];
+  TROUPEAUX_O.forEach((s0, h) => { const per = 14, ch = chO() + h * 4.7, n = Math.floor(ch / per), u = (ch - n * per) / per, sens = n % 2 ? 1 : -1, c = sens * (-30 + 60 * u);
+    for (let k = 0; k < 12; k++) out.push({ s: s0 + (k % 4) * 3.4 - 6 + (h * 7 + k) % 3 * 0.8, lat: c + (Math.floor(k / 4) - 1) * 2.6 * sens, r: 1.2, id: "m" + h + "_" + k + "_" + n, f: 0.75, mouton: k, sens }); });
+  return out; }
 // la main du Cyclope aveuglé : elle balaie la piste devant sa grotte
 const mainCycO = () => Math.sin(chO() * 0.85) * (DEMI_PISTE + 3);
 // la tornade (île d'Éole)
 const tornadeO = () => Math.sin(chO() * 0.5) * (DEMI_PISTE + 4);
+const TORNADE2_O = 2450;
 // les rafales (île d'Éole) : dans quelques zones, une rafale toutes les 5 s, de côté, une fois à gauche, une fois à droite
-const ZONES_VENT = [[2780, 2990], [1200, 1400], [3160, 3520], [460, 650]];
+const ZONES_VENT = [[2700, 3060], [1150, 1450], [3140, 3560], [400, 700], [2350, 2600], [3700, 3950]];
 function rafaleO(s){ const u = modO(s); if (!ZONES_VENT.some(([a, b]) => u > a && u < b)) return 0; const ch = chO(), n = Math.floor(ch / 5), w = ch - n * 5;
-  if (w > 2.2) return 0; return (n % 2 ? 1 : -1) * Math.sin(w / 2.2 * Math.PI); }
+  if (w > 3.6) return 0; return (n % 2 ? 1 : -1) * Math.sin(w / 3.6 * Math.PI); }
 // Circé : les cercles magiques (on y passe : cochon pendant 5 s) et les flaques de potion (ça glisse)
-const CERCLES_O = [[2840, -0.55], [3060, 0.45], [3270, -0.25], [3450, 0.55], [1250, 0.3], [1330, -0.5], [600, 0.05]];
-const FLAQUES_O = [[3570, 0.35], [3615, -0.45], [3790, 0.2], [3845, -0.3], [1085, 0.45], [1125, -0.2], [1450, 0.05]];
+const CERCLES_O = [[2840, -0.55], [3060, 0.45], [3270, -0.25], [3450, 0.55], [1250, 0.3], [1330, -0.5], [600, 0.05], [2320, 0.4], [2410, -0.45], [2530, 0.1], [2620, -0.3]];
+const FLAQUES_O = [[3570, 0.35], [3615, -0.45], [3790, 0.2], [3845, -0.3], [1085, 0.45], [1125, -0.2], [1450, 0.05], [2365, -0.1], [2470, 0.4], [2580, -0.5]];
 const latO = f => f * 2 * (DEMI_PISTE - 1.6);
-function cochonOdy(v){ return estOdy() && v.cochonO != null && chO() < v.cochonO; }
+function cochonOdy(v){ if (!estOdy()) return false; if (jeu.multi && v !== jeu.joueur) cercleDistantO(v); return v.cochonO != null && chO() < v.cochonO; }
+function cercleDistantO(v){ if (v.s == null || ileO(v) !== 3) return; const s = modO(v.s), lat = v.lat || 0;
+  CERCLES_O.forEach(([s0, f], j) => { if (Math.abs(s - s0) < 2.4 && Math.abs(lat - latO(f)) < 3.2){ const cle = "ce" + j + ":" + v.tour; v._chocO = v._chocO || {}; if (!v._chocO[cle]){ v._chocO[cle] = 1; v.cochonO = chO() + 5; } } }); }
 // le vent du sac d'Éole sur le bateau : de dos (ça pousse) ou de face, toutes les 7 s
-const ventDosO = () => Math.floor(chO() / 7) % 2 === 0;
+const ventDosO = () => Math.floor(chO() / 5) % 2 === 0;
+// le sac des vents souffle bien avant le bateau et longtemps après (passerelles, quais, début de l'île)
+// la tempête de Poséidon (traversée 5) : elle se lève 450 m avant la passerelle, culmine sur le bateau, retombe 550 m après
+const tempeteO = s => { const u = modO(s), a = ODY.R0 - 450, b = ODY.R1 + 550; if (u < a || u > b) return 0; return Math.min(1, (u - a) / 250, (b - u) / 300); };
+const zoneSacO = s => { const u = modO(s); return u > ODY.R0 - 260 && u < ODY.R1 + 380; };
 // la tempête : le pont roule
 const roulisO = () => Math.sin(chO() * 0.8);
 function limiteOdy(s, marge, signe){ return DEMI_PISTE + ACCOTEMENT - marge; }
@@ -10610,9 +10658,9 @@ function obstaclesOdy(v){
   if (!bat && k === 1){
     for (const r of lancersO("cyc")) if (r.age > r.vol - 0.9) out.push({ s: r.s, lat: r.lat, r: 2.6, id: "c" + r.n, f: 0.55, roc: 1, actif: r.tombe });
     out.push(...moutonsO());
-    out.push({ s: ODY.CYC, lat: mainCycO(), r: 3.4, longue: 4, id: "main" + Math.floor(chO() / 4), f: 0.5 });
   }
-  if (!bat && k === 2) out.push({ s: ODY.TORNADE, lat: tornadeO(), r: 4.2, id: "tor" + Math.floor(chO() / 3), f: 0.6, tornade: 1 });
+  if (!bat && k === 2){ out.push({ s: ODY.TORNADE, lat: tornadeO(), r: 4.2, id: "tor" + Math.floor(chO() / 3), f: 0.6, tornade: 1 });
+    out.push({ s: TORNADE2_O, lat: -tornadeO() * 0.9, r: 4.2, id: "tr2" + Math.floor(chO() / 3), f: 0.6, tornade: 1 }); }
   if (!bat && k === 3){ CERCLES_O.forEach(([s0, f], j) => out.push({ s: s0, lat: latO(f), r: 2.3, id: "ce" + j, cercle: 1 }));
     FLAQUES_O.forEach(([s0, f], j) => out.push({ s: s0, lat: latO(f), r: 2.8, id: "fl" + j, flaque: 1 })); }
   if (!bat && k === 4) for (const r of lancersO("scy")) out.push({ s: r.s, lat: r.lat, r: 3.0, id: "s" + r.n, scylla: 1, actif: r.tombe && r.age < r.vol + r.sol });
@@ -10624,8 +10672,10 @@ function obstaclesOdy(v){
 function capOdy(v){
   if (!estOdy() || v.s == null || v.tempsFinal != null) return 1;
   let f = 1; const s = modO(v.s);
-  if (cochonOdy(v)) f *= 0.8;
-  if (surPontO(s)){ const c = traverseeO(v); if (c === 1) f *= 1.05; else if (c === 2) f *= ventDosO() ? 1.06 : 0.94; }
+  if (cochonOdy(v)) f *= 0.55;
+  if (v.tornO && chO() - v.tornO.t < 1.6) f *= 0.5;
+  if (v.scyO && chO() - v.scyO.t < 1.3) f *= 0.2;
+  { const c = traverseeO(v); if (c === 1 && surPontO(s)) f *= 1.05; else if (c === 2 && zoneSacO(s)) f *= ventDosO() ? 1.07 : 0.93; }
   return f;
 }
 function chocOdy(v, dt){
@@ -10638,9 +10688,11 @@ function chocOdy(v, dt){
   if (!bat && k === 2){ const r = rafaleO(s); if (r){ pousser(r * 4.2); if (moi && v._rafale !== Math.floor(ch / 5)){ v._rafale = Math.floor(ch / 5); sonVent(); } } }
   // Charybde : le tourbillon tire vers la mer sur la route de la côte
   if (!bat && k === 4 && s > ODY.COTE0 + 30 && s < ODY.COTE1 - 30){ const sm = decor && decor.odyD ? decor.odyD.sMer : 1, w = Math.sin((s - ODY.COTE0 - 30) / (ODY.COTE1 - ODY.COTE0 - 60) * Math.PI); pousser(sm * 2.6 * w); }
+  // le sac des vents (traversée 2) : de dos ou de face, sur tout le passage du bateau
+  if (c === 2 && zoneSacO(s)){ if (ventDosO()) v.v = Math.min(v.v + 1.2 * dt, v.v + 1); else v.v = Math.max(0, v.v - 1.4 * dt);
+    pousser(Math.sin(ch * 0.9) * 1.4); if (moi && v._sac !== Math.floor(ch / 5)){ v._sac = Math.floor(ch / 5); sonVent(); } }
   // sur le pont
   if (surPontO(s)){
-    if (c === 2){ if (ventDosO()) v.v = Math.min(v.v + 1.2 * dt, v.v + 1); else v.v = Math.max(0, v.v - 1.4 * dt); }
     if (c === 4 && ch % 9 < 6){ const so = decor && decor.odyD ? decor.odyD.sOutB : 1; pousser(so * 2.8); if (moi && v._chant !== Math.floor(ch / 9)){ v._chant = Math.floor(ch / 9); for (let j = 0; j < 5; j++) setTimeout(() => bip([659, 784, 880, 784, 1046][j], 0.5, 0.12, "sine"), j * 420); } }
     if (c === 5){ pousser(roulisO() * 3.2); secouer(0.18 + 0.12 * Math.abs(roulisO()));
       // les vagues qui balaient le pont, toutes les 3,6 s
@@ -10659,13 +10711,20 @@ function chocOdy(v, dt){
     const cle = o.id + ":" + v.tour; if (v._chocO[cle]) continue; v._chocO[cle] = 1;
     if (o.cercle){ v.cochonO = ch + 5; if (moi){ bip(220, 0.25, 0.3, "square"); setTimeout(() => bip(180, 0.3, 0.3, "square"), 200); v.flashO = { c: "#b24ce0", t: ch }; } continue; }
     if (o.flaque){ v.glisseO = { t: ch, sens: hC(ch, s) < 0.5 ? 1 : -1 }; if (moi) bip(500, 0.15, 0.2, "sine"); continue; }
-    if (o.scylla){ if (v.joueur){ const p = auPoint(piste, s - 30); v.x = p.x + p.nx * lat; v.z = p.z + p.nz * lat; v.v = Math.min(v.v, 20); if (moi){ v.flashO = { c: "#3a3a3a", t: ch }; bip(90, 0.5, 0.35, "sawtooth"); secouer(1.4); } }
-      else { v.s -= 30; v.v = Math.min(v.v, 20); } continue; }
-    if (o.tornade){ v.v *= 0.6; if (v.joueur){ v.cap += 2.2; v.capVit = v.cap; if (moi){ secouer(1.2); sonVent(); } } else v.vlat = (v.vlat || 0) + (Math.sign(lat - o.lat) || 1) * 4; continue; }
+    if (o.scylla){ if (v.scyO && ch - v.scyO.t < 2) continue; v.scyO = { t: ch, fait: false }; if (moi){ bip(90, 0.5, 0.35, "sawtooth"); setTimeout(() => bip(60, 0.6, 0.3, "sawtooth"), 350); secouer(1.4); } continue; }
+    if (o.tornade){ v.tornO = { t: ch, sens: Math.sign(lat - o.lat) || 1, cap0: v.cap }; if (moi){ secouer(1.2); sonVent(); } continue; }
     if (o.vmax) v.v = Math.min(v.v, o.vmax); else v.v *= (o.f || 0.85);
     if (v.joueur){ v.flashO = { c: o.fleche ? "#ffb020" : "#ff5040", t: ch }; if (moi){ secouer(o.roc ? 1.5 : 0.9); bip(o.fleche ? 900 : 140, 0.2, 0.3, o.fleche ? "triangle" : "square"); } }
     else v.vlat = (v.vlat || 0) + (Math.sign(lat - o.lat) || 1) * 3.5;
   }
+  // la tornade en cours : la voiture tourne sur elle-même (un tour et demi) et file vers le bas-côté
+  if (v.tornO){ const u = (ch - v.tornO.t) / 1.5; if (u >= 0 && u < 1){ pousser(v.tornO.sens * 15 * Math.sin(u * Math.PI)); v.v = Math.max(v.v * (1 - 1.2 * dt), 6);
+      if (v.joueur){ v.cap = v.tornO.cap0 + Math.sin(u * Math.PI * 0.5) * Math.PI * 3; if (u > 0.92) v.cap = v.tornO.cap0; v.capVit = v.cap; } secouer(0.5); v.tornH = Math.sin(u * Math.PI) * 4.5; }
+    else { v.tornH = 0; if (u >= 1) v.tornO = null; } }
+  // Scylla t'a attrapé : la voiture est soulevée (0,6 s), puis reposée 30 m en arrière
+  if (v.scyO){ const u = ch - v.scyO.t; v.v = Math.min(v.v, 4); v.scyH = u < 0.6 ? Math.sin(u / 0.6 * Math.PI * 0.5) * 9 : Math.max(0, 9 - (u - 0.6) * 16);
+    if (u >= 0.6 && !v.scyO.fait){ v.scyO.fait = true; if (v.joueur){ const p = auPoint(piste, s - 30); v.x = p.x + p.nx * lat; v.z = p.z + p.nz * lat; } else v.s -= 30; }
+    if (u > 1.3){ v.scyO = null; v.scyH = 0; } }
   // la flaque de potion : la voiture glisse de côté un instant, le volant ne répond plus
   if (v.glisseO && ch - v.glisseO.t < 0.9){ pousser(v.glisseO.sens * 4.5); if (moi && typeof cmd !== "undefined") cmd.dir *= 0.35; }
   // les pilotes du jeu voient venir ce qui peut les toucher (pas les cercles de Circé déjà passés)
@@ -10682,10 +10741,14 @@ function ambianceOdy(){
   else if (k === 3) teinte(0.18, [0.92, 0.82, 1.04], [1.0, 0.78, 1.12]);
   else if (k === 4){ teinte(0.14, [0.84, 0.88, 0.96], [0.74, 0.80, 0.92]); SABLE_ACT = PLUIE_E; TEMPETE = 0.08; }
   else if (k === 5) teinte(0.34, [1.0, 0.80, 0.58], [1.15, 0.70, 0.45]);
+  if (c === 2 && zoneSacO(s) && !surBateauO(s)){ SABLE_ACT = SABLE; TEMPETE = Math.max(TEMPETE, 0.14); }
+  // la tempête de Poséidon monte doucement avant le bateau et retombe doucement après
+  const tp = c === 5 ? (forcer.poseidon ? 1 : tempeteO(s)) : 0;
+  if (tp > 0){ const g = tp * tp * (3 - 2 * tp); teinte(0.30 * g + (k === 5 ? 0.34 : 0.12) * (1 - g), melange3([1.0, 0.80, 0.58], [0.70, 0.74, 0.82], g), melange3([1.15, 0.70, 0.45], [0.50, 0.55, 0.66], g)); SABLE_ACT = PLUIE_E; TEMPETE = Math.max(TEMPETE, 0.5 * g); }
   // sur le bateau : la brume au milieu de la traversée (c'est là qu'on change d'île), ou la tempête
   if (surBateauO(s) || forcer.brume != null){
     const d = Math.abs(s - MILIEU_O), b = forcer.brume != null ? forcer.brume : Math.max(0, 1 - d / 140);
-    if (c === 5){ teinte(0.30, [0.70, 0.74, 0.82], [0.50, 0.55, 0.66]); SABLE_ACT = PLUIE_E; TEMPETE = Math.max(0.42, 0.85 * b); }
+    if (c === 5){ SABLE_ACT = PLUIE_E; TEMPETE = Math.max(TEMPETE, 0.5, 0.85 * b); }
     else if (b > 0){ SABLE_ACT = BRUME_O; TEMPETE = Math.max(TEMPETE, 0.88 * b * b * (3 - 2 * b)); }
   }
   if (forcer.tempete != null) TEMPETE = forcer.tempete;
@@ -10712,6 +10775,11 @@ function maillagesOdy(){
   const voile = fait(m => { for (let k = 0; k < 8; k++){ const y0 = k / 8, y1 = (k + 1) / 8, c = k % 2 ? [0.95, 0.92, 0.84] : [0.74, 0.16, 0.12];
       for (let j = 0; j < 6; j++){ const x0 = -0.5 + j / 6, x1 = -0.5 + (j + 1) / 6, b = u => Math.sin((u + 0.5) * Math.PI) * 0.12;
         quad(m, [x0, y0, b(x0)], [x1, y0, b(x1)], [x1, y1, b(x1)], [x0, y1, b(x0)], c); quad(m, [x1, y0, b(x1)], [x0, y0, b(x0)], [x0, y1, b(x0)], [x1, y1, b(x1)], c); } } });
+  // une montagne (hauteur 1, rayon 1) : des anneaux bosselés, de la roche, des éboulis, de la neige au sommet
+  const mont = fait(m => { const N = 14, A = [0, 0.18, 0.4, 0.62, 0.82, 1], Rr = [1, 0.82, 0.58, 0.36, 0.17, 0];
+    const pt = (i, j) => { const a = j / N * 6.283, w = A[i] > 0.99 ? 0 : (0.75 + 0.5 * hC(i * 7 + j, 3)) * Rr[i]; return [Math.cos(a) * w, A[i] * (A[i] > 0.99 ? 1 : 0.9 + 0.2 * hC(j, i)), Math.sin(a) * w]; };
+    const coul = (i, j) => A[i] >= 0.8 ? [0.94, 0.95, 0.97] : A[i] >= 0.6 ? [0.52, 0.50, 0.47] : i === 0 ? [0.36, 0.32, 0.27] : (j % 2 ? [0.44, 0.40, 0.35] : [0.40, 0.37, 0.33]);
+    for (let i = 0; i < A.length - 1; i++) for (let j = 0; j < N; j++){ const a = pt(i, j), b = pt(i, (j + 1) % N), c = pt(i + 1, (j + 1) % N), d = pt(i + 1, j); triangle(m, a, c, b, coul(i, j)); triangle(m, a, d, c, coul(i, j)); } });
   // la rame : un manche et une pale
   const rame = fait(m => { boite(m, 0, 0, 0.5, 0.35, 0.35, 1, [0.46, 0.30, 0.15]); boite(m, 0, 0, 0.94, 0.12, 1.6, 0.14, [0.52, 0.35, 0.18]); });
   // le poing du Cyclope (la main qui tâtonne) : la même peau jaune
@@ -10736,13 +10804,13 @@ function maillagesOdy(){
   return (meshO = { piste, cube, boule, disque, anneau, voile, rame, poing, fleche, tornade, tourbillon, colonne, eclair, flamme, ecran: texQuad(),
     cyc0: modele(MO.cyc0), cycHaut: modele(MO.cycHaut), cycFrappe: modele(MO.cycFrappe), mouton1: modele(MO.mouton1), mouton2: modele(MO.mouton2),
     rocher: modele(MO.rocher), rocherN: modele(MO.rocher, MO.rocher ? MO.rocher.pal.map(c => c.map(v => v * 0.6)) : null), scylla0: modele(MO.scylla0), scylla1: modele(MO.scylla1),
-    sirene: modele(MO.sirene), poseidon: modele(MO.poseidon), cochon: modele(MO.cochon), kiosque: modele(MO.kiosque) });
+    sirene: modele(MO.sirene), poseidon: modele(MO.poseidon), mont, cochon: modele(MO.cochon, MO.cochon ? MO.cochon.pal.map(c => { const l = (c[0] + c[1] + c[2]) / 3; return [Math.min(1, l * 0.55 + 0.58), Math.min(1, l * 0.45 + 0.36), Math.min(1, l * 0.45 + 0.42)]; }) : null), kiosque: modele(MO.kiosque) });
 }
 const T_O = (x, y, z) => m4Translation(x, y, z), Ry_O = a => m4RotY(a), S3_O = (a, b = a, c = a) => m4Echelle(a, b, c), mul_O = (...a) => a.reduce((p, q) => m4Mul(p, q));
 function dessinerCochonOdy(v){
   if (!decor || !decor.odyD) return; const M = maillagesOdy(), t = performance.now() / 1000;
   gl.disable(gl.CULL_FACE);
-  tracer(M.cochon, mul_O(T_O(v.x, v.y + Math.abs(Math.sin(t * 9)) * 0.15, v.z), Ry_O(v.cap), S3_O(2.4)), [1, 1, 1], 0.95);
+  tracer(M.cochon, mul_O(modeleVoiture(v), T_O(0, Math.abs(Math.sin(t * 9)) * 0.12 - 0.02, 0), Ry_O(-Math.PI / 4), S3_O(2.3)), [1, 1, 1], 0.95);
   gl.enable(gl.CULL_FACE);
 }
 function dessinerOdy(){
@@ -10769,33 +10837,39 @@ function dessinerOdy(){
     tracer(M.rocher, mul(T(x, y - 3, z), Ry(j), S3(9, 7, 9)), [0.7, 0.66, 0.6], 0.9);
     tracer(M.sirene, mul(T(x, y + 2.5, z), Ry(Math.atan2(-p.nx * so, -p.nz * so) + Math.sin(t + j) * 0.2), S3(7)), [1, 1, 1], 0.95); } }
   // la traversée 5 : la tempête — Poséidon sort de la mer, les vagues balaient le pont, les éclairs
-  if (c === 5 && (bat || forcer.poseidon)){ const [x, , z, p] = enPiste(MILIEU_O + 60, -D.sOutB * 230), u = Math.min(1, Math.max(0, (sJ - ODY.R0) / 260));
+  if (c === 5 && (tempeteO(sJ) > 0 || forcer.poseidon)){ const [x, , z, p] = enPiste(MILIEU_O + 60, -D.sOutB * 230), tq = forcer.poseidon ? 1 : tempeteO(sJ), u = tq * tq * (3 - 2 * tq);
     tracer(M.poseidon, mul(T(x, D.eau - 130 + u * 132, z), Ry(Math.atan2(p.nx * D.sOutB, p.nz * D.sOutB)), S3(130)), [0.70, 0.86, 0.92], 0.9);
     const n = Math.floor(ch / 3.6), w = ch - n * 3.6, sens = n % 2 ? 1 : -1;
-    if (w < 1.3) for (let s = ODY.B0; s < ODY.B1; s += 6){ const lw = sens * (-(DEMI_PISTE + ACCOTEMENT) + w / 1.3 * 2 * (DEMI_PISTE + ACCOTEMENT)), [x2, y2, z2, p2] = enPiste(s, lw);
+    if (w < 1.3 && bat) for (let s = ODY.B0; s < ODY.B1; s += 6){ const lw = sens * (-(DEMI_PISTE + ACCOTEMENT) + w / 1.3 * 2 * (DEMI_PISTE + ACCOTEMENT)), [x2, y2, z2, p2] = enPiste(s, lw);
       if (proche(x2, z2, 260)) tracer(M.cube, mul(T(x2, y2 + 0.6, z2), Ry(p2.cap), S3(2.4, 1.4 + Math.sin(s) * 0.4, 6.2)), [0.55, 0.78, 0.92], 1.05); }
-    if (ch % 4.3 < 0.25){ const [x3, , z3] = enPiste(sJ + 120, (hC(Math.floor(ch / 4.3), 2) - 0.5) * 300); tracer(M.eclair, mul(T(x3, D.eau, z3), S3(280, 260, 280)), [1, 1, 1.2], 2.5); } }
+    if (ch % 4.3 < 0.25 && tq > 0.4){ const [x3, , z3] = enPiste(sJ + 120, (hC(Math.floor(ch / 4.3), 2) - 0.5) * 300); tracer(M.eclair, mul(T(x3, D.eau, z3), S3(280, 260, 280)), [1, 1, 1.2], 2.5); } }
+  // l'île du Cyclope : les montagnes sortent de terre (5 s, ça tremble), et au tour d'après elles s'enfoncent
+  if (D.monts){ const etat = J._montsO || (J._montsO = { k: -1, t: 0 }); if (etat.k !== k){ etat.k = k; etat.t = ch; }
+    const e = (ch - etat.t) / 5, f = forcer.monts ? 1 : k === 1 ? Math.min(1, Math.max(0, e)) : k === 2 ? Math.max(0, 1 - Math.max(0, e)) : 0, g = f * f * (3 - 2 * f);
+    if (g > 0.001){ for (const o of D.monts){ if (!proche(o.x, o.z, 1500)) continue; tracer(M.mont, mul(T(o.x, o.y - 2 - o.h * 0.08, o.z), Ry(o.a), S3(o.r, o.h * g, o.r)), [1, 1, 1], 0.92); }
+      if (f > 0 && f < 1 && typeof secousse !== "undefined"){ secousse = Math.max(secousse, 0.35); if (J._grondO !== Math.floor(ch)){ J._grondO = Math.floor(ch); bip(45 + hC(ch, 1) * 15, 1.2, 0.25, "sawtooth"); } } } }
   // Troie : la ville brûle
   if (k === 0) for (const [x, y, z, r] of D.feux[0]){ if (!proche(x, z, 520)) continue;
     for (let j = 0; j < 3; j++){ const u = ((t * 0.7 + j / 3 + x * 0.01) % 1); tracer(M.flamme, mul(T(x + Math.sin(j * 2 + t) * r * 0.3, y + u * r * 2, z), S3(r * (1 - u * 0.6))), [1, 0.8, 0.5], 2.0);
       if (j === 0) tracer(M.boule, mul(T(x, y + r * 2.5 + u * 18, z), S3(r * (0.35 + u * 0.9))), [0.42, 0.40, 0.38], 0.75); } }
   // l'île du Cyclope : Polyphème qui lance ses rochers, la main qui tâtonne, le troupeau
-  if (k === 1 && D.cyc){ const C = D.cyc, per = 2.3, u = ch % per, M2 = u < 0.9 ? M.cycHaut : u < 1.25 ? M.cycFrappe : M.cyc0;
-    tracer(M2, mul(T(C.x, C.y - 0.5, C.z), Ry(Math.atan2(C.fx, C.fz)), S3(58)), [1, 1, 1], 0.95);
+  if (k === 1 && D.cyc){ const C = D.cyc, per = 2.3, u = ch % per, M2 = u > per - 0.75 ? M.cycHaut : u < 0.35 ? M.cycFrappe : M.cyc0;
+    // il se tourne vers là où part le prochain rocher, respire, se penche quand il lance
+    const lc = lancersO("cyc"), cib = lc.length ? lc[lc.length - 1] : null; let lacet = Math.atan2(C.fx, C.fz);
+    if (cib){ const [cx2, , cz2] = enPiste(cib.s, cib.lat); const vise = Math.atan2(cx2 - C.x, cz2 - C.z); let d = vise - lacet; d = Math.atan2(Math.sin(d), Math.cos(d)); lacet += Math.max(-0.6, Math.min(0.6, d)); }
+    const souffle = 1 + Math.sin(t * 1.7) * 0.012;
+    tracer(M2, mul(T(C.x, C.y - 0.5 + Math.sin(t * 1.7) * 0.4, C.z), Ry(lacet), S3(58, 58 * souffle, 58)), [1, 1, 1], 0.95);
     for (const r of lancersO("cyc")){ const [x, y, z] = enPiste(r.s, r.lat); if (!proche(x, z, 600)) continue;
       if (!r.tombe){ const w = r.age / r.vol, hx = C.x + (x - C.x) * w, hz = C.z + (z - C.z) * w, hy = C.y + 40 + (y - C.y - 40) * w + Math.sin(w * Math.PI) * 60;
         tracer(M.rocherN, mul(T(hx, hy, hz), Ry(t * 3), S3(3.2)), [1, 1, 1], 0.9);
         tracer(M.disque, mul(T(x, y + 0.06, z), S3(1 + w * 2.4, 1, 1 + w * 2.4)), [0.08, 0.08, 0.08], 0.5); }
       else tracer(M.rocherN, mul(T(x, y - 0.6, z), Ry(r.n), S3(3.4, 2.6, 3.4)), [1, 1, 1], 0.9); }
-    { const [x, y, z, p] = enPiste(ODY.CYC, mainCycO()); if (proche(x, z, 500)){ tracer(M.poing, mul(T(x, y + 2.2, z), Ry(Math.atan2(-C.fx, -C.fz)), S3(3.2)), [1, 1, 1], 0.95);
-      const ex = C.x, ey = C.y + 40, ez = C.z, mx = (x + ex) / 2, my = (y + 2.2 + ey) / 2, mz = (z + ez) / 2, dh = Math.hypot(ex - x, ez - z), dl = Math.hypot(dh, ey - y - 2.2);
-      tracer(M.cube, mul(T(mx, my, mz), Ry(Math.atan2(ex - x, ez - z)), m4RotX(-Math.atan2(ey - y - 2.2, dh)), S3(3.0, 3.0, dl)), [0.86, 0.66, 0.26], 0.95); } }
     { const pas = Math.floor(t * 4) % 2; for (const o of moutonsO()){ const [x, y, z, p] = enPiste(o.s, o.lat); if (!proche(x, z, 400)) continue;
-      tracer((pas + o.mouton) % 2 ? M.mouton1 : M.mouton2, mul(T(x, y, z), Ry(p.cap + Math.PI / 2), S3(2.0)), [1, 1, 1], 0.95); } } }
+      tracer((pas + o.mouton) % 2 ? M.mouton1 : M.mouton2, mul(T(x, y, z), Ry(p.cap + Math.PI / 2 * o.sens), S3(2.5)), [1, 1, 1], 0.95); } } }
   // l'île d'Éole : les rochers qui flottent, la tornade, les rafales (des feuilles qui filent)
-  if (k === 2){ for (const f of D.flottants || []){ if (!proche(f.x, f.z, 900)) continue; const y = f.y + Math.sin(t * 0.6 + f.ph) * 2.5;
+  if (k === 2){ for (const f of []){ if (!proche(f.x, f.z, 900)) continue; const y = f.y + Math.sin(t * 0.6 + f.ph) * 2.5;
       tracer(M.rocher, mul(T(f.x, y, f.z), Ry(f.a + t * 0.05), S3(f.h, f.h * 0.8, f.h)), [0.9, 0.86, 0.8], 0.9); }
-    { const [x, y, z] = enPiste(ODY.TORNADE, tornadeO()); if (proche(x, z, 700)) tracer(M.tornade, mul(T(x, y, z), Ry(t * 4), S3(1.6, 1.4, 1.6)), [1, 1, 1], 0.9); }
+    for (const [st, lt] of [[ODY.TORNADE, tornadeO()], [TORNADE2_O, -tornadeO() * 0.9]]){ const [x, y, z] = enPiste(st, lt); if (proche(x, z, 700)) tracer(M.tornade, mul(T(x, y, z), Ry(t * 4), S3(1.6, 1.4, 1.6)), [1, 1, 1], 0.9); }
     const r = rafaleO(sJ); if (r) for (let j = 0; j < 24; j++){ const u = (t * 1.6 + j / 24) % 1, [x, y, z, p] = enPiste(sJ + 8 + j * 3.5, -Math.sign(r) * (18 - u * 36));
       tracer(M.cube, mul(T(x, y + 0.6 + hC(j, 1) * 2, z), Ry(t * 9 + j), S3(0.35, 0.05, 0.25)), j % 2 ? [0.42, 0.56, 0.22] : [0.66, 0.50, 0.24], 0.9); } }
   // l'île de Circé : les cercles magiques, les flaques de potion, l'écran
@@ -10809,6 +10883,10 @@ function dessinerOdy(){
       tracer(M.ecran, mul(T(C.x + C.fx * 0.4, C.y + 8, C.z + C.fz * 0.4), Ry(Math.atan2(C.fx, C.fz)), S3(C.W, H, 1)), [1, 1, 1], 1.0, tx); } } }
   // Charybde et Scylla
   if (k === 4){ const C = D.charybde; if (C && proche(C.x, C.z, 900)) tracer(M.tourbillon, mul(T(C.x, D.eau + 0.15, C.z), Ry(-t * 1.6), S3(52, 1, 52)), [1, 1, 1], 1.05);
+    // une tête de Scylla plonge sur la voiture attrapée et la soulève
+    for (const v of jeu.voitures){ if (!v.scyO || v.cache) continue; const u = ch - v.scyO.t; if (u < 0 || u > 1.3 || !proche(v.x, v.z, 400)) continue; const sm = D.sMer || 1, p = auPoint(piste, modO(v.s || 0));
+      const off = u < 0.25 ? (1 - u / 0.25) * 14 : u > 1.0 ? (u - 1.0) / 0.3 * 14 : 0, hx = v.x + p.nx * sm * (5 + off), hz = v.z + p.nz * sm * (5 + off), hy = v.y + (v.scyH || 0) + 4 + off * 0.8;
+      gl.disable(gl.CULL_FACE); tracer(M.scylla1, mul(T(hx, hy - 10, hz), Ry(Math.atan2(-p.nx * sm, -p.nz * sm)), S3(16)), [1, 1, 1], 0.95); gl.enable(gl.CULL_FACE); }
     const Sc = D.scylla; if (Sc && proche(Sc.x, Sc.z, 900)){ tracer(Math.floor(t * 2) % 2 ? M.scylla0 : M.scylla1, mul(T(Sc.x, Sc.y - 2, Sc.z), Ry(Math.atan2(Sc.fx, Sc.fz)), S3(34)), [1, 1, 1], 0.95);
       for (const r of lancersO("scy")){ const [x, y, z] = enPiste(r.s, r.lat); if (!proche(x, z, 500)) continue;
         if (!r.tombe){ const w = r.age / r.vol; tracer(M.disque, mul(T(x, y + 0.06, z), S3(3.0 * (0.4 + 0.6 * w), 1, 3.0 * (0.4 + 0.6 * w))), [0.10, 0.08, 0.08], 0.6);
@@ -10831,11 +10909,22 @@ function dessinerOdy(){
     else { if (!r.tombe) tracer(M.anneau, mul(T(x, y, z), S3(2.8, 0.4 + r.age, 2.8)), [0.85, 0.95, 1.0], 1.6);
       else { const u = (r.age - r.vol) / r.sol; tracer(M.colonne, mul(T(x, y, z), S3(2.6, 14 * Math.sin(Math.min(1, u * 1.4) * Math.PI * 0.5) * (1 - Math.max(0, u - 0.7) / 0.3), 2.6)), [1, 1, 1], 1.3); } } }
 }
+const ILES_TXT_O = ["🔥 TROIE EN FLAMMES", "👁️ L'ÎLE DU CYCLOPE — gare aux rochers et aux moutons !", "🌪️ L'ÎLE D'ÉOLE — rafales et tornades !", "🐷 L'ÎLE DE CIRCÉ — évite les cercles violets !", "🐙 CHARYBDE ET SCYLLA — reste loin de la mer !", "🏹 ITHAQUE — les prétendants tirent !"];
+const TRAV_TXT_O = ["", "🥁 Les rameurs ! Le bateau accélère", "💨 Le sac des vents s'ouvre !", "🪨 Les Lestrygons lancent des rochers !", "🧜 Les Sirènes chantent… tiens ton volant !", "🔱 POSÉIDON SE RÉVEILLE"];
 function dessinerEvenementsOdy(ctx, W, H, E){
   const J = jeu.joueur; if (!J || !estOdy()) return; const ch = chO();
+  if (jeu.phase === "course" && typeof bandeau === "function"){ const k = ileO(J), c = traverseeO(J), s = modO(J.s || 0);
+    if (J._ileTxtO !== k && !surBateauO(s)){ J._ileTxtO = k; bandeau(ILES_TXT_O[k], 3200); }
+    const cle = c + ":" + J.tour; if (s > ODY.R0 - 470 && s < ODY.R0 && J._travTxtO !== cle){ J._travTxtO = cle; bandeau(TRAV_TXT_O[c], 3200); } }
   if (J.flashO && ch - J.flashO.t < 0.45){ ctx.save(); ctx.globalAlpha = 0.35 * (1 - (ch - J.flashO.t) / 0.45); ctx.fillStyle = J.flashO.c; ctx.fillRect(0, 0, W, H); ctx.restore(); }
   // la tempête : les éclairs blanchissent l'écran
-  if (traverseeO(J) === 5 && surBateauO(J.s || 0) && ch % 4.3 < 0.12){ ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = "#eef4ff"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  if (traverseeO(J) === 5 && tempeteO(J.s || 0) > 0.4 && ch % 4.3 < 0.12){ ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = "#eef4ff"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  // Scylla t'attrape : des mâchoires se referment sur l'écran, tout devient noir, puis on se retrouve en arrière
+  if (J.scyO){ const u = (ch - J.scyO.t) / 1.3; if (u >= 0 && u < 1){ ctx.save(); const f = u < 0.45 ? u / 0.45 : u < 0.6 ? 1 : 1 - (u - 0.6) / 0.4, o = f * H * 0.52;
+      ctx.fillStyle = "#1c1a17"; ctx.fillRect(0, 0, W, o); ctx.fillRect(0, H - o, W, o); ctx.fillStyle = "#e9e2cf";
+      for (let x = 0; x < W; x += W / 14){ ctx.beginPath(); ctx.moveTo(x, o); ctx.lineTo(x + W / 28, o + H * 0.07 * f); ctx.lineTo(x + W / 14, o); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x + W / 28, H - o); ctx.lineTo(x + W / 14, H - o - H * 0.07 * f); ctx.lineTo(x + W * 3 / 28, H - o); ctx.fill(); }
+      if (u > 0.4 && u < 0.7){ ctx.globalAlpha = 0.6; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); } ctx.restore(); } }
   // en cochon : un voile rose sur les bords
   if (cochonOdy(J)){ ctx.save(); const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.9); g.addColorStop(0, "rgba(255,160,190,0)"); g.addColorStop(1, "rgba(255,140,180,0.45)"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore(); }
 }
@@ -15320,7 +15409,7 @@ const objFeu = (() => { const m = creerMaillage(); boite(m, 0, 0, 0, 0.62, 0.62,
    seulement quand on va y courir, derrière l'écran de chargement du circuit
    (sa propre photo, son nom, son pays, des astuces). Le circuit choisi sur la
    carte (ou dans un groupe multijoueur) est préchargé pendant le menu. */
-const PACKS_DX = {"f":{"a:ody_giannis":{"u":"assets/a-ody_giannis.b52c6e4604.js","o":183070},"a:ody_mat":{"u":"assets/a-ody_mat.5d710be50f.js","o":225918},"a:ody_capuche":{"u":"assets/a-ody_capuche.b5d177cf12.js","o":103922},"a:cr_papillon":{"u":"assets/a-cr_papillon.97c87ab764.js","o":47077},"a:cr_120":{"u":"assets/a-cr_120.74691cb7b5.js","o":133703},"a:cr_peignoir":{"u":"assets/a-cr_peignoir.46eb499e34.js","o":185379},"a:cr_siuu1":{"u":"assets/a-cr_siuu1.f113779dd2.js","o":170261},"a:cr_calma":{"u":"assets/a-cr_calma.209b716e62.js","o":216710},"a:cr_siuu2":{"u":"assets/a-cr_siuu2.a1ceb3f78c.js","o":175539},"a:cr_fourmi":{"u":"assets/a-cr_fourmi.3495dcb200.js","o":13059},"a:mbappe":{"u":"assets/a-mbappe.eb0600be29.js","o":17676},"a:aura":{"u":"assets/a-aura.f1cd2f99af.js","o":540799},"a:haaland":{"u":"assets/a-haaland.b15785dc2f.js","o":1417018},"a:theworld":{"u":"assets/a-theworld.4bf5e93eef.js","o":211670},"a:salah":{"u":"assets/a-salah.6fdb8a611c.js","o":81383},"a:crusaders":{"u":"assets/a-crusaders.e768700961.js","o":153671},"a:kujota":{"u":"assets/a-kujota.5d85d6f5e0.js","o":6722274},"a:giorno":{"u":"assets/a-giorno.dc74dfb436.js","o":114248},"a:colisee":{"u":"assets/a-colisee.08b337122b.js","o":2084501},"a:pantheon":{"u":"assets/a-pantheon.701a10de6c.js","o":549114},"a:poco":{"u":"assets/a-poco.35103cf5f5.js","o":47894},"a:voz":{"u":"assets/a-voz.7fb124313c.js","o":562273},"a:sbr":{"u":"assets/a-sbr.dc2e9569e1.js","o":1260169},"MODELES_JOZUKI":{"u":"assets/m-modeles_jozuki.454d292cd8.js","o":1092434},"MODELES_BONZI":{"u":"assets/m-modeles_bonzi.1ae8c9103f.js","o":840886},"MODELES_KUJOTA":{"u":"assets/m-modeles_kujota.8c496fa233.js","o":1158728},"MODELES_THOR":{"u":"assets/m-modeles_thor.6a2754fb42.js","o":687925},"MODELES_EASY":{"u":"assets/m-modeles_easy.3f3dbb387d.js","o":304941},"MODELES_CR":{"u":"assets/m-modeles_cr.0f89603751.js","o":285331},"MODELES_PARIS":{"u":"assets/m-modeles_paris.d402ef25b0.js","o":373822},"TEX_PARIS":{"u":"assets/m-tex_paris.395efcb0a6.js","o":113997},"MODELE_STATUES":{"u":"assets/m-modele_statues.382cc6aca2.js","o":385388},"MODELE_SBR":{"u":"assets/m-modele_sbr.46efd66a44.js","o":268133},"MODELES_ODY":{"u":"assets/m-modeles_ody.dbd9725b19.js","o":872286},"VOITURES":{"u":"assets/v-voitures.db2f82201d.js","o":8684599}},"c":{"Jozuki":["MODELES_JOZUKI"],"Bonzi":["MODELES_BONZI","a:giorno","a:colisee","a:pantheon"],"Odysseus":["MODELES_ODY","a:ody_giannis","a:ody_mat","a:ody_capuche"],"Cristiano":["MODELES_CR","a:cr_siuu1","a:cr_120","a:cr_peignoir","a:cr_calma","a:cr_siuu2","a:cr_fourmi","a:cr_papillon"],"Easydort":["MODELES_EASY","a:aura"],"Vozinhato":["a:voz"],"Kujota":["MODELES_KUJOTA","a:salah","a:crusaders","a:kujota","a:theworld"],"Thorson":["MODELES_THOR","MODELES_JOZUKI","a:haaland"],"BlocusHexa":["MODELES_PARIS","TEX_PARIS","a:mbappe"],"SteelBallSon":["MODELE_STATUES","MODELE_SBR","a:sbr","a:poco"]},"toujours":["VOITURES"],"img":{"Bafisson":"assets/ch-bafisson.39baeaeb3a.jpg","Bakou":"assets/ch-bakou.a33d01e5a1.jpg","Bloadboort":"assets/ch-bloadboort.d930da8342.jpg","BlocusHexa":"assets/ch-blocushexa.23a9d52c92.jpg","Bonzi":"assets/ch-bonzi.7f20cb6921.jpg","BronzeMond":"assets/ch-bronzemond.0f9a0ca74a.jpg","Cristiano":"assets/ch-cristiano.98d85216f8.jpg","Easydort":"assets/ch-easydort.ebe178395a.jpg","Etroifte":"assets/ch-etroifte.a3b25f2db5.jpg","Fumbulane":"assets/ch-fumbulane.41954dd61c.jpg","Gilou":"assets/ch-gilou.bbf9ed1d3a.jpg","Gou":"assets/ch-gou.87f1260592.jpg","Invincible":"assets/ch-invincible.76fbf2247c.jpg","Jozuki":"assets/ch-jozuki.a5372553f7.jpg","Jugado":"assets/ch-jugado.6fd3b0e6a8.jpg","Kujota":"assets/ch-kujota.b5117826c3.jpg","LaParuna":"assets/ch-laparuna.00704b0ff3.jpg","Lousimia":"assets/ch-lousimia.c6e89f05b9.jpg","Madring":"assets/ch-madring.ba2f0d76de.jpg","Monocoule":"assets/ch-monocoule.9554b7de1a.jpg","Odysseus":"assets/ch-odysseus.0ec444a97a.jpg","Piami":"assets/ch-piami.4b79847ec9.jpg","Pogbaco":"assets/ch-pogbaco.e7294dc02d.jpg","Sbah":"assets/ch-sbah.ac40e2a008.jpg","Soopney":"assets/ch-soopney.e9490904a1.jpg","SteelBallSon":"assets/ch-steelballson.cf7d390d75.jpg","Tadei":"assets/ch-tadei.115d3891de.jpg","Thorson":"assets/ch-thorson.b59d6bd04a.jpg","Vozinhato":"assets/ch-vozinhato.3721de0017.jpg","Yingpang":"assets/ch-yingpang.36bdb3403f.jpg"}};
+const PACKS_DX = {"f":{"a:ody_giannis":{"u":"assets/a-ody_giannis.b52c6e4604.js","o":183070},"a:ody_mat":{"u":"assets/a-ody_mat.5d710be50f.js","o":225918},"a:ody_capuche":{"u":"assets/a-ody_capuche.b5d177cf12.js","o":103922},"a:cr_papillon":{"u":"assets/a-cr_papillon.97c87ab764.js","o":47077},"a:cr_120":{"u":"assets/a-cr_120.74691cb7b5.js","o":133703},"a:cr_peignoir":{"u":"assets/a-cr_peignoir.46eb499e34.js","o":185379},"a:cr_siuu1":{"u":"assets/a-cr_siuu1.f113779dd2.js","o":170261},"a:cr_calma":{"u":"assets/a-cr_calma.209b716e62.js","o":216710},"a:cr_siuu2":{"u":"assets/a-cr_siuu2.a1ceb3f78c.js","o":175539},"a:cr_fourmi":{"u":"assets/a-cr_fourmi.3495dcb200.js","o":13059},"a:mbappe":{"u":"assets/a-mbappe.eb0600be29.js","o":17676},"a:aura":{"u":"assets/a-aura.f1cd2f99af.js","o":540799},"a:haaland":{"u":"assets/a-haaland.b15785dc2f.js","o":1417018},"a:theworld":{"u":"assets/a-theworld.4bf5e93eef.js","o":211670},"a:salah":{"u":"assets/a-salah.6fdb8a611c.js","o":81383},"a:crusaders":{"u":"assets/a-crusaders.e768700961.js","o":153671},"a:kujota":{"u":"assets/a-kujota.5d85d6f5e0.js","o":6722274},"a:giorno":{"u":"assets/a-giorno.dc74dfb436.js","o":114248},"a:colisee":{"u":"assets/a-colisee.08b337122b.js","o":2084501},"a:pantheon":{"u":"assets/a-pantheon.701a10de6c.js","o":549114},"a:poco":{"u":"assets/a-poco.35103cf5f5.js","o":47894},"a:voz":{"u":"assets/a-voz.7fb124313c.js","o":562273},"a:sbr":{"u":"assets/a-sbr.dc2e9569e1.js","o":1260169},"MODELES_JOZUKI":{"u":"assets/m-modeles_jozuki.454d292cd8.js","o":1092434},"MODELES_BONZI":{"u":"assets/m-modeles_bonzi.1ae8c9103f.js","o":840886},"MODELES_KUJOTA":{"u":"assets/m-modeles_kujota.8c496fa233.js","o":1158728},"MODELES_THOR":{"u":"assets/m-modeles_thor.6a2754fb42.js","o":687925},"MODELES_EASY":{"u":"assets/m-modeles_easy.3f3dbb387d.js","o":304941},"MODELES_CR":{"u":"assets/m-modeles_cr.0f89603751.js","o":285331},"MODELES_PARIS":{"u":"assets/m-modeles_paris.d402ef25b0.js","o":373822},"TEX_PARIS":{"u":"assets/m-tex_paris.395efcb0a6.js","o":113997},"MODELE_STATUES":{"u":"assets/m-modele_statues.382cc6aca2.js","o":385388},"MODELE_SBR":{"u":"assets/m-modele_sbr.46efd66a44.js","o":268133},"MODELES_ODY":{"u":"assets/m-modeles_ody.a517d1c2ae.js","o":909022},"VOITURES":{"u":"assets/v-voitures.db2f82201d.js","o":8684599}},"c":{"Jozuki":["MODELES_JOZUKI"],"Bonzi":["MODELES_BONZI","a:giorno","a:colisee","a:pantheon"],"Odysseus":["MODELES_ODY","a:ody_giannis","a:ody_mat","a:ody_capuche"],"Cristiano":["MODELES_CR","a:cr_siuu1","a:cr_120","a:cr_peignoir","a:cr_calma","a:cr_siuu2","a:cr_fourmi","a:cr_papillon"],"Easydort":["MODELES_EASY","a:aura"],"Vozinhato":["a:voz"],"Kujota":["MODELES_KUJOTA","a:salah","a:crusaders","a:kujota","a:theworld"],"Thorson":["MODELES_THOR","MODELES_JOZUKI","a:haaland"],"BlocusHexa":["MODELES_PARIS","TEX_PARIS","a:mbappe"],"SteelBallSon":["MODELE_STATUES","MODELE_SBR","a:sbr","a:poco"]},"toujours":["VOITURES"],"img":{"Bafisson":"assets/ch-bafisson.39baeaeb3a.jpg","Bakou":"assets/ch-bakou.a33d01e5a1.jpg","Bloadboort":"assets/ch-bloadboort.d930da8342.jpg","BlocusHexa":"assets/ch-blocushexa.23a9d52c92.jpg","Bonzi":"assets/ch-bonzi.7f20cb6921.jpg","BronzeMond":"assets/ch-bronzemond.0f9a0ca74a.jpg","Cristiano":"assets/ch-cristiano.98d85216f8.jpg","Easydort":"assets/ch-easydort.ebe178395a.jpg","Etroifte":"assets/ch-etroifte.a3b25f2db5.jpg","Fumbulane":"assets/ch-fumbulane.41954dd61c.jpg","Gilou":"assets/ch-gilou.bbf9ed1d3a.jpg","Gou":"assets/ch-gou.87f1260592.jpg","Invincible":"assets/ch-invincible.76fbf2247c.jpg","Jozuki":"assets/ch-jozuki.a5372553f7.jpg","Jugado":"assets/ch-jugado.6fd3b0e6a8.jpg","Kujota":"assets/ch-kujota.b5117826c3.jpg","LaParuna":"assets/ch-laparuna.00704b0ff3.jpg","Lousimia":"assets/ch-lousimia.c6e89f05b9.jpg","Madring":"assets/ch-madring.ba2f0d76de.jpg","Monocoule":"assets/ch-monocoule.9554b7de1a.jpg","Odysseus":"assets/ch-odysseus.0ec444a97a.jpg","Piami":"assets/ch-piami.4b79847ec9.jpg","Pogbaco":"assets/ch-pogbaco.e7294dc02d.jpg","Sbah":"assets/ch-sbah.ac40e2a008.jpg","Soopney":"assets/ch-soopney.e9490904a1.jpg","SteelBallSon":"assets/ch-steelballson.cf7d390d75.jpg","Tadei":"assets/ch-tadei.115d3891de.jpg","Thorson":"assets/ch-thorson.b59d6bd04a.jpg","Vozinhato":"assets/ch-vozinhato.3721de0017.jpg","Yingpang":"assets/ch-yingpang.36bdb3403f.jpg"}};
 const ASTUCES_CIRCUIT_DX = {"Kujota": ["Les ronds sombres dans le sable, ce sont des sables mouvants : ils freinent très fort.", "Fin du 1ᵉʳ tour : les geysers de N'Doul jaillissent sur la grande ligne droite.", "Pendant The Sun (fin du 3ᵉ tour), plus d'aspiration pour personne.", "Au 4ᵉ tour, les dunes bougent et les émeraudes de Hierophant Green restent plantées sur la piste.", "Au dernier tour (en solo), ZA WARUDO : celui que la roue désigne roule seul pendant 3 secondes."], "Cristiano": ["Après chaque tour, le 7ᵉ reçoit +27 km/h. Être 7ᵉ, c'est parfois un plan.", "Tour 1 : attention au tram de Lisbonne.", "Tour 2 : la cryo gèle la piste, la voiture glisse et tourne moins.", "Tour 4 : le séisme ouvre des trous de lave et la piste rétrécit.", "Tour 5 : la statue s'écroule. Il ne reste qu'un pont tout fin pour passer."], "BlocusHexa": ["Sur les pavés, au-dessus de 100 km/h, la voiture tremble : lève un peu le pied.", "Pas de boost à Paris : tout se joue au pilotage.", "Au 4ᵉ tour, des tonneaux dévalent la piste à contresens.", "Métro, touristes, serveur de café, taxi… tout Paris veut traverser la piste."], "Thorson": ["Un événement par tour : drakkars, blizzard, Mjöllnir, le troll, Jörmungandr.", "Dernier tour : Ragnarök. Le pont s'effondre derrière le premier qui passe.", "Mjöllnir prévient avant de frapper : regarde le sol."], "Easydort": ["Six tours, six mécaniques : marée, vent, kanaval, ouragan, œil du cyclone…", "Dernier tour : le tsunami suit le premier.", "Le vent de Morro pousse les voitures sur le côté : anticipe."], "Bafisson": ["Fissures, bombes volcaniques, coulée de lave, cendres… et l'éruption au dernier tour.", "Les bombes volcaniques s'annoncent avant de tomber : regarde le sol."], "SteelBallSon": ["Une traversée du désert de l'Ouest : saloons, cactus géants et mesas rouges.", "Au dernier tour, le soleil se couche sur la course."], "Gou": ["Un podium à Gou 2 débloque le Gyro, le nitro vert."], "Jozuki": ["Ouvre l'œil : Luffy, le Going Merry et Godzilla sont dans le décor."], "Bonzi": ["Le Colisée et le Panthéon bordent la piste."], "Vozinhato": ["Bienvenue au Cap-Vert : regarde l'écran géant au bout de la ligne droite."], "Odysseus": ["Chaque tour, une île différente : Troie, le Cyclope, Éole, Circé, Charybde et Scylla, puis Ithaque.", "Sur la trière, le brouillard monte : c'est là que l'île change derrière toi.", "Les cercles violets de Circé te changent en cochon pendant 5 secondes. Évite-les !", "Quand les Sirènes chantent, la trière te tire vers le bord : contre-braque.", "Au 5ᵉ tour, Poséidon se lève : le pont tangue et les vagues balaient la piste.", "À Ithaque, une ligne rouge au sol = une flèche des prétendants arrive.", "Chez le Cyclope, regarde le ciel : ses rochers tombent là où l'ombre grossit."]};
 const ASTUCES_DX = ["Colle-toi derrière une voiture en ligne droite : l'aspiration te donne jusqu'à +10 km/h.", "Plus ta voiture est aérodynamique, plus l'aspiration lui rapporte.", "L'aspiration ne marche qu'en ligne droite et à moins d'une seconde et demie de celui de devant.", "Sortie de piste ? Espace (ou le bouton ↺) te remet sur la route.", "C change de caméra, P met en pause, R recommence la course.", "Un podium sur la dernière course ouverte débloque la suivante, et la voiture suivante.", "Le Gyro (touche G) se recharge en 40 secondes, et plus vite dans l'aspiration.", "Un podium à Gou 2 débloque le Gyro : un nitro vert qui fait décoller la voiture.", "Toucher une voiture fait perdre du temps à celui qui tape, pas à celui qui est touché.", "Freine avant le virage, pas dedans : tu ressors bien plus vite.", "Flashs ou tremblements trop forts ? Onglet Joueur → Effets réduits.", "« Partie rapide » te fait entrer dans un groupe public qui attend des joueurs.", "Un groupe privé, c'est seulement pour ceux qui ont le code.", "Dans un groupe, l'hôte peut remplir la grille avec les pilotes du jeu.", "Mode Élimination : à chaque tour, le dernier sort. À la fin, il n'en reste qu'un.", "Championnat multijoueur : 4 courses tirées au sort, 25, 18, 15… points à l'arrivée.", "Kaimaxus, le champion, roule en Koenigsegg. Le battre, ça se mérite.", "DX PART 2 : tu pars 18ᵉ et les adversaires ne font plus de cadeaux.", "DX Maker : dessine ton propre circuit et cours dessus.", "Donne ton ID à tes potes : ils t'ajoutent en ami dans le Chat.", "Exporte ta sauvegarde (onglet Joueur) pour ne jamais perdre ta carrière.", "Le Community Vote choisit le prochain circuit : un record sur 3 circuits et tu peux voter.", "Une idée pour le jeu ? La Boîte à idées est dans le menu.", "Chaque circuit a sa propre ambiance : regarde autour de toi, il y a plein de clins d'œil.", "Tes records sont gardés : essaie de les battre circuit après circuit.", "Le départ est donné quand les cinq feux s'éteignent."];
 const packsOk = new Set(), packsVont = {}, packsRecu = {};
