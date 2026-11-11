@@ -7,6 +7,7 @@
 <title>DX GRAND PRIX</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
+  .acc-pastille[hidden],.acc-nouveau[hidden]{display:none!important}
   .mu-point{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2fbf71;box-shadow:0 0 0 3px rgba(47,191,113,.18);margin-right:8px;vertical-align:1px}
   .mu-point-gris{background:#8a96a8;box-shadow:none}
 
@@ -12830,6 +12831,8 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
   document.getElementById("btn-vote").onclick = () => {
     vue = "actuel"; message = "";
     if (E && E.actif) ecrireLS("cv-ouvert-" + E.actif.id, "1");
+    // pas de vote en cours : ouvrir l'onglet suffit, les résultats sont vus
+    vuResultatsSiVus(); majPastille();
     montrer("ecran-vote"); demander(); rendreTout();
     document.getElementById("ecran-vote").scrollTop = 0;
   };
