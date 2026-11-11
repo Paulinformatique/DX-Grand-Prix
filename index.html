@@ -8473,11 +8473,25 @@ function suivrePlaces(dt){
    droite, dans son sillage (moins de 1,8 m de décalage), gagne jusqu'à 10 km/h
    de vitesse de pointe : de 0 à 10 selon son aérodynamique, à plein dans les
    0,4 s, rien au-delà d'une seconde. Le gain monte et retombe en douceur. */
+/* Kujota : pendant The Sun (9 s, au 3e tour sur la grande ligne droite), plus d'aspiration :
+   le faux soleil écrase tout. En solo, pour tout le monde tant que le joueur le voit ;
+   et chaque voiture a aussi sa propre fenêtre (le même déclenchement), pour le multi. */
+function sunActifK(v){
+  if (!piste || !piste.def || piste.def.nom !== "Kujota" || jeu.phase !== "course") return false;
+  const dans = e => e && e.nom === "sun" && jeu.chrono - e.t0 >= 0 && jeu.chrono - e.t0 <= 9;
+  if (dans(jeu.joueur && jeu.joueur.evK)) return true;
+  if (v.tour === 2 && v.s != null && v.sunAspiK == null){
+    const dr = droitePrincipale(), L = piste.longueur, i = Math.floor((((v.s % L) + L) % L) / piste.pas), r = ((i - dr.deb) % piste.nb + piste.nb) % piste.nb;
+    if (r > 3 && r < dr.long * 0.35) v.sunAspiK = jeu.chrono;
+  }
+  return v.sunAspiK != null && jeu.chrono - v.sunAspiK >= 0 && jeu.chrono - v.sunAspiK <= 9;
+}
 function calculerAspiration(dt){
   for (const v of jeu.voitures){
     let cible = 0, de = null;
     const k1 = Math.abs(auPoint(piste, v.distance).courbure), k2 = Math.abs(auPoint(piste, v.distance + 50).courbure);
-    if (k1 < 0.003 && k2 < 0.003 && v.v > 15 && (jeu.phase === "course")){
+    const sunK = sunActifK(v);
+    if (k1 < 0.003 && k2 < 0.003 && v.v > 15 && (jeu.phase === "course") && !sunK){
       let meilleur = Infinity;
       for (const a of jeu.voitures){
         if (a === v || a.cache) continue;
@@ -8492,7 +8506,7 @@ function calculerAspiration(dt){
         cible = gainMax * Math.max(0, Math.min(1, (1.5 - meilleur) / 0.9));
       }
     }
-    v.aspi = (v.aspi || 0) + (cible - (v.aspi || 0)) * Math.min(1, dt * 2);
+    v.aspi = sunK ? 0 : (v.aspi || 0) + (cible - (v.aspi || 0)) * Math.min(1, dt * 2);   // The Sun : coupée net
     const F = jeu.faits;
     if (F && de && cible > 0.3){
       if (v.joueur) F.aspiPrise[de.nom] = (F.aspiPrise[de.nom] || 0) + dt;
@@ -11378,7 +11392,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 31;      // 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 32;      // 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
