@@ -6327,7 +6327,9 @@ const coffre = (() => {
       try { localStorage.setItem(CLE, t); localStorage.setItem(SECOURS, t); localStorage.setItem(MARQUE, "1"); } catch (e) {} },
     // export : la progression validée seulement
     exporter(){ if (ref != null && copie() !== ref) revenir(); return true; },
-    importer(){ return !suspect(); }
+    // import d'un fichier exporté par le jeu (son sceau a été vérifié) : on l'adopte et on l'écrit tout de suite
+    importer(d){ if (!d || !d.sceau || d.sceau !== sceauSauvegarde(d)) return false; const x = JSON.parse(JSON.stringify(d)); delete x.sceau;
+      for (const k of Object.keys(x)) carriere[k] = x[k]; carriere.maj = Date.now(); ref = copie(); this.ecrire(); return true; }
   };
 })();
 function charger(){
@@ -13601,11 +13603,12 @@ function sceauSauvegarde(d){
 document.getElementById("btn-exporter").onclick = () => {
   coffre.exporter();
   const d = Object.assign({}, carriere); delete d.sceau; d.sceau = sceauSauvegarde(d);
-  const blob = new Blob([JSON.stringify(d, null, 1)], { type: "application/json" });
-  const lien = document.createElement("a");
-  lien.href = URL.createObjectURL(blob);
-  lien.download = "dx-grand-prix-sauvegarde.json";
-  document.body.appendChild(lien); lien.click(); lien.remove();
+  const texte = JSON.stringify(d, null, 1), nom = "dx-grand-prix-sauvegarde.json";
+  const classique = () => { const lien = document.createElement("a"); lien.href = URL.createObjectURL(new Blob([texte], { type: "application/json" }));
+    lien.download = nom; document.body.appendChild(lien); lien.click(); lien.remove(); setTimeout(() => URL.revokeObjectURL(lien.href), 60000); };
+  // dans la version Claude, la page ne peut pas télécharger elle-même : on passe par Claude
+  if (window.claude && window.claude.use){ window.claude.use("downloads").then(dl => { if (!dl) return classique(); return dl.save({ filename: nom, data: texte }).catch(err => { if (err && err.code !== "declined") alert("L'export n'a pas marché ici (" + (err.code || "erreur") + ")."); }); }).catch(classique); return; }
+  classique();
 };
 document.getElementById("btn-importer").onclick = () => document.getElementById("fichier-import").click();
 document.getElementById("btn-recommencer").onclick = () => {
@@ -13620,15 +13623,13 @@ document.getElementById("fichier-import").onchange = (e) => {
     try {
       const d = JSON.parse(lecteur.result);
       if (!d || typeof d !== "object" || !("argent" in d) || !Array.isArray(d.possedees)) throw new Error();
-      if (!coffre.importer()) return;
       // une sauvegarde modifiée à la main (ou sans sceau) n'est pas acceptée
-      if (!d.sceau || d.sceau !== sceauSauvegarde(d)){
+      if (!coffre.importer(d)){
         alert("Cette sauvegarde a été modifiée (ou elle vient d'une ancienne version du jeu) : elle ne peut pas être importée. Exporte-la de nouveau depuis le jeu.");
         return;
       }
-      delete d.sceau;
-      Object.assign(carriere, d);
-      sauver();
+      e.target.value = "";
+      alert("Sauvegarde importée ! Le jeu va se recharger.");
       location.reload();                    // recharge pour réintégrer les circuits de l'atelier
     } catch (err) { alert("Ce fichier n'est pas une sauvegarde DX Grand Prix."); }
   };
