@@ -4283,12 +4283,37 @@ function construireDecor(piste){
     { const sM = (ODY.B0 + ODY.B1) / 2, p = auPoint(piste, sM), yP = p.y + ODY.DY * 0;
       const Lb = 470, Wb = 84, Hb = 30, yb = p.y - 0.93 * Hb;
       poserM(paysage, MO.triere, p.x, yb, p.z, -p.tz, p.tx, Lb / 7.827, Hb, Wb / 1.878);
+      // ── les flancs de la trière, bien visibles depuis la terre : bois en haut, bande rouge, coque noire de poix dans l'eau,
+      //    une rangée de rames qui plongent dans la mer, l'œil peint à la proue, deux grandes poupes recourbées à l'embarquement ──
+      const q2 = (m, A, B2, C, D2, c) => { quad(m, A, B2, C, D2, c); quad(m, D2, C, B2, A, c); };
+      const flanc = (s, sg, f) => { const [x, y, z, q] = enPiste(s, sg * (DEMI_PISTE + ACCOTEMENT + 1.5 + f * 9)); return [x, y + 3.2 * (1 - f) + (EAU - 1.5 - y) * f, z]; };
+      const BANDES = [[0, 0.22, [0.46, 0.30, 0.15]], [0.22, 0.34, [0.72, 0.14, 0.10]], [0.34, 0.42, [0.86, 0.72, 0.30]], [0.42, 1, [0.13, 0.11, 0.10]]];
+      for (let s = ODY.B0 - 30; s < ODY.B1 + 30; s += 5) for (const sg of [1, -1]) for (const [f0, f1, c] of BANDES) q2(paysage, flanc(s, sg, f0), flanc(s + 5, sg, f0), flanc(s + 5, sg, f1), flanc(s, sg, f1), c);
+      // les rames : une tous les 7 m, de chaque côté, qui sortent du flanc et plongent dans l'eau
+      for (let s = ODY.B0; s < ODY.B1; s += 7) for (const sg of [1, -1]){ const [x0, y0, z0, q] = enPiste(s, sg * (DEMI_PISTE + ACCOTEMENT + 5)), [x1, , z1] = enPiste(s - 6, sg * (DEMI_PISTE + ACCOTEMENT + 30));
+        const a0 = [x0, y0 + 0.5, z0], a1 = [x1, EAU - 0.5, z1], e = 0.35; q2(paysage, [a0[0] + q.tx * e, a0[1], a0[2] + q.tz * e], [a1[0] + q.tx * e, a1[1], a1[2] + q.tz * e], [a1[0] - q.tx * e, a1[1], a1[2] - q.tz * e], [a0[0] - q.tx * e, a0[1], a0[2] - q.tz * e], [0.55, 0.38, 0.19]);
+        const [xp, , zp] = enPiste(s - 5.5, sg * (DEMI_PISTE + ACCOTEMENT + 28)); q2(paysage, [xp + q.tx * 1.4, EAU + 0.3, zp + q.tz * 1.4], [xp - q.tx * 1.4, EAU + 0.3, zp - q.tz * 1.4], [xp - q.tx * 1.4, EAU - 1.2, zp - q.tz * 1.4], [xp + q.tx * 1.4, EAU - 1.2, zp + q.tz * 1.4], [0.50, 0.34, 0.17]); }
+      // l'œil peint de chaque côté de la proue
+      for (const sg of [1, -1]){ const s0 = ODY.B1 - 12, cen = (r, f) => { const out = []; for (let k = 0; k < 12; k++){ const a = k / 12 * 6.283, P2 = flanc(s0 + Math.cos(a) * r * 1.6, sg, f + Math.sin(a) * r / 9 * 0.9); out.push(P2); } return out; };
+        for (const [r, c, dl] of [[3.2, [0.95, 0.93, 0.88], 0.15], [1.4, [0.08, 0.08, 0.10], 0.3]]){ const pts = cen(r, 0.62), m0 = flanc(s0, sg, 0.62); for (let k = 0; k < 12; k++){ const A = pts[k], B2 = pts[(k + 1) % 12];
+            const o = (P2) => [P2[0] + (enPiste(s0, sg)[3].nx) * sg * dl, P2[1], P2[2] + (enPiste(s0, sg)[3].nz) * sg * dl]; triangle(paysage, o(m0), o(A), o(B2), c); triangle(paysage, o(m0), o(B2), o(A), c); } } }
+      // les deux poupes recourbées (l'aphlaston), de chaque côté de la passerelle d'embarquement : on les voit de loin
+      for (const sg of [1, -1]){ let prev = null; for (let k = 0; k <= 16; k++){ const a = k / 16 * Math.PI * 1.15, rr = 20, sB = ODY.B0 - 26 + Math.sin(a) * rr * 0.9, h = 4 + (1 - Math.cos(a)) * rr * 1.25, l = sg * (DEMI_PISTE + ACCOTEMENT + 3.5 - Math.max(0, k - 11) * 0.6);
+          const [x, y, z, q] = enPiste(sB, l), P2 = [x, y + h, z], ep = 3.2 - k * 0.12;
+          if (prev){ const c = k % 3 === 0 ? [0.80, 0.62, 0.25] : [0.36, 0.22, 0.11]; q2(paysage, [prev[0] + q.nx * ep, prev[1], prev[2] + q.nz * ep], [P2[0] + q.nx * ep, P2[1], P2[2] + q.nz * ep], [P2[0] - q.nx * ep, P2[1], P2[2] - q.nz * ep], [prev[0] - q.nx * ep, prev[1], prev[2] - q.nz * ep], c);
+            q2(paysage, [prev[0] + q.nx * ep, prev[1], prev[2] + q.nz * ep], [P2[0] + q.nx * ep, P2[1], P2[2] + q.nz * ep], [P2[0] + q.nx * ep, P2[1] - 3.5, P2[2] + q.nz * ep], [prev[0] + q.nx * ep, prev[1] - 3.5, prev[2] + q.nz * ep], c);
+            q2(paysage, [prev[0] - q.nx * ep, prev[1], prev[2] - q.nz * ep], [P2[0] - q.nx * ep, P2[1], P2[2] - q.nz * ep], [P2[0] - q.nx * ep, P2[1] - 3.5, P2[2] - q.nz * ep], [prev[0] - q.nx * ep, prev[1] - 3.5, prev[2] - q.nz * ep], c); }
+          prev = P2; } }
+      // des flammes (fanions) en haut des mâts
       // les deux mâts, la vergue au-dessus de la piste (la voile est dessinée à part)
-      const v = auPoint(piste, ODY.VOILE), lm = DEMI_PISTE + ACCOTEMENT - 2.5;
-      for (const s of [1, -1]){ const x = v.x + v.nx * s * lm, z = v.z + v.nz * s * lm; cylindreY(paysage, x, v.y - 1, z, 1.1, 0.8, 60, 8, [0.40, 0.26, 0.13]); reserver(x, z, 2); }
+      for (const sV of [ODY.VOILE, ODY.B0 + 70]){ const v = auPoint(piste, sV), lm = DEMI_PISTE + ACCOTEMENT - 2.5;
+      for (const s of [1, -1]){ const x = v.x + v.nx * s * lm, z = v.z + v.nz * s * lm; cylindreY(paysage, x, v.y - 1, z, 1.3, 0.8, 75, 8, [0.40, 0.26, 0.13]); reserver(x, z, 2);
+        for (let k = 0; k < 6; k++) triangle(paysage, [x, v.y + 74 - k * 0.0, z], [x, v.y + 70, z], [x + v.tx * (14 - k * 2) - v.nx * s * 0.2, v.y + 72 - k * 0.4, z + v.tz * (14 - k * 2)], k % 2 ? [0.95, 0.92, 0.84] : [0.74, 0.16, 0.12]); }
       { const A = [v.x + v.nx * (lm + 2), v.y + 55, v.z + v.nz * (lm + 2)], B = [v.x - v.nx * (lm + 2), v.y + 55, v.z - v.nz * (lm + 2)];
         for (const [dy, dt] of [[0, 0.55], [1.1, -0.55]]) quad(paysage, [A[0] + v.tx * dt, A[1] + dy, A[2] + v.tz * dt], [B[0] + v.tx * dt, B[1] + dy, B[2] + v.tz * dt], [B[0] - v.tx * dt, B[1] + dy, B[2] - v.tz * dt], [A[0] - v.tx * dt, A[1] + dy, A[2] - v.tz * dt], [0.38, 0.24, 0.12]); }
-      odyD.voile = { s: ODY.VOILE, lm };
+      }
+      const lm = DEMI_PISTE + ACCOTEMENT - 2.5;
+      odyD.voile = { s: ODY.VOILE, lm }; odyD.voile2 = { s: ODY.B0 + 70, lm };
       // les rameurs, assis le long du bastingage, des amphores, des rouleaux de cordage
       for (let s = ODY.B0 + 20; s < ODY.B1 - 15; s += 30) for (const sg of [1, -1]){
         const [x, y, z, q] = enPiste(s, sg * (DEMI_PISTE + ACCOTEMENT + 5)); poser(paysage, MO.soldat, x, y - 0.5, z, q.tx, q.tz, 2.0);
@@ -10831,7 +10856,9 @@ function dessinerOdy(){
   { const [x, y, z, p] = enPiste(D.voile.s, 0), W = 2 * D.voile.lm, gonfle = c === 2 ? (ventDosO() ? 2.4 : -2.4) : 1;
     const B = mul(T(x, y + 30, z), Ry(Math.atan2(p.tx, p.tz))), tx = c === 4 ? textureAnim("ody_mat") : null;
     if (tx) tracer(M.ecran, mul(B, T(0, 1, -0.4), S3(W * 0.98, 23, 1)), [1, 1, 1], 1.0, tx);
-    else tracer(M.voile, mul(B, S3(W, 24, gonfle * 10)), [1, 1, 1], 0.9); }
+    else tracer(M.voile, mul(B, T(0, -6, 0), S3(W, 32, gonfle * 12)), [1, 1, 1], 0.9); }
+  if (D.voile2){ const [x, y, z, p] = enPiste(D.voile2.s, 0), W = 2 * D.voile2.lm, gonfle = c === 2 ? (ventDosO() ? 2.4 : -2.4) : 1;
+    tracer(M.voile, mul(T(x, y + 24, z), Ry(Math.atan2(p.tx, p.tz)), S3(W, 32, gonfle * 12)), [1, 1, 1], 0.9); }
   // la traversée 4 : les Sirènes sur leurs rochers, d'un côté du bateau
   if (c === 4 && bat){ const so = D.sOutB; for (let j = 0; j < 6; j++){ const s = ODY.B0 + 40 + j * 60, [x, , z, p] = enPiste(s, so * (62 + (j % 2) * 18)), y = D.eau;
     tracer(M.rocher, mul(T(x, y - 3, z), Ry(j), S3(9, 7, 9)), [0.7, 0.66, 0.6], 0.9);
@@ -10913,9 +10940,7 @@ const ILES_TXT_O = ["🔥 TROIE EN FLAMMES", "👁️ L'ÎLE DU CYCLOPE — gare
 const TRAV_TXT_O = ["", "🥁 Les rameurs ! Le bateau accélère", "💨 Le sac des vents s'ouvre !", "🪨 Les Lestrygons lancent des rochers !", "🧜 Les Sirènes chantent… tiens ton volant !", "🔱 POSÉIDON SE RÉVEILLE"];
 function dessinerEvenementsOdy(ctx, W, H, E){
   const J = jeu.joueur; if (!J || !estOdy()) return; const ch = chO();
-  if (jeu.phase === "course" && typeof bandeau === "function"){ const k = ileO(J), c = traverseeO(J), s = modO(J.s || 0);
-    if (J._ileTxtO !== k && !surBateauO(s)){ J._ileTxtO = k; bandeau(ILES_TXT_O[k], 3200); }
-    const cle = c + ":" + J.tour; if (s > ODY.R0 - 470 && s < ODY.R0 && J._travTxtO !== cle){ J._travTxtO = cle; bandeau(TRAV_TXT_O[c], 3200); } }
+  // (plus de bandeaux à chaque étape)
   if (J.flashO && ch - J.flashO.t < 0.45){ ctx.save(); ctx.globalAlpha = 0.35 * (1 - (ch - J.flashO.t) / 0.45); ctx.fillStyle = J.flashO.c; ctx.fillRect(0, 0, W, H); ctx.restore(); }
   // la tempête : les éclairs blanchissent l'écran
   if (traverseeO(J) === 5 && tempeteO(J.s || 0) > 0.4 && ch % 4.3 < 0.12){ ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = "#eef4ff"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
