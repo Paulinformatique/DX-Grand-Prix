@@ -2635,24 +2635,25 @@ function construireDecor(piste){
     if (monoP){
       {
         const b2 = P[(i + 1) % nb], s0 = i * piste.pas, cor = dansCouloirM(s0 + piste.pas / 2);
-        const W1 = murM(s0 + piste.pas / 2), H = hautM(s0 + piste.pas / 2), W2 = W1 + PROF_SALLE_M;
+        const W1 = [murM(s0), murM(s0 + piste.pas)], H = hautM(s0 + piste.pas / 2), W2 = [W1[0] + PROF_SALLE_M, W1[1] + PROF_SALLE_M], D0 = [DEMI_PISTE, DEMI_PISTE];
+        const fois = (L2, k) => [L2[0] * k, L2[1] * k];
         const moq = i % 2 ? [0.47, 0.41, 0.25] : [0.44, 0.38, 0.23], moqS = [0.42, 0.37, 0.22];
         const pap = i % 2 ? [0.80, 0.72, 0.42] : [0.76, 0.68, 0.39], papS = [0.72, 0.65, 0.38], pl = [0.42, 0.35, 0.20], plaf = [0.82, 0.79, 0.64], plafB = [0.66, 0.63, 0.50];
         const pt = (q, l, h) => { const r = bord(q, l); r[1] += h; return r; };
-        const mur = (l, h0, h1, c) => { const A = pt(a, l, h0), B2 = pt(b2, l, h0), C = pt(b2, l, h1), D = pt(a, l, h1); quad(monoM, A, B2, C, D, c); quad(monoM, B2, A, D, C, c); };
-        const sol = (l0, l1, c, h = -0.04) => { const A = pt(a, l0, h), B2 = pt(a, l1, h), C = pt(b2, l1, h), D = pt(b2, l0, h); quad(monoM, A, B2, C, D, c); quad(monoM, B2, A, D, C, c); };
+        const mur = (l, h0, h1, c) => { const A = pt(a, l[0], h0), B2 = pt(b2, l[1], h0), C = pt(b2, l[1], h1), D = pt(a, l[0], h1); quad(monoM, A, B2, C, D, c); quad(monoM, B2, A, D, C, c); };
+        const sol = (l0, l1, c, h = -0.04) => { const A = pt(a, l0[0], h), B2 = pt(a, l1[0], h), C = pt(b2, l1[1], h), D = pt(b2, l0[1], h); quad(monoM, A, B2, C, D, c); quad(monoM, B2, A, D, C, c); };
         for (const sg of [1, -1]){
           const ouv = porteM(s0 + piste.pas / 2, sg);
-          sol(sg * DEMI_PISTE, sg * W1, moq);
-          if (!ouv){ mur(sg * W1, 0, 0.35, pl); mur(sg * W1, 0.35, H, pap); }
-          else mur(sg * W1, H - 1.4, H, pap);                 // le linteau au-dessus de l'ouverture
+          sol(fois(D0, sg), fois(W1, sg), moq);
+          if (!ouv){ mur(fois(W1, sg), 0, 0.35, pl); mur(fois(W1, sg), 0.35, H, pap); }
+          else mur(fois(W1, sg), H - 1.4, H, pap);                 // le linteau au-dessus de l'ouverture
           if (!cor){
-            sol(sg * W1, sg * W2, moqS); mur(sg * W2, 0, 0.35, pl); mur(sg * W2, 0.35, H, papS);
-            sol(sg * W1, sg * W2, Math.floor(s0 / 4) % 2 ? plaf : plafB, H);
+            sol(fois(W1, sg), fois(W2, sg), moqS); mur(fois(W2, sg), 0, 0.35, pl); mur(fois(W2, sg), 0.35, H, papS);
+            sol(fois(W1, sg), fois(W2, sg), Math.floor(s0 / 4) % 2 ? plaf : plafB, H);
           }
         }
         // le faux plafond au-dessus de la piste : des dalles, avec leurs joints
-        sol(-W1, W1, Math.floor(s0 / 4) % 2 ? plaf : plafB, H);
+        sol(fois(W1, -1), W1, Math.floor(s0 / 4) % 2 ? plaf : plafB, H);
       }
       continue;
     }
@@ -4579,8 +4580,8 @@ function construireDecor(piste){
       if (sal.s1 - sal.s0 > 12){ const [x, y, z, q] = enPiste(s + 3, sg * (W1 + PROF_SALLE_M * 0.55)); boite(monoM, x, y + hautM(s) / 2, z, 1.3, hautM(s), 1.3, [0.78, 0.70, 0.41], Math.atan2(q.tx, q.tz)); }
     }
     // l'entrée et la sortie du couloir : le mur qui ferme les salles, et la retombée du plafond
-    for (const s of [MONO.C0, MONO.C1]){ const [x, y, z, q] = enPiste(s, 0), cap = Math.atan2(q.tx, q.tz), Wc = murM(s + (s === MONO.C0 ? 4 : -4)), Wn = murM(s + (s === MONO.C0 ? -4 : 4));
-      for (const sg of [1, -1]){ const lm = sg * (Wc + Wn + PROF_SALLE_M) / 2, [x2, , z2] = enPiste(s, lm); boite(monoM, x2, y + 4, z2, Wn + PROF_SALLE_M - Wc + 1, 8.2, 0.5, [0.76, 0.68, 0.39], cap); }
+    for (const sC of [MONO.C0, MONO.C1]){ const s = Math.ceil((sC - piste.pas / 2) / piste.pas) * piste.pas, [x, y, z, q] = enPiste(s, 0), cap = Math.atan2(q.tx, q.tz), Wc = murM(sC + (sC === MONO.C0 ? 4 : -4)), Wn = murM(sC + (sC === MONO.C0 ? -4 : 4));
+      for (const sg of [1, -1]){ const lm = sg * (Wc + (PROF_SALLE_M + 0.5) / 2), [x2, , z2] = enPiste(s, lm); boite(monoM, x2, y + 4, z2, PROF_SALLE_M + 1, 8.2, 0.5, [0.76, 0.68, 0.39], cap); }
       boite(monoM, x, y + 5.5 + 1.3, z, 2 * Wc + 1, 2.7, 0.5, [0.80, 0.72, 0.42], cap); }
     // des trèfles gravés sur les murs du couloir (des griffures sombres), et des traces d'humidité sur la moquette
     for (let s = MONO.C0 + 20; s < MONO.C1 - 10; s += 37){ const sg = Math.floor(s / 37) % 2 ? 1 : -1, [x, y, z, q] = enPiste(s, sg * (murM(s) - 0.05)), cap = Math.atan2(q.tx, q.tz);
@@ -11093,10 +11094,15 @@ const estMono = () => !!piste && !!piste.def && piste.def.nom === "Monocoule";
 const modM = s => { const L = piste.longueur; return ((s % L) + L) % L; };
 const chM = () => jeu.chrono || 0;
 const dansCouloirM = s => { const u = modM(s); return u >= MONO.C0 && u < MONO.C1; };
-const murM = s => dansCouloirM(s) ? DEMI_PISTE + 1.6 : DEMI_PISTE + 5;
+// les murs se resserrent en entonnoir sur 45 m avant le couloir et s'écartent sur 45 m après (sinon on se coince dans l'angle)
+const murM = s => { const u = modM(s), A = DEMI_PISTE + 5, B = DEMI_PISTE + 1.6, F = 45;
+  if (u >= MONO.C0 && u < MONO.C1) return B;
+  if (u >= MONO.C0 - F && u < MONO.C0) return A + (B - A) * (u - (MONO.C0 - F)) / F;
+  if (u >= MONO.C1 && u < MONO.C1 + F) return B + (A - B) * (u - MONO.C1) / F;
+  return A; };
 const hautM = s => dansCouloirM(s) ? 5.5 : 8;
 // les ouvertures vers les salles : 12 m tous les 150 m, en quinconce (jamais au départ ni dans le couloir)
-const porteM = (s, sg) => { const u = modM(s), L = piste.longueur; if (u < 60 || u > L - 60 || (u > MONO.C0 - 30 && u < MONO.C1 + 30)) return false;
+const porteM = (s, sg) => { const u = modM(s), L = piste.longueur; if (u < 60 || u > L - 60 || (u > MONO.C0 - 70 && u < MONO.C1 + 70)) return false;
   const v = ((u + (sg > 0 ? 0 : 75)) % 150 + 150) % 150; return v < 12; };
 function limiteMono(s, marge, signe){ return murM(s) - 0.6 - marge; }
 const tourM = v => Math.max(0, v.tour || 0);
@@ -11163,6 +11169,8 @@ function chocMono(v, dt){
     if (P2.d < 3){ P2.d = 55; peurMono(v, 1.4, 0.5, false); } }
   // obstacles : grimoires, apparitions, bulles
   const liste = obstaclesMono(v); v._chocM = v._chocM || {};
+  // les bots esquivent la Monochrome, les raptors et les bulles (pas le grimoire, qu'ils prennent s'ils passent dessus)
+  if (!v.joueur && typeof planObstK === "function"){ const dv = liste.filter(o => (o.monstre || o.raptor || o.bulle) && o.s - s > -3 && o.s - s < 120); if (dv.length) planObstK(v, dv.sort((a, b) => a.s - b.s)); }
   for (const o of liste){ let ds = o.s - s; if (ds > L / 2) ds -= L; if (ds < -L / 2) ds += L;
     if (Math.abs(ds) > 1.8 || Math.abs(lat - o.lat) > o.r + 0.9) continue;
     const cle = o.id + ":" + v.tour; if (v._chocM[cle]) continue; v._chocM[cle] = 1;
@@ -12595,7 +12603,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 37;      // 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 38;      // 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
