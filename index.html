@@ -11153,7 +11153,7 @@ function chocMono(v, dt){
   const pousser = (vit) => { if (v.joueur){ const p = auPoint(piste, s); v.x += p.nx * vit * dt; v.z += p.nz * vit * dt; } else v.lat = lat + vit * dt; };
   // tour 4 : le grand jumpscare, pour tout le monde, en passant au même endroit
   if (t >= 3 && s > MONO.JUMP && s < MONO.JUMP + 60 && v._jumpM !== v.tour){ v._jumpM = v.tour; v.chargeM = { t: ch, s0: s + 85 }; }
-  if (v.chargeM && ch - v.chargeM.t >= 1.1){ v.chargeM = null; peurMono(v, 2.6, 0.35, true); }
+  if (v.chargeM && ch - v.chargeM.t >= 0.6){ v.chargeM = null; peurMono(v, 2.6, 0.35, true); }
   // la lame de Yami : un trait noir prévient, puis la coupure projette de côté
   if (t >= 1) for (const s0 of YAMI_M){ const y = yamiM(s0); if (!y.frappe || Math.abs(s - s0) > 2.6) continue; const cle = s0 + ":" + Math.floor((ch + hM(s0, 3) * 5.2) / 5.2);
     if (v._yamiM === cle) continue; v._yamiM = cle; if (v.immuM && t >= 3) continue; v.yamiM = { t: ch, sens: y.sens }; v.v *= 0.8; if (moi){ bip(70, 0.4, 0.35, "sawtooth"); if (typeof secousse !== "undefined") secousse = Math.max(secousse, 1); } }
@@ -11282,9 +11282,9 @@ function dessinerMono(){
     if (vis) monstre(sal.s + (hM(j, 2) - 0.5) * 8, sal.sg * (murM(sal.s) + 9), 7.2); });
   if (t === 2) APPARITIONS_M.forEach(([s, f], j) => { if (J._chocM && J._chocM["ap" + j + ":" + J.tour]) return; monstre(s, latM(f), 6.4); });
   // tour 4 : à la sortie du virage, elle surgit et te fonce dessus
-  if (J.chargeM){ const u = Math.min(1, (ch - J.chargeM.t) / 1.1), sm = J.chargeM.s0 + (sJ + 3 - J.chargeM.s0) * u * u; const [x, y, z, p] = enPiste(sm, (J.lat || 0) * u);
-    const R = mul(T(x, y + Math.abs(Math.sin(tt * 16)) * 0.5, z), Ry(Math.atan2(J.x - x, J.z - z)), S3(6.6)); tracer(M.corps, R, [1, 1, 1], 0.98); tracer(M.yeux, R, [1, 1, 1], 1.0);
-    if (J._pasM !== Math.floor(tt * 7)){ J._pasM = Math.floor(tt * 7); bip(60, 0.08, 0.35, "square"); } }
+  if (J.chargeM){ const u = Math.min(1, (ch - J.chargeM.t) / 0.6), sm = J.chargeM.s0 + (sJ + 3 - J.chargeM.s0) * u; const [x, y, z, p] = enPiste(sm, (J.lat || 0) * u);
+    const R = mul(T(x, y + Math.abs(Math.sin(tt * 26)) * 0.5, z), Ry(Math.atan2(J.x - x, J.z - z)), S3(6.6)); tracer(M.corps, R, [1, 1, 1], 0.98); tracer(M.yeux, R, [1, 1, 1], 1.0);
+    if (J._pasM !== Math.floor(tt * 12)){ J._pasM = Math.floor(tt * 12); bip(60, 0.08, 0.35, "square"); } }
   // tour 4 : elle te suit
   if (t >= 3 && J.chasseM && J.chasseM.d < 45 && sJ > MONO.JUMP + 60) monstre(sJ - J.chasseM.d, (J.lat || 0) * 0.6, 6.4);
   // le grimoire à 5 feuilles (tour 2) : il flotte, tourne, et brille
