@@ -11117,7 +11117,12 @@ const APPARITIONS_M = [[700, -0.4], [1180, 0.45], [MONO.C0 + 330, 0], [2330, 0.3
 // les grimoires à 4 feuilles (un petit coup de boost) : à tous les tours
 const GRIM4_M = [[470, -0.5], [1060, 0.4], [2080, -0.3], [2860, 0.45], [3480, -0.1], [3900, 0.3]];
 // la lame des ténèbres de Yami (à partir du tour 2) et les bulles de Noelle (tours 1 et 2)
-const YAMI_M = [1000, 2620, 3760], BULLES_M = [880, 2150, 3380];
+const YAMI_M = [1000, 2620, 3760], BULLES_M = [880, 2150, 3420];
+// tour 2 : l'épée d'Asta tombe du plafond au début de la ligne droite et fend la piste : un mur noir d'anti-magie
+// la coupe en deux couloirs d'une voie jusqu'au bout de la ligne droite, puis tout se rejoint
+const Rz_M = a => m4RotZ(a);
+const ASTA_M = { Z0: 3010, Z1: 3330, MI: 0.45, LAT: 1.55 };
+const dansMurM = s => { const u = modM(s); return u >= ASTA_M.Z0 && u <= ASTA_M.Z1; };
 const latM = f => f * (DEMI_PISTE - 1.2);
 // Scary Monsters (le stand de Diego Brando) : aux tours 2 et 3, des meutes de raptors sortent des salles et traversent la piste.
 // Celui qui se fait griffer devient un dinosaure pendant 4 s (comme les victimes de Diego).
@@ -11164,6 +11169,14 @@ function chocMono(v, dt){
   if (t >= 1) for (const s0 of YAMI_M){ const y = yamiM(s0); if (!y.frappe || Math.abs(s - s0) > 2.6) continue; const cle = s0 + ":" + Math.floor((ch + hM(s0, 3) * 5.2) / 5.2);
     if (v._yamiM === cle) continue; v._yamiM = cle; if (v.immuM && t >= 3) continue; v.yamiM = { t: ch, sens: y.sens }; v.v *= 0.8; if (moi){ bip(70, 0.4, 0.35, "sawtooth"); if (typeof secousse !== "undefined") secousse = Math.max(secousse, 1); } }
   if (v.yamiM){ const u = (ch - v.yamiM.t) / 0.7; if (u < 1) pousser(v.yamiM.sens * 18 * (1 - u)); else v.yamiM = null; }
+  // l'épée d'Asta (tour 2) : chacun reste dans son couloir
+  if (t === 1){ const u = s;
+    if (!v.joueur && u > ASTA_M.Z0 - 70 && u < ASTA_M.Z1){ if (v._coteAsta == null || u < ASTA_M.Z0 - 60) v._coteAsta = Math.sign(lat) || (jeu.voitures.indexOf(v) % 2 ? 1 : -1);
+      const k = Math.min(1, Math.max(0, (u - (ASTA_M.Z0 - 70)) / 50)), m = (ASTA_M.LAT + 1.0) * k; if (v._coteAsta * lat < m) v.lat = v._coteAsta * m; }
+    if (v.joueur && v.astaM && v.astaM.mur && dansMurM(u)){ if (v._coteAsta == null || v._coteAsta === 0) v._coteAsta = Math.sign(lat) || 1;
+      if (v._coteAsta * lat < ASTA_M.LAT){ const p = auPoint(piste, u), d = v._coteAsta * ASTA_M.LAT - lat; v.x += p.nx * d; v.z += p.nz * d; v.v *= 0.992;
+        if (moi && v._frotteM !== Math.floor(ch * 8)){ v._frotteM = Math.floor(ch * 8); bip(1400 + Math.random() * 600, 0.05, 0.12, "square"); } } }
+    else if (!dansMurM(u)) v._coteAsta = null; }
   // la Monochrome qui te poursuit (tour 4, après le jumpscare) : chez le joueur seulement
   if (moi && t >= 3 && s > MONO.JUMP + 60 && !v.immuM){ const P2 = v.chasseM || (v.chasseM = { d: 70 }); P2.d = Math.min(160, P2.d + ((v.v || 0) - 33) * dt);
     if (P2.d < 3){ P2.d = 55; peurMono(v, 1.4, 0.5, false); } }
@@ -11289,6 +11302,25 @@ function dessinerMono(){
   if (t >= 1) D.salles.forEach((sal, j) => { if (hM(j, 11) > (t === 1 ? 0.25 : 0.45)) return; const vis = Math.floor(tt * 0.8 + hM(j, 5) * 9) % 5 === 0;
     if (vis) monstre(sal.s + (hM(j, 2) - 0.5) * 8, sal.sg * (murM(sal.s) + 9), 7.2); });
   if (t === 2) APPARITIONS_M.forEach(([s, f], j) => { if (J._chocM && J._chocM["ap" + j + ":" + J.tour]) return; monstre(s, latM(f), 6.4); });
+  // tour 2 : l'épée d'Asta tombe, le mur sort de terre (une vague qui court le long de la ligne droite)
+  if (t === 1){ if (!J.astaM && sJ > ASTA_M.Z0 - 170 && sJ < ASTA_M.Z1) J.astaM = { t: tt };
+    if (J.astaM){ const e = tt - J.astaM.t, chute = Math.min(1, e / 0.5), imp = e >= 0.5;
+      if (imp && !J.astaM.boum){ J.astaM.boum = 1; J.astaM.mur = 1; bip(45, 0.9, 0.5, "sawtooth"); bip(90, 0.5, 0.3, "square"); if (typeof secousse !== "undefined") secousse = Math.max(secousse, 1.8); }
+      // l'épée : une immense lame noire ébréchée, plantée pointe en bas au début du mur
+      const [xe, ye, ze, pe] = enPiste(ASTA_M.Z0 - 2, 0), cap = Math.atan2(pe.tx, pe.tz), yb = ye + (1 - chute) * 45 - 2;
+      if (proche(xe, ze, 400)){ const B = mul(T(xe, yb, ze), Ry(cap + Math.PI / 2));
+        tracer(M.cube, mul(B, T(0, 9, 0), S3(3.4, 18, 0.6)), [0.06, 0.06, 0.07], 0.9); tracer(M.cube, mul(B, T(0, -0.6, 0), Rz_M(0.785), S3(2.4, 2.4, 0.6)), [0.06, 0.06, 0.07], 0.9);
+        for (let k = 0; k < 6; k++) tracer(M.cube, mul(B, T((k % 2 ? 1.75 : -1.75), 2 + k * 2.6, 0), Ry(0.785), S3(0.7, 0.7, 0.62)), [0.06, 0.06, 0.07], 0.9);
+        tracer(M.cube, mul(B, T(0, 18.4, 0), S3(6, 1, 1)), [0.10, 0.10, 0.10], 0.9);
+        tracer(M.cube, mul(B, T(0, 20.6, 0), S3(0.7, 3.6, 0.7)), [0.35, 0.28, 0.20], 0.9);
+        tracer(M.cube, mul(B, T(0, 9, 0.32), S3(0.3, 16, 0.05)), [0.15, 0.95, 0.45], 1.0); tracer(M.cube, mul(B, T(0, 9, -0.32), S3(0.3, 16, 0.05)), [0.15, 0.95, 0.45], 1.0); }
+      // le mur : chaque tronçon sort de terre quand la vague passe
+      if (imp) for (let s = ASTA_M.Z0; s < ASTA_M.Z1; s += 6){ const [x, y, z, p] = enPiste(s + 3, 0); if (!proche(x, z, 320)) continue;
+        const k = Math.min(1, Math.max(0, (e - 0.5 - (s - ASTA_M.Z0) / 320) / 0.25)), fin = Math.min(1, (ASTA_M.Z1 - s) / 24), h = 3.2 * k * Math.max(0.15, fin); if (h <= 0.01) continue;
+        const c2 = Math.atan2(p.tx, p.tz); tracer(M.cube, mul(T(x, y + h / 2 - 0.1, z), Ry(c2), S3(0.9, h, 6.05)), [0.05, 0.05, 0.06], 0.92);
+        tracer(M.cube, mul(T(x, y + h + 0.02, z), Ry(c2), S3(0.3, 0.06, 6.05)), [0.15, 0.95, 0.45], 1.0);
+        if ((s / 6) % 3 === 0) tracer(M.cube, mul(T(x, y + h * 0.5, z), Ry(c2 + 0.6), S3(0.95, h * 0.7, 0.12)), [0.12, 0.8, 0.4], 1.0); } } }
+  else if (J.astaM) J.astaM = null;
   // tour 4 : à la sortie du virage, elle surgit et te fonce dessus
   if (J.chargeM){ const u = Math.min(1, (ch - J.chargeM.t) / 0.6), sm = J.chargeM.s0 + (sJ + 3 - J.chargeM.s0) * u; const [x, y, z, p] = enPiste(sm, (J.lat || 0) * u);
     const R = mul(T(x, y + Math.abs(Math.sin(tt * 26)) * 0.5, z), Ry(Math.atan2(J.x - x, J.z - z)), S3(6.6)); tracer(M.corps, R, [1, 1, 1], 0.98); tracer(M.yeux, R, [1, 1, 1], 1.0);
@@ -12603,7 +12635,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 38;      // 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 39;      // 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
