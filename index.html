@@ -11176,7 +11176,8 @@ function chocMono(v, dt){
   if (t === 1){ const u = s;
     if (!v.joueur && u > ASTA_M.Z0 - 70 && u < ASTA_M.Z1){ if (v._coteAsta == null || u < ASTA_M.Z0 - 60) v._coteAsta = Math.sign(lat) || (jeu.voitures.indexOf(v) % 2 ? 1 : -1);
       const k = Math.min(1, Math.max(0, (u - (ASTA_M.Z0 - 70)) / 50)), m = (ASTA_M.LAT + 1.0) * k; if (v._coteAsta * lat < m) v.lat = v._coteAsta * m; }
-    if (v.joueur && v.astaM && v.astaM.mur && dansMurM(u)){ if (v._coteAsta == null || v._coteAsta === 0) v._coteAsta = Math.sign(lat) || 1;
+    // (le mur compte dès le tour 2, sans attendre l'animation : le serveur, qui ne dessine rien, doit calculer pareil que toi)
+    if (v.joueur && dansMurM(u)){ if (v._coteAsta == null || v._coteAsta === 0) v._coteAsta = Math.sign(lat) || 1;
       if (v._coteAsta * lat < ASTA_M.LAT){ const p = auPoint(piste, u), d = v._coteAsta * ASTA_M.LAT - lat; v.x += p.nx * d; v.z += p.nz * d; v.v *= 0.992;
         if (moi && v._frotteM !== Math.floor(ch * 8)){ v._frotteM = Math.floor(ch * 8); bip(1400 + Math.random() * 600, 0.05, 0.12, "square"); } } }
     else if (!dansMurM(u)) v._coteAsta = null; }
