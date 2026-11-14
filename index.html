@@ -581,6 +581,8 @@
         <option value="championnat">🏆 Championnat (4 courses)</option>
         <option value="equipes">👥 Course par équipes</option>
         <option value="elimination">❌ Élimination</option>
+        <option value="chat">🐱 Chat et souris</option>
+        <option value="roi">👑 Roi de la piste</option>
       </select></label>
     <div id="mu-mode-aff" class="aide" style="text-align:left;margin:-2px 0 0"></div>
     <label class="aide" style="display:flex;align-items:center;gap:8px;margin:0" id="mu-voit-choix">Voitures
@@ -6787,6 +6789,8 @@ function majGyro(v, dt){
   cmd.gyro = 0;
 }
 let PENTE_G = 1.8;            // la pente pèse (× g) : en montée on accélère moins, en descente plus
+const R_CHAT_M = new WeakMap();
+function rChatM(R){ let x = R_CHAT_M.get(R); if (!x){ x = Object.assign({}, R, { vmax: R.vmax * 1.1, puissance: R.puissance * 1.1 }); R_CHAT_M.set(R, x); } return x; }
 function majJoueur(v, dt){
   chocObstaclesK(v, dt);                                  // Kujota : geysers, émeraudes
   chocBaf(v, dt);                                         // Bafisson : fissures, bombes de lave
@@ -6814,7 +6818,7 @@ function majJoueur(v, dt){
   const adh = surPiste ? 1 : 0.42;     // l'herbe fait perdre l'adhérence
   const vmax = auto.vmax * (surPiste ? 1 : 0.55);
 
-  const R = auto.R;
+  const R = v.chatM ? rChatM(auto.R) : auto.R;          // Chat et souris : le chat a 110 % de sa vitesse
 
   // --- longitudinal ---
   const gyro = v.gyroT > 0;                              // Gyro : bien plus de puissance et de vitesse
@@ -8786,7 +8790,7 @@ function dessinerHUD(){
     }
     ctx2.restore();
   }
-  dessinerEvenementsK(ctx2, W, H, E); dessinerEvenementsBaf(ctx2, W, H, E); dessinerEvenementsThor(ctx2, W, H, E); dessinerEvenementsEasy(ctx2, W, H, E); dessinerEvenementsBH(ctx2, W, H, E); dessinerEvenementsCR(ctx2, W, H, E); dessinerEvenementsOdy(ctx2, W, H, E); dessinerEvenementsMono(ctx2, W, H, E);
+  dessinerEvenementsK(ctx2, W, H, E); dessinerEvenementsBaf(ctx2, W, H, E); dessinerEvenementsThor(ctx2, W, H, E); dessinerEvenementsEasy(ctx2, W, H, E); dessinerEvenementsBH(ctx2, W, H, E); dessinerEvenementsCR(ctx2, W, H, E); dessinerEvenementsOdy(ctx2, W, H, E); dessinerEvenementsMono(ctx2, W, H, E); dessinerModeMulti(ctx2, W, H, E);
   if (jeu.zw) dessinerZaWarudo(ctx2, W, H, E);
   if (jeu.flashFleche && performance.now() - jeu.flashFleche < 1000){
     const a = 1 - (performance.now() - jeu.flashFleche) / 1000;
@@ -8929,7 +8933,7 @@ function dessinerClassement(x, y, larg, E){
 
     ctx2.fillStyle = moi ? "#f2b632" : "#c6cfdb";
     ctx2.font = `${moi ? 700 : 400} ${12*E*fz}px Bahnschrift, sans-serif`;
-    ctx2.fillText(c.nom, x + 36*E, ly);
+    ctx2.fillText((c.chatM ? "🐱 " : "") + c.nom + (jeu.multi && jeu.multi.mode === "roi" ? "  👑" + Math.floor(c.roiT || 0) : ""), x + 36*E, ly);
 
     if (i > 0){
       // écart affiché rafraîchi quatre fois par seconde : lisible, sans clignoter
@@ -11530,6 +11534,7 @@ function majCourse(dt){
 
   jeu.chrono += dt;
   lireCommandes();
+  if (jeu.multi && jeu.joueur && jeu.joueur.chatAttente && jeu.chrono < 10){ cmd.gaz = 0; cmd.frein = 1; }     // Chat et souris : le chat attend
 
   for (const v of jeu.voitures){
     if (zw === "arret" && v !== jeu.zw.elu) continue;                 // le temps est arrêté pour lui
@@ -12639,7 +12644,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 41;      // 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 42;      // 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -12871,6 +12876,28 @@ function syncEmeraudesK(k, ch){
   }
   for (const id of k[1] || []){ const e = O.emeraudes.find(x => x.id === id); if (e && e.casse == null){ e.casse = jeu.chrono; e.casseX = true; } }
 }
+/* Chat et souris / Roi de la piste : ce que dit le serveur de chaque voiture */
+function modeVoitureMulti(v, chF, roiS){
+  if (roiS != null) v.roiT = roiS;
+  if (chF && !v.chatM){
+    v.chatM = true;
+    if (v === jeu.joueur){
+      bandeau(chF === 2 ? "🐱 C'est toi le chat ! Tu pars dans 10 s… dépasse-les tous" : "🐱 Tu es devenu chat ! Dépasse les autres pour les attraper", 3500); bip(660, 0.15, 0.3, "square"); }
+    else bandeau(chF === 2 ? "🐱 " + v.nom + " est le chat : il part dans 10 s !" : "🐱 " + v.nom + " est devenu chat !", 2500);
+  }
+  v.chatAttente = chF === 2;
+}
+function dessinerModeMulti(ctx, W, H, E){
+  if (!jeu.multi || jeu.phase !== "course" || !jeu.joueur) return; const J = jeu.joueur;
+  if (jeu.multi.mode === "chat"){ const vs = jeu.voitures.filter(v => !v.parti && !v.elimine), n = vs.filter(v => v.chatM).length;
+    ctx.save(); ctx.textAlign = "center"; ctx.font = `800 ${15 * E}px Bahnschrift, sans-serif`; ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(W / 2 - 120 * E, 8 * E, 240 * E, 26 * E);
+    ctx.fillStyle = J.chatM ? "#f2b632" : "#fff"; ctx.fillText(`🐱 ${n} chat${n > 1 ? "s" : ""} · 🐭 ${vs.length - n} souris`, W / 2, 26 * E);
+    if (J.chatAttente && jeu.chrono < 10){ ctx.font = `900 ${46 * E}px Bahnschrift, sans-serif`; ctx.fillStyle = "#f2b632"; ctx.fillText("🐱 " + Math.ceil(10 - jeu.chrono), W / 2, H * 0.42); }
+    ctx.restore(); }
+  if (jeu.multi.mode === "roi"){ const tete = [...jeu.voitures].filter(v => !v.parti).sort((a, b) => (b.distance || 0) - (a.distance || 0))[0];
+    ctx.save(); ctx.textAlign = "center"; ctx.font = `800 ${15 * E}px Bahnschrift, sans-serif`; ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(W / 2 - 130 * E, 8 * E, 260 * E, 26 * E);
+    ctx.fillStyle = tete === J ? "#f2b632" : "#fff"; ctx.fillText(`👑 ${tete === J ? "TU ES LE ROI" : (tete ? tete.nom : "")} · toi : ${Math.floor(J.roiT || 0)} s`, W / 2, 26 * E); ctx.restore(); }
+}
 function serveurEtat(d){
   if (!jeu.multi) return;
   if (d.k) syncEmeraudesK(d.k, d.ch);
@@ -12882,7 +12909,8 @@ function serveurEtat(d){
   }
   const tr = performance.now();
   for (const c of d.c){
-    const [id, x, y, z, cap, tg, rl, br, v, lat, dd, tour, m, tf, hp, , nP, dX, dZ, el, gc, gt] = c;
+    const [id, x, y, z, cap, tg, rl, br, v, lat, dd, tour, m, tf, hp, , nP, dX, dZ, el, gc, gt, chF, roiS] = c;
+    if (chF != null || roiS != null){ const vm = id === reseau.moi ? jeu.joueur : jeu.voitures.find(o => o.distant && o.idDistant === id); if (vm) modeVoitureMulti(vm, chF, roiS); }
     // Gyro : la jauge et le Gyro en cours, d'après le serveur
     if (gc != null){
       const vg = id === reseau.moi ? jeu.joueur : jeu.voitures.find(o => o.distant && o.idDistant === id);
@@ -12911,10 +12939,10 @@ function serveurEtat(d){
       if (reseau.decalMoi == null || brut < reseau.decalMoi) reseau.decalMoi = brut; else reseau.decalMoi += Math.min(5, brut - reseau.decalMoi) * 0.02;
       reseau.srvMoi = { ts: d.ts, tr, x, z, cap, v, lat, d: dd, tour, tf };
       // élimination : plus que nous en course, le serveur nous donne la victoire tout de suite
-      if (tf != null && J && J.tempsFinal == null && jeu.phase === "course" && jeu.multi.mode === "elimination" && J.tour < toursCourse()){
+      if (tf != null && J && J.tempsFinal == null && jeu.phase === "course" && ["elimination", "chat", "roi"].includes(jeu.multi.mode) && (J.tour < toursCourse() || jeu.multi.mode !== "elimination")){
         // (ou un autre vient de gagner au dernier tour : la course est finie pour nous aussi)
         const gagne = !jeu.voitures.some(o => o !== J && o.tempsFinal != null && o.tempsFinal < tf);
-        terminer(); J.tempsFinal = tf; bandeau(gagne ? "🏆 Tu es le dernier en course : VICTOIRE !" : "🏁 Course finie !", 4000);
+        terminer(); J.tempsFinal = tf; bandeau(!gagne ? "🏁 Course finie !" : jeu.multi.mode === "chat" ? "🐭 Dernière souris : VICTOIRE !" : jeu.multi.mode === "roi" ? "👑 Roi de la piste : VICTOIRE !" : "🏆 Tu es le dernier en course : VICTOIRE !", 4000);
       }
       continue;
     }
@@ -13393,7 +13421,8 @@ function demarrerMultiVrai(d){
   reseau.nGyro = 0;
   reseau.dernier = null; document.getElementById("fin-multi").style.display = "none";
   { const txt = { championnat: d.champ ? "🏆 Championnat · course " + (d.champ.n + 1) + " / " + d.champ.total : "", equipes: "👥 Course par équipes",
-                  elimination: "❌ Élimination · " + (d.tours || CIRCUITS[i].tours) + " tours : le dernier saute à chaque tour" }[d.mode];
+                  elimination: "❌ Élimination · " + (d.tours || CIRCUITS[i].tours) + " tours : le dernier saute à chaque tour",
+                  chat: "🐱 Chat et souris : ne te fais pas dépasser par le chat !", roi: "👑 Roi de la piste : reste en tête le plus longtemps possible" }[d.mode];
     if (txt) setTimeout(() => bandeau(txt, 4000), 600);
     if (d.voitures === "hasard" && !d.spectateur && VOITURES[moi.voiture]) setTimeout(() => bandeau("🎲 Pour cette course : " + VOITURES[moi.voiture].nom, 4000), txt ? 4800 : 600); }
   // Kaimaxus roule chez l'hôte ; chez les invités, c'est une voiture distante
@@ -13431,6 +13460,8 @@ const TEXTE_MODES = {
   championnat: "4 courses tirées au hasard, des points à chaque arrivée (25, 18, 15…) : le plus de points gagne.",
   equipes: "Les points de chaque équipe s'additionnent (25, 18, 15…). L'hôte fait les équipes en touchant les couleurs.",
   elimination: "À chaque tour, le dernier est éliminé. Au dernier tour, il n'en reste que deux.",
+  chat: "Un chat tiré au sort part 10 s après tout le monde, à 110 % de sa vitesse. Chaque voiture qu'il dépasse devient chat à son tour. La dernière souris attrapée (ou celle qui finit sans l'être) gagne.",
+  roi: "Chaque seconde passée en tête rapporte un point. À l'arrivée, celui qui a été roi le plus longtemps gagne.",
 };
 const echapHtml = t => String(t ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
 function htmlGeneral(ch, fini){
