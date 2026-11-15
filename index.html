@@ -5653,6 +5653,7 @@ function construireDecor(piste){
     };
     const pierre = [0.66, 0.60, 0.52], pierreF = [0.52, 0.47, 0.41];
     const statue = (nom, frac, haut, socle) => place(frac, 5, (x, y, z, fx, fz) => {
+      if (typeof MODELE_STATUES === "undefined") return;
       const M = MODELE_STATUES[nom], a = Math.atan2(fx, fz), ca = Math.cos(a), sa = Math.sin(a);
       boite(paysage, x, y + socle / 2 - 0.6, z, 4.4, socle + 1.2, 4.4, pierreF, a);
       boite(paysage, x, y + socle - 0.1, z, 5.0, 0.4, 5.0, pierre, a);
@@ -5671,6 +5672,7 @@ function construireDecor(piste){
         if (!libreD(x, z, 4)) continue;
         fait = true;
         const fx0 = pA.x - x, fz0 = pA.z - z, fl = Math.hypot(fx0, fz0), fx = fx0 / fl, fz = fz0 / fl;
+        if (typeof MODELE_STATUES === "undefined") break;
         const M = MODELE_STATUES.tusk, a2 = Math.atan2(fx, fz), ca = Math.cos(a2), sa = Math.sin(a2), y = solEn(x, z)[0], socle = 6.5 + Math.max(0, pA.y - solEn(x, z)[0]), haut = 9.0;   // haut perché : on le voit par-dessus les barrières
         // un piton de roche du canyon, en gradins, puis la plaque de pierre
         boite(paysage, x, y + socle * 0.3 - 0.6, z, 7.5, socle * 0.6 + 1.2, 7.0, [0.66, 0.38, 0.24], a2);
@@ -16204,7 +16206,7 @@ const indexDepart = (() => {
 })();
 // Une piste est bâtie dès le lancement pour avoir un décor derrière le menu
 { const pret = circuitPretDX(indexDepart);
-  preparerCourse(indexDepart);
+  try { preparerCourse(indexDepart); } catch (e) { console.warn("décor du menu", e); try { preparerCourse(0); } catch (e2) {} }
   jeu.phase = "menu";
   rafraichirMenu();
   montrer("ecran-accueil");
