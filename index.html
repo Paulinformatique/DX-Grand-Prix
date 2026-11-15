@@ -15733,6 +15733,7 @@ const MODELE_CHAPEAU = {"chapeau":"oggAAEgWAAA50SS/AAAAAAAAgL+oJiU/nhnePwAAgD+IA
 let objSBR = null;
 function objetsSBR(){
   if (objSBR) return objSBR;
+  if (typeof MODELE_SBR === "undefined") return null;
   const M = MODELE_SBR, f = (b, pal) => televerser(depliermodele(b, -1, pal).reste, true);
   // anneau d'aura : un ruban plat de rayon 1, dessiné des deux côtés
   const anneau = creerMaillage();
@@ -15748,7 +15749,7 @@ function objetsSBR(){
 }
 function dessinerSBR(sb){
   if (!sb) return;
-  const O = objetsSBR(), t = performance.now() / 1000;
+  const O = objetsSBR(), t = performance.now() / 1000; if (!O) return;
   gl.disable(gl.CULL_FACE);
   if (sb.statue){
     const S = sb.statue, base = m4Mul(m4Translation(S.x, S.y, S.z), m4RotY(S.cap));
@@ -15794,7 +15795,7 @@ function dessinerFleche(){
 }
 function dessinerBalleRoulante(){
   const B = balleSBS(); if (!B) return;
-  const O = objetsSBR(), r = BALLE_R, lb = latBalle(jeu.chrono), p = auPoint(piste, B.s), t = performance.now() / 1000;
+  const O = objetsSBR(); if (!O) return; const r = BALLE_R, lb = latBalle(jeu.chrono), p = auPoint(piste, B.s), t = performance.now() / 1000;
   const c = m4Translation(p.x + p.nx * lb, p.y + r, p.z + p.nz * lb);
   gl.disable(gl.CULL_FACE);
   // elle roule vraiment : un tour pour 2πr parcourus
@@ -16240,8 +16241,8 @@ function boucle(maintenant){
     majCourse(dt);
   }
 
-  rendre();
-  dessinerHUD();
+  try { rendre(); dessinerHUD(); }
+  catch (e) { if (!window.erreurRenduDX){ window.erreurRenduDX = 1; console.error("rendu", e); } }
   requestAnimationFrame(boucle);
 }
 
