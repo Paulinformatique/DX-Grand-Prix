@@ -16139,7 +16139,13 @@ function avecCircuitDX(i, fn, opts = {}){
   const essayer = n => chargerCircuitDX(i).then(() => {
     // deux images pour que l'écran soit bien affiché, puis on construit la piste derrière
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      try { fn(); } catch (e) { clearInterval(minuteur); cacherChargementDX(); throw e; }
+      try { fn(); } catch (e) { clearInterval(minuteur); console.error(e);
+        const z = document.getElementById("ch-erreur"); z.hidden = false;
+        const ou = String(e && e.stack || "").split("\n").filter(l => /\d+:\d+/.test(l)).slice(0, 2).map(l => l.replace(/^.*?([A-Za-z_$][\w$]*)?@?\s*\(?https?:[^)]*?:(\d+):\d+\)?$/, (m, f, n) => (f || "?") + ":" + n)).join(" < ");
+        document.getElementById("ch-erreur-txt").textContent = "Erreur : " + (e && e.message || e) + (ou ? " (" + ou + ")" : "");
+        document.getElementById("ch-reessayer").onclick = () => { z.hidden = true; avecCircuitDX(i, fn, opts); };
+        document.getElementById("ch-menu").onclick = () => { cacherChargementDX(); if (opts.annuler) opts.annuler(); else { jeu.phase = "menu"; rafraichirMenu(); montrer("ecran-accueil"); } };
+        return; }
       const reste = Math.max(0, mini - (performance.now() - t0));
       setTimeout(() => { clearInterval(minuteur); majBarreDX(1); setTimeout(cacherChargementDX, 180); }, reste);
     }));
