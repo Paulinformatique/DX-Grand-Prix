@@ -7,7 +7,7 @@
    les textes affichés (page, HUD dessiné sur canvas, alertes) d'après un
    dictionnaire. Les noms propres (circuits, voitures, pilotes) ne bougent pas,
    les messages des joueurs non plus. Le choix est gardé dans ce navigateur. */
-(function(){
+try { (function(){
   let L = "fr";
   try { if (localStorage.getItem("dx-langue") === "en") L = "en"; } catch (e) {}
   window.DX_LANGUE = L;
@@ -31,13 +31,13 @@
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const cles = [...frag.keys()].sort((a, b) => b.length - a.length).map(k => {
     let r = esc(k).replace(/ /g, "\\s+");
-    if (/^[\p{L}\p{N}]/u.test(k)) r = "(?<![\\p{L}\\p{N}])" + r;
     if (/[\p{L}\p{N}]$/u.test(k)) r = r + "(?![\\p{L}\\p{N}])";
     return r; });
   const RE = new RegExp(cles.join("|"), "gu");
   const ord = n => { n = +n; const d = n % 100; return n + (d >= 11 && d <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th"); };
   const cache = new Map();
-  const T = s => {
+  const T = s => { try { return T0(s); } catch (e) { return s; } };
+  const T0 = s => {
     if (typeof s !== "string" || s.length < 2 || !/[A-Za-zÀ-ÿᵉ]/.test(s)) return s;
     const c = cache.get(s); if (c !== undefined) return c;
     const m = s.match(/^(\s*)([\s\S]*?)(\s*)$/), coeur = norm(m[2]);
@@ -46,7 +46,7 @@
     else {
       r = s.replace(/(\d+)ᵉʳ/g, (x, n) => ord(n)).replace(/(\d+)\s*ᵉ/g, (x, n) => ord(n)).replace(/(\d+)\s*ʳᵉ/g, (x, n) => ord(n));
       const e = exact.get(norm(r));
-      r = e !== undefined ? m[1] + e + m[3] : r.replace(RE, x => { const t = frag.get(norm(x)); return t !== undefined ? t : x; });
+      r = e !== undefined ? m[1] + e + m[3] : r.replace(RE, (x, o, str) => { if (/^[\p{L}\p{N}]/u.test(x) && /[\p{L}\p{N}]/u.test(str[o - 1] || "")) return x; const t = frag.get(norm(x)); return t !== undefined ? t : x; });
       r = r.replace(/«\s*/g, "“").replace(/\s*»/g, "”").replace(/“\s+/g, "“");
       r = r.replace(/ ([!?:;])/g, (x, p, i, str) => /[A-Za-z0-9)»”]/.test(str[i - 1] || "") ? p : x);
     }
@@ -87,7 +87,7 @@
   const al = window.alert, co = window.confirm;
   window.alert = s => al.call(window, T(String(s)));
   window.confirm = s => co.call(window, T(String(s)));
-})();
+})(); } catch (e) { try { console.warn("langue", e); } catch (e2) {} }
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0d1117">
