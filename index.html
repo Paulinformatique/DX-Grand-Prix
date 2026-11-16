@@ -9066,13 +9066,15 @@ function dessinerMiniCarte(x, y, taille){
   ctx2.lineWidth = Math.max(2, taille*0.028);
   ctx2.stroke();
 
-  // la ligne de départ sur la mini-carte : un trait blanc en travers de la piste
+  // la ligne de départ sur la mini-carte : une fine bande à damier en travers de la piste
   const dep = auPoint(piste, 0), [ad, bd] = PX(dep);
-  { const l = taille * 0.055, ux = -dep.nx, uz = -dep.nz;
-    ctx2.save(); ctx2.lineCap = "round";
-    ctx2.strokeStyle = "rgba(0,0,0,.75)"; ctx2.lineWidth = Math.max(3, taille * 0.03);
-    ctx2.beginPath(); ctx2.moveTo(ad - ux * l, bd - uz * l); ctx2.lineTo(ad + ux * l, bd + uz * l); ctx2.stroke();
-    ctx2.strokeStyle = "#fff"; ctx2.lineWidth = Math.max(1.5, taille * 0.014); ctx2.stroke();
+  { const L = Math.max(7, taille * 0.075), e = Math.max(2.4, taille * 0.024), nc = 6;
+    ctx2.save(); ctx2.translate(ad, bd); ctx2.rotate(Math.atan2(-dep.nz, -dep.nx));
+    ctx2.globalAlpha = 0.92;
+    ctx2.fillStyle = "rgba(0,0,0,.55)"; ctx2.fillRect(-L / 2 - 0.75, -e / 2 - 0.75, L + 1.5, e + 1.5);
+    for (let i = 0; i < nc; i++) for (let j = 0; j < 2; j++){
+      ctx2.fillStyle = (i + j) % 2 ? "#1b1f26" : "#f4f6f8";
+      ctx2.fillRect(-L / 2 + i * L / nc, -e / 2 + j * e / 2, L / nc + 0.3, e / 2 + 0.3); }
     ctx2.restore(); }
   // SteelBallSon : la balle verte de Gyro, là où elle roule en ce moment
   { const B = typeof balleSBS === "function" ? balleSBS() : null;
@@ -9089,26 +9091,6 @@ function dessinerMiniCarte(x, y, taille){
       : `rgb(${v.coul.map(c=>Math.round(c*255)).join(",")})`;
     ctx2.fill();
   }
-  // et un petit drapeau à damier planté au bord, du côté extérieur du tracé, toujours droit
-  { const cx = x + taille / 2, cy = y + taille / 2, ux = -dep.nx, uz = -dep.nz;
-    const sg = (ux * (ad - cx) + uz * (bd - cy)) >= 0 ? 1 : -1, ecart = taille * 0.07;
-    const h = taille * 0.15, fw = taille * 0.11, fh = taille * 0.075, nc = 4, nr = 3, m = 3;
-    let px = ad + ux * ecart * sg, py = bd + uz * ecart * sg;
-    if (py - h - 2 < y + m) py = y + m + h + 2;                       // il reste dans le cadre de la carte
-    px = Math.max(x + m + 2, Math.min(x + taille - m - 2, px));
-    const dr = px + fw + 3 > x + taille - m ? -1 : 1;                 // le drapeau flotte vers l'intérieur
-    ctx2.save();
-    ctx2.fillStyle = "rgba(0,0,0,.45)"; ctx2.beginPath(); ctx2.ellipse(px, py, taille * 0.025, taille * 0.01, 0, 0, Math.PI * 2); ctx2.fill();
-    ctx2.lineCap = "round";
-    ctx2.strokeStyle = "#1a1a1a"; ctx2.lineWidth = Math.max(2.5, taille * 0.022);
-    ctx2.beginPath(); ctx2.moveTo(px, py); ctx2.lineTo(px, py - h); ctx2.stroke();
-    ctx2.strokeStyle = "#d9dde3"; ctx2.lineWidth = Math.max(1.2, taille * 0.01); ctx2.stroke();
-    const fx = dr > 0 ? px + 1 : px - 1 - fw, fy = py - h;
-    for (let i = 0; i < nc; i++){
-      const yo = Math.sin((dr > 0 ? i : nc - 1 - i) / nc * Math.PI) * fh * 0.14;
-      ctx2.fillStyle = "#111"; ctx2.fillRect(fx + i * fw / nc - 0.5, fy + yo - 1, fw / nc + 1, fh + 2);
-      for (let j = 0; j < nr; j++){ ctx2.fillStyle = (i + j) % 2 ? "#111" : "#fff"; ctx2.fillRect(fx + i * fw / nc, fy + j * fh / nr + yo, fw / nc + 0.5, fh / nr + 0.5); } }
-    ctx2.restore(); }
 }
 
 
