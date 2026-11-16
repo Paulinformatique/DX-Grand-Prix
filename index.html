@@ -9066,6 +9066,22 @@ function dessinerMiniCarte(x, y, taille){
   ctx2.lineWidth = Math.max(2, taille*0.028);
   ctx2.stroke();
 
+  // la ligne de départ sur la mini-carte : un petit trait damier en travers de la piste
+  { const d = auPoint(piste, 0), [a0, b0] = PX(d), l = taille * 0.06, ux = -d.nx, uz = -d.nz, n = 4, e = Math.max(1.5, taille * 0.022);
+    ctx2.save(); ctx2.lineCap = "butt";
+    ctx2.strokeStyle = "rgba(0,0,0,.7)"; ctx2.lineWidth = e + 2;
+    ctx2.beginPath(); ctx2.moveTo(a0 - ux * l, b0 - uz * l); ctx2.lineTo(a0 + ux * l, b0 + uz * l); ctx2.stroke();
+    ctx2.lineWidth = e;
+    for (let k = 0; k < n; k++){ const t0 = -1 + 2 * k / n, t1 = -1 + 2 * (k + 1) / n;
+      ctx2.strokeStyle = k % 2 ? "#111" : "#fff";
+      ctx2.beginPath(); ctx2.moveTo(a0 + ux * l * t0, b0 + uz * l * t0); ctx2.lineTo(a0 + ux * l * t1, b0 + uz * l * t1); ctx2.stroke(); }
+    ctx2.restore(); }
+  // SteelBallSon : la balle verte de Gyro, là où elle roule en ce moment
+  { const B = typeof balleSBS === "function" ? balleSBS() : null;
+    if (B){ const p = auPoint(piste, B.s), lb = typeof latBalle === "function" ? latBalle(jeu.chrono || 0) : 0, [a1, b1] = PX({ x: p.x + p.nx * lb, z: p.z + p.nz * lb });
+      ctx2.beginPath(); ctx2.arc(a1, b1, taille * 0.03, 0, Math.PI * 2);
+      ctx2.fillStyle = "#3ee06a"; ctx2.fill(); ctx2.lineWidth = Math.max(1, taille * 0.01); ctx2.strokeStyle = "#0b3d1c"; ctx2.stroke(); } }
+
   for (const v of jeu.voitures){
     if (v.cache) continue;
     const [a,b] = PX(v);
