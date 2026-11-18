@@ -11859,7 +11859,7 @@ function capFumb(v){
   if (v.brideF && ch - v.brideF < 3){ const vm = v.R ? v.R.vmax : (typeof VOITURES !== "undefined" && v.modele != null ? VOITURES[v.modele].R.vmax : 70); f *= Math.min(1, 50 / vm); }
   return f;
 }
-function annonceF(v, txt, coul){ if (jeu.joueur === v) jeu.annonceF = { txt, coul: coul || "#ffd54a", t: performance.now() / 1000 }; }
+function annonceF(v, txt, coul){ }     // (plus de textes à l'écran sur Fumbulane)
 function chocFumb(v, dt){
   if (!estFu() || v.s == null || v.tempsFinal != null) return;
   const s = modF(v.s), lat = v.lat || 0, moi = jeu.joueur === v, ch = chF(), t = tourF(v), L = piste.longueur;
@@ -12102,7 +12102,7 @@ function dessinerEvenementsFumb(ctx, W, H, E){
   // le clip : les bandes noires, l'image chaude, « ● REC »
   if (jeu.clipF && !red){ const u = tt - jeu.clipF.t; if (u >= 0 && u < 6){ const k = Math.min(1, u * 3, (6 - u) * 3), bh = H * 0.12 * k;
       ctx.fillStyle = `rgba(255,170,80,${0.10 * k})`; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, bh); ctx.fillRect(0, H - bh, W, bh);
-      ctx.font = `700 ${14 * E}px system-ui, sans-serif`; ctx.fillStyle = Math.floor(tt * 2) % 2 ? "#ff3b30" : "rgba(255,59,48,0.4)"; ctx.textAlign = "left"; ctx.fillText("● REC", 20 * E, bh - 10 * E); ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.fillText("RUMBA · FUMBULANE · PRISE " + (jeu.clipF.explo ? "2" : "1"), W - 20 * E, H - bh + 22 * E); } }
+      } }
   // l'éclair de l'impact de la météorite
   if (jeu.meteoreF_imp){ const u = (tt - jeu.meteoreF_imp) / 0.8; if (u < 1){ ctx.fillStyle = `rgba(255,190,120,${(red ? 0.3 : 0.7) * (1 - u)})`; ctx.fillRect(0, 0, W, H); } }
   // les annonces
