@@ -2887,40 +2887,59 @@ function construireDecor(piste){
     if (fumbP){ const sa = i * piste.pas, sb = sa + piste.pas;
       const ptF = (q, l, dy) => { const r = bord(q, l); r[1] += dy; return r; };
       const quad2 = (m, A, B, C, D2, c) => { quad(m, A, B, C, D2, c); quad(m, B, A, D2, C, c); };
-      if (sa >= FU.MUR0 - 2 && sb <= FU.MUR1 + 2){
-        const N = 6, x0 = DEMI_PISTE + BORDURE, roc = k => [[0.66, 0.34, 0.20], [0.58, 0.28, 0.18], [0.72, 0.42, 0.24], [0.48, 0.24, 0.20], [0.62, 0.30, 0.26]][k % 5];
+      // les gorges : des falaises en strates qui montent et descendent en douceur aux deux bouts,
+      // et, dans la partie des parois, une courbe qu'on peut rouler (qui s'aplatit elle aussi aux bouts)
+      const lisseF = w => { w = Math.max(0, Math.min(1, w)); return w * w * (3 - 2 * w); };
+      const fMur = s => lisseF(Math.min(s - FU.MUR0, FU.MUR1 - s) / 25);
+      const rampeG = s => lisseF(Math.min((s - (FU.GORGE0 - 70)) / 70, ((FU.GORGE1 + 70) - s) / 70, Math.max((FU.PONT0 - 40 - s) / 60, (s - (FU.PONT1 + 40)) / 60)));
+      const x0 = DEMI_PISTE + BORDURE, ltM = x0 + FU.MUR_W, ltG = DEMI_PISTE + ACCOTEMENT + 4;
+      const ltF = s => { const d = s < FU.MUR0 ? FU.MUR0 - s : s > FU.MUR1 ? s - FU.MUR1 : 0; return ltM + (ltG - ltM) * lisseF(d / 40); };
+      const ra = rampeG(sa), rb = rampeG(sb);
+      if (ra > 0.001 || rb > 0.001){
+        const roc = k => [[0.66, 0.34, 0.20], [0.58, 0.28, 0.18], [0.72, 0.42, 0.24], [0.48, 0.24, 0.20], [0.62, 0.30, 0.26]][k % 5];
+        const ma = fMur(sa), mb = fMur(sb), avecMur = ma > 0.001 || mb > 0.001, N = 6;
         for (const sg of [1, -1]){
-          for (let k = 0; k < N; k++){ const l0 = x0 + FU.MUR_W * k / N, l1 = x0 + FU.MUR_W * (k + 1) / N, h0 = FU.MUR_H * (k / N) ** 2, h1 = FU.MUR_H * ((k + 1) / N) ** 2;
-            quad2(fuM, ptF(a, sg * l0, h0), ptF(a, sg * l1, h1), ptF(b, sg * l1, h1), ptF(b, sg * l0, h0), (i + k) % 2 ? [0.70, 0.40, 0.24] : [0.66, 0.37, 0.22]);
-            if (k === N - 1) quad2(fuM, ptF(a, sg * (l1 - 0.05), h1 + 0.02), ptF(a, sg * (l1 + 0.6), h1 + 0.02), ptF(b, sg * (l1 + 0.6), h1 + 0.02), ptF(b, sg * (l1 - 0.05), h1 + 0.02), [0.95, 0.85, 0.3]); }
-          // la falaise au-dessus, en strates rouges, orange et violettes
-          const lt = x0 + FU.MUR_W; let y = FU.MUR_H;
-          for (let k = 0; k < 6; k++){ const hh = 2.4 + hF(k, 3) * 1.6, rec = 0.35 * Math.sin(k * 1.7 + i * 0.05); quad2(fuM, ptF(a, sg * (lt + rec), y), ptF(a, sg * (lt + rec + 0.4), y + hh), ptF(b, sg * (lt + rec + 0.4), y + hh), ptF(b, sg * (lt + rec), y), roc(k + (i % 7 === 0 ? 2 : 0))); y += hh; }
-          quad2(fuM, ptF(a, sg * (lt + 0.6), y), ptF(a, sg * (lt + 26), y + 2), ptF(b, sg * (lt + 26), y + 2), ptF(b, sg * (lt + 0.6), y), [0.42, 0.50, 0.22]);
+          const la = ltF(sa) + 34 * (1 - ra) ** 1.6, lb = ltF(sb) + 34 * (1 - rb) ** 1.6;
+          let ya = 0, yb = 0;
+          if (avecMur){
+            for (let k = 0; k < N; k++){ const l0 = x0 + FU.MUR_W * k / N, l1 = x0 + FU.MUR_W * (k + 1) / N, q0 = (k / N) ** 2, q1 = ((k + 1) / N) ** 2;
+              quad2(fuM, ptF(a, sg * l0, FU.MUR_H * ma * q0), ptF(a, sg * l1, FU.MUR_H * ma * q1), ptF(b, sg * l1, FU.MUR_H * mb * q1), ptF(b, sg * l0, FU.MUR_H * mb * q0), (i + k) % 2 ? [0.70, 0.40, 0.24] : [0.66, 0.37, 0.22]); }
+            ya = FU.MUR_H * ma; yb = FU.MUR_H * mb;
+            if (ma > 0.6 && mb > 0.6) quad2(fuM, ptF(a, sg * (ltM - 0.05), ya + 0.02), ptF(a, sg * (ltM + 0.5), ya + 0.02), ptF(b, sg * (ltM + 0.5), yb + 0.02), ptF(b, sg * (ltM - 0.05), yb + 0.02), [0.95, 0.85, 0.3]);
+            // entre le haut de la paroi et la falaise (aux bouts, quand la falaise s'écarte) : de la terre
+            quad2(fuM, ptF(a, sg * ltM, ya), ptF(a, sg * la, ya), ptF(b, sg * lb, yb), ptF(b, sg * ltM, yb), [0.46, 0.26, 0.14]);
+          } else { ya = yb = -0.36; }
+          // la falaise, en strates (le retrait de chaque strate dépend de l'endroit : pas de fissure entre deux tronçons)
+          const rec = (s, k) => 0.45 * Math.sin(k * 1.7 + s * 0.011);
+          for (let k = 0; k < 7; k++){ const hk = 2.6 + hF(k, 3) * 1.6, ha = hk * ra, hb = hk * rb;
+            quad2(fuM, ptF(a, sg * (la + rec(sa, k)), ya), ptF(a, sg * (la + rec(sa, k) + 0.5), ya + ha), ptF(b, sg * (lb + rec(sb, k) + 0.5), yb + hb), ptF(b, sg * (lb + rec(sb, k)), yb), roc(k));
+            ya += ha; yb += hb; }
+          // le haut des falaises : la forêt, qui descend doucement vers l'extérieur
+          quad2(fuM, ptF(a, sg * (la + 0.9), ya), ptF(a, sg * (la + 16), ya), ptF(b, sg * (lb + 16), yb), ptF(b, sg * (lb + 0.9), yb), i % 2 ? [0.56, 0.38, 0.22] : [0.53, 0.36, 0.21]);
+          // le dos du massif : on ne voit jamais l'intérieur creux des falaises
+          quad2(fuM, ptF(a, sg * (la + 16), ya), ptF(a, sg * (la + 16), -0.4), ptF(b, sg * (lb + 16), -0.4), ptF(b, sg * (lb + 16), yb), [0.46, 0.26, 0.17]);
+          // quelques buissons sur le plateau
+          if ((i * 7 + (sg > 0 ? 3 : 0)) % 9 === 0 && ra > 0.3){ const q = ptF(a, sg * (la + 4 + hF(i, 2) * 9), ya); boite(fuM, q[0], q[1] + 0.7, q[2], 2.2, 1.4, 2.2, [0.30, 0.36, 0.16], i); }
         }
-        continue;
-      }
-      if (sa >= FU.GORGE0 && sb <= FU.GORGE1 && !(sa >= FU.PONT0 - 40 && sb <= FU.PONT1 + 40)){
-        const lt = DEMI_PISTE + ACCOTEMENT + 4, roc = k => [[0.66, 0.34, 0.20], [0.58, 0.28, 0.18], [0.72, 0.42, 0.24], [0.48, 0.24, 0.20], [0.62, 0.30, 0.26]][k % 5];
-        for (const sg of [1, -1]){ let y = -0.4; for (let k = 0; k < 7; k++){ const hh = 2.6 + hF(k, 3) * 1.6, rec = 0.5 * Math.sin(k * 1.7 + i * 0.05); quad2(fuM, ptF(a, sg * (lt + rec), y), ptF(a, sg * (lt + rec + 0.5), y + hh), ptF(b, sg * (lt + rec + 0.5), y + hh), ptF(b, sg * (lt + rec), y), roc(k + (i % 7 === 0 ? 2 : 0))); y += hh; }
-          quad2(fuM, ptF(a, sg * (lt + 0.8), y), ptF(a, sg * (lt + 30), y + 2), ptF(b, sg * (lt + 30), y + 2), ptF(b, sg * (lt + 0.8), y), [0.42, 0.50, 0.22]); }
+        if (avecMur) continue;
       }
       if (sa >= FU.PONT0 - 30 && sb <= FU.PONT1 + 30){
         const x0 = DEMI_PISTE + BORDURE, eau = [0.42, 0.34, 0.22];
         // le gué : un film d'eau sur la moitié droite (dessiné transparent, à part), des pierres de chaque côté
-        quad2(fuC.eau, ptF(a, 0.3, 0.16), ptF(a, x0, 0.16), ptF(b, x0, 0.16), ptF(b, 0.3, 0.16), [0.55, 0.46, 0.30]);
+        if (sa >= FU.PONT0 && sb <= FU.PONT1) quad2(fuC.eau, ptF(a, 0.3, 0.16), ptF(a, x0, 0.16), ptF(b, x0, 0.16), ptF(b, 0.3, 0.16), [0.55, 0.46, 0.30]);
         // le fleuve sous le pont, de part et d'autre
-        for (const sg of [1, -1]) quad2(fuM, ptF(a, sg * x0, -0.7), ptF(a, sg * 70, -0.7), ptF(b, sg * 70, -0.7), ptF(b, sg * x0, -0.7), (i % 2 ? [0.30, 0.40, 0.38] : [0.27, 0.37, 0.35]));
+        for (const sg of [1, -1]) quad2(fuM, ptF(a, sg * x0, -0.7), ptF(a, sg * 70, -0.7), ptF(b, sg * 70, -0.7), ptF(b, sg * x0, -0.7), (i % 2 ? [0.50, 0.43, 0.32] : [0.46, 0.40, 0.30]));
         // le pont : tablier sur la gauche, garde-corps, et ses piles dans l'eau
         quad2(fuM, ptF(a, -x0, -0.02), ptF(a, -x0, -1.4), ptF(b, -x0, -1.4), ptF(b, -x0, -0.02), [0.45, 0.45, 0.47]);
         quad2(fuM, ptF(a, -(x0 + 0.1), 1.0), ptF(a, -(x0 + 0.1), 1.15), ptF(b, -(x0 + 0.1), 1.15), ptF(b, -(x0 + 0.1), 1.0), [0.85, 0.75, 0.2]);
         if (i % 3 === 0){ const q = bord(a, -(x0 + 0.1)); boite(fuM, q[0], q[1] + 0.55, q[2], 0.15, 1.1, 0.15, [0.5, 0.5, 0.52]); }
         if (i % 6 === 0){ const q = bord(a, -DEMI_PISTE / 2); boite(fuM, q[0], q[1] - 3, q[2], 2, 5.6, 2, [0.40, 0.40, 0.42]); }
-        // la structure métallique du pont, au-dessus de sa moitié gauche
-        if (sa >= FU.PONT0 && sb <= FU.PONT1){ const g = bord(a, -(x0 + 0.4)), m = bord(a, -0.2), g2 = bord(b, -(x0 + 0.4)), m2 = bord(b, -0.2), bleu = [0.20, 0.38, 0.62];
-          if (i % 2 === 0){ boite(fuM, g[0], g[1] + 3.2, g[2], 0.3, 6.4, 0.3, bleu); boite(fuM, m[0], m[1] + 3.2, m[2], 0.25, 6.4, 0.25, bleu); }
-          quad2(fuM, [g[0], g[1] + 6.2, g[2]], [m[0], m[1] + 6.2, m[2]], [m2[0], m2[1] + 6.2, m2[2]], [g2[0], g2[1] + 6.2, g2[2]], bleu);
-          quad2(fuM, [g[0], g[1] + 6.4, g[2]], [g2[0], g2[1] + 6.4, g2[2]], [g2[0], g2[1] + 5.6, g2[2]], [g[0], g[1] + 5.6, g[2]], [0.25, 0.45, 0.70]); }
+        // la poutre métallique du pont, sur son bord extérieur (rien au milieu de la route)
+        if (sa >= FU.PONT0 && sb <= FU.PONT1){ const g = bord(a, -(x0 + 0.5)), g2 = bord(b, -(x0 + 0.5)), bleu = [0.20, 0.38, 0.62], H = 4.2;
+          if (i % 4 === 0) boite(fuM, g[0], g[1] + H / 2, g[2], 0.28, H, 0.28, bleu);
+          quad2(fuM, [g[0], g[1] + H, g[2]], [g2[0], g2[1] + H, g2[2]], [g2[0], g2[1] + H - 0.35, g2[2]], [g[0], g[1] + H - 0.35, g[2]], [0.25, 0.45, 0.70]);
+          const tri = x => 0.2 + (H - 0.5) * (1 - Math.abs(x - 2) / 2), h0 = tri(i % 4), h1 = tri(i % 4 + 1), e = 0.13;
+          quad2(fuM, [g[0], g[1] + h0 - e, g[2]], [g[0], g[1] + h0 + e, g[2]], [g2[0], g2[1] + h1 + e, g2[2]], [g2[0], g2[1] + h1 - e, g2[2]], bleu); }
         // le bord droit du gué : des grosses pierres
         if (i % 2 === 0){ const q = bord(a, x0 + 0.3); boite(fuM, q[0], q[1] - 0.1, q[2], 0.9, 0.7, 0.9, [0.35, 0.32, 0.30], a.cap + i); }
         continue;
@@ -4875,7 +4894,7 @@ function construireDecor(piste){
     // de la boue partout : des flaques sur les bas-côtés, et des ornières sur la piste
     { let gb = 9; const ab = () => (gb = (gb * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
       for (let k = 0; k < 220; k++){ const s = ab() * piste.longueur, sg = ab() < 0.5 ? 1 : -1, lat = sg * (DEMI_PISTE + BORDURE + 0.8 + ab() * (ACCOTEMENT - 3)), [x, y, z, p] = enP(s, lat), r = 0.8 + ab() * 2.2;
-        disque(fuM, x, y - 0.06, z, r * 1.5, r, Math.atan2(p.tz, p.tx), ab() < 0.5 ? [0.30, 0.17, 0.09] : [0.36, 0.30, 0.24], 10); }
+        disque(fuM, x, y - 0.06, z, r * 1.5, r, Math.atan2(p.tz, p.tx), ab() < 0.5 ? [0.47, 0.28, 0.16] : [0.42, 0.27, 0.17], 10); }
       for (let k = 0; k < 60; k++){ const s0 = ab() * piste.longueur, n = 6 + Math.floor(ab() * 12), l0 = (ab() - 0.5) * (DEMI_PISTE - 1.2);
         for (let j = 0; j < n; j++){ for (const d of [-0.8, 0.8]){ const [x1, y1, z1] = enP(s0 + j * 3, l0 + d), [x2, y2, z2] = enP(s0 + j * 3 + 3, l0 + d), [nx, nz] = [z2 - z1, x1 - x2], m = Math.hypot(nx, nz) || 1, w = 0.13;
           const A = [x1 + nx / m * w, y1 + 0.02, z1 + nz / m * w], B = [x1 - nx / m * w, y1 + 0.02, z1 - nz / m * w], C = [x2 - nx / m * w, y2 + 0.02, z2 - nz / m * w], D2 = [x2 + nx / m * w, y2 + 0.02, z2 + nz / m * w];
@@ -4899,8 +4918,8 @@ function construireDecor(piste){
       const [x4, y4, z4] = enP(FU.CLIP0 + 80, -(DEMI_PISTE + BORDURE + 2.5)); boite(fuM, x4, y4 + 0.45, z4, 0.6, 0.9, 0.6, [0.6, 0.1, 0.1]); boite(fuM, x4, y4 + 2.6, z4, 0.06, 0.06, 4.5, [0.3, 0.3, 0.3], c + 0.5); }
     // la chute d'eau : une corniche de roche avance au-dessus de la voie de droite, l'eau tombe de son bord
     { const sg = FU.CASC_SG, ext = DEMI_PISTE + ACCOTEMENT + 4;
-      for (let s = FU.CASC0 - 6; s < FU.CASC1 + 6; s += 3){ const [x0, y0, z0, p] = enP(s + 1.5, sg * (1.0 + ext) / 2), c = Math.atan2(p.tx, p.tz), ep = 2.2 + 0.6 * Math.sin(s);
-        boite(fuM, x0, y0 + 12.8 + ep / 2, z0, ext - 1.0, ep, 3.1, [0.55, 0.28, 0.18], c); boite(fuM, x0, y0 + 13.6 + ep, z0, ext - 0.6, 0.6, 3.1, [0.30, 0.45, 0.18], c);
+      for (let s = FU.CASC0 - 6; s < FU.CASC1 + 6; s += 3){ const [x0, y0, z0, p] = enP(s + 1.5, sg * (1.0 + ext + 6) / 2), c = Math.atan2(p.tx, p.tz), ep = 2.2 + 0.6 * Math.sin(s);
+        boite(fuM, x0, y0 + 12.8 + ep / 2, z0, ext + 5.0, ep, 3.1, [0.55, 0.28, 0.18], c); boite(fuM, x0, y0 + 13.6 + ep, z0, ext + 5.4, 0.6, 3.1, [0.53, 0.36, 0.21], c);
         const [x1, y1, z1] = enP(s + 1.5, sg * 1.0); boite(fuM, x1, y1 + 12.4, z1, 0.5, 0.8, 3.1, [0.45, 0.22, 0.15], c); }
       // le bassin au pied, au bord de la piste
       const [x, y, z, p] = enP((FU.CASC0 + FU.CASC1) / 2, sg * (DEMI_PISTE + BORDURE + 3.5)); disque(fuM, x, y - 0.05, z, 3.5, 12, Math.atan2(p.tz, p.tx), [0.38, 0.50, 0.55], 14); }
@@ -6409,7 +6428,7 @@ function construireDecor(piste){
     bafVolcan.fum = fum;
   }
   if (fumbP){
-    const zones = [[FU.GORGE0, FU.GORGE1, DEMI_PISTE + ACCOTEMENT + 40], [FU.PONT0 - 20, FU.PONT1 + 20, 75], [FU.CRAT - FU.CRAT_R - 8, FU.CRAT + FU.CRAT_R + 8, DEMI_PISTE + ACCOTEMENT + 6]];
+    const zones = [[FU.GORGE0 - 60, FU.GORGE1 + 60, DEMI_PISTE + ACCOTEMENT + 110], [FU.PONT0 - 20, FU.PONT1 + 20, 75], [FU.CRAT - FU.CRAT_R - 8, FU.CRAT + FU.CRAT_R + 8, DEMI_PISTE + ACCOTEMENT + 6]];
     const pts = []; for (const [s0, s1, r] of zones) for (let s = s0; s <= s1; s += 4){ const q = auPoint(piste, s); pts.push([q.x, q.z, r]); }
     const pres = (x, z) => { for (const [px, pz, r] of pts) if ((px - x) ** 2 + (pz - z) ** 2 < r * r) return true; return false; };
     const filtrer = m => { if (!m || !m.idx) return; const I = m.idx, out = []; for (let k = 0; k < I.length; k += 3){ const a = I[k] * 3, b = I[k + 1] * 3, c = I[k + 2] * 3;
@@ -6730,8 +6749,42 @@ const carriere = { argent: 0, voiture: 0, possedees: [0], records: {}, circuitsP
    du navigateur est scellée : modifiée à la main, elle est refusée au
    chargement (on reprend la copie de secours, sinon la progression repart
    de zéro — le prénom, les records et les circuits restent). */
+
+/* ── Faille des sauvegardes (nov. 2026) ── */
+// la barrière : les voitures dont la course n'est pas passée sont retirées (le mode « tout débloquer » de l'administrateur mis à part)
+function voituresIllegitimes(){
+  if (carriere.toutDebloque) return [];
+  // (seuil le plus bas qu'a connu la carte, 27 courses : une voiture achetée avant l'arrivée de nouveaux circuits reste)
+  const ok = a => { if (a.rang <= 1) return true; if (a.rang >= VOITURES.length) return voitureOuverte(a);
+    return (carriere.niveau || 0) >= Math.min(seuilVoiture(a), Math.round((a.rang - 1) * 26 / (VOITURES.length - 2))); };
+  return (carriere.possedees || []).filter(i => i !== 0 && (!VOITURES[i] || !ok(VOITURES[i])));
+}
+function retirerVoitures(liste){
+  carriere.possedees = (carriere.possedees || []).filter(i => !liste.includes(i));
+  if (!carriere.possedees.includes(0)) carriere.possedees.unshift(0);
+  if (!carriere.possedees.includes(carriere.voiture)) carriere.voiture = 0;
+}
+// les comptes qui ont utilisé la faille : une fois, et seulement sur ce compte-là
+const SANCTIONS_DX = { "80437751": { id: "faille-sauvegarde-1", argent: 20000000 }, "34086666": { id: "faille-sauvegarde-1", argent: 20000000 } };
+function messageSanction(){
+  const nom = (typeof nomJeu === "function" && nomJeu()) || carriere.prenom || "";
+  const fond = document.createElement("div");
+  fond.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(5,8,14,.78);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Bahnschrift,'Segoe UI',sans-serif";
+  const boite = document.createElement("div");
+  boite.style.cssText = "max-width:440px;width:100%;background:#151b27;border:1px solid #f2b632;border-radius:14px;padding:22px 22px 18px;color:#e9edf5;box-shadow:0 20px 60px rgba(0,0,0,.6)";
+  const titre = document.createElement("div"); titre.textContent = "🔧 Message de l'équipe DX Grand Prix";
+  titre.style.cssText = "font-weight:800;letter-spacing:.04em;color:#f2b632;font-size:17px;margin-bottom:12px";
+  const corps = document.createElement("div"); corps.textContent = MSG_SANCTION.replace("{nom}", nom).replace("Salut  !", "Salut !");
+  corps.style.cssText = "white-space:pre-line;line-height:1.45;font-size:15px";
+  const ok = document.createElement("button"); ok.textContent = "Compris !";
+  ok.style.cssText = "margin-top:18px;width:100%;height:42px;border:0;border-radius:10px;background:#f2b632;color:#151b27;font:800 15px Bahnschrift,sans-serif;cursor:pointer";
+  ok.onclick = () => fond.remove();
+  boite.append(titre, corps, ok); fond.append(boite); document.body.append(fond);
+}
+const MSG_SANCTION = "Salut {nom} ! On a vu que ton garage avait les 18 voitures sans que tu aies passé les courses qui les débloquent : tu es passé par une faille de la sauvegarde. Elle est corrigée maintenant.\n\nTes voitures ont été retirées (tu gardes la BMW M3), mais toute ta progression reste : courses, victoires, records.\n\nEt comme tu nous as aidés à trouver le bug : +20 000 000 berries pour toi 💰. Bonne course !";
+function appliquerSanction(id){ if (coffre.sanction(id)) setTimeout(messageSanction, 300); }
 const coffre = (() => {
-  const CHAMPS = ["argent", "possedees", "niveau", "niveau2", "podiums", "coursesFaites", "gyro", "meilleuresPlaces", "victoireFinale", "victoireFinale2", "toutDebloque", "avantTout", "stats"];
+  const CHAMPS = ["argent", "possedees", "niveau", "niveau2", "podiums", "coursesFaites", "gyro", "meilleuresPlaces", "victoireFinale", "victoireFinale2", "toutDebloque", "avantTout", "stats", "sanctions"];
   const CLE = "apex-gp", SECOURS = "apex-gp-s", MARQUE = "dx-sv1", DATE_SCEAU = 1794310000000;
   const sceau = (d) => {
     const o = Object.assign({}, d); delete o.sceau;
@@ -6767,7 +6820,15 @@ const coffre = (() => {
       const garde = {}; if (x) for (const k of ["prenom", "records", "recordsCourse", "circuitsPerso", "couleurs", "controle", "effets", "versionCarriere", "historique", "gyroAnnonce"]) if (k in x) garde[k] = x[k];
       garde.triche = true; return garde;
     },
-    depart(){ ref = copie(); setInterval(() => { if (ref != null && copie() !== ref) revenir(); }, 400); },
+    depart(){ ref = copie(); let premier = true;
+      setInterval(() => { if (ref != null && copie() !== ref) revenir();
+        if (premier){ premier = false; try { const x = voituresIllegitimes(); if (x.length){ retirerVoitures(x); carriere.maj = Date.now(); ref = copie(); this.ecrire(); try { rafraichirGarage(); rafraichirMenu(); } catch (e) {} } } catch (e) {} } }, 400); },
+    // un compte qui a utilisé la faille : ses voitures (sauf la BMW) retirées, sa prime, une seule fois
+    sanction(id){ const s = SANCTIONS_DX[id]; if (!s || suspect()) return false; carriere.sanctions = carriere.sanctions || {};
+      if (carriere.sanctions[s.id]) return false;
+      if (carriere.toutDebloque){ carriere.toutDebloque = false; delete carriere.avantTout; }
+      carriere.possedees = [0]; carriere.voiture = 0; carriere.argent = (carriere.argent || 0) + s.argent; carriere.sanctions[s.id] = Date.now();
+      carriere.maj = Date.now(); ref = copie(); this.ecrire(); try { garageSel = 0; rafraichirGarage(); rafraichirMenu(); } catch (e) {} return true; },
     // une sauvegarde : seulement si elle vient du jeu
     valider(){ if (suspect()){ if (ref != null) revenir(); return false; } ref = copie(); return true; },
     ecrire(){ const d = JSON.parse(JSON.stringify(carriere)); d.sceau = sceau(d); const t = JSON.stringify(d);
@@ -7252,8 +7313,8 @@ function majJoueur(v, dt){
     if (liegeCR(v)){                       // Cristiano, 4ᵉ tour : le liège renvoie la voiture vers l'autre côté
       v.cap = vers + da; v.capVit = v.cap; v.v *= 0.95; const q = Math.sign(v.lat) * (limite - 0.4); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q;
       secousse = 0.8; if (jeu.joueur === v){ v.liegeT = jeu.chrono; bip(240, 0.12, 0.3, "sine"); setTimeout(() => bip(360, 0.1, 0.25, "sine"), 90); }
-    } else if (piste.def.nom === "Fumbulane" && typeof dansMursF === "function" && dansMursF(v.s)){     // Fumbulane : en haut de la paroi, on glisse
-      v.v *= 0.995; v.cap += da * 0.5; v.capVit = v.cap; const q = Math.sign(v.lat) * (limite - 0.15); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q;
+    } else if (piste.def.nom === "Fumbulane" && typeof dansMursF === "function" && (dansMursF(v.s) || (modF(v.s) > FU.GORGE0 - 60 && modF(v.s) < FU.GORGE1 + 40))){     // Fumbulane : contre les falaises des gorges, on glisse
+      v.v *= dansMursF(v.s) ? 0.995 : 0.985; v.cap += da * 0.5; v.capVit = v.cap; const q = Math.sign(v.lat) * (limite - 0.15); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q;
     } else if (piste.def.nom === "Monocoule"){       // Monocoule : on frotte et on glisse le long du mur
       const fort = !(v._murMT > jeu.chrono - 0.3); v.v *= fort ? 0.86 : 0.99; v.cap += da * 0.6; v.capVit = v.cap;
       const q = Math.sign(v.lat) * (limite - 0.2); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q; v._murMT = jeu.chrono; if (fort) secousse = 0.4;
@@ -11772,14 +11833,14 @@ const surPontF = s => { const u = modF(s); return u >= FU.PONT0 && u <= FU.PONT1
 const pontFermeF = v => tourF(v) % 2 === 1;                       // tours 2, 4 et 6 : le pont est fermé, tout le monde passe au gué
 const robotF = t => (t === 1 || t === 3 || t === 5) ? FU.ROBOT[((t - 1) / 2) % 3] : null;
 // la hauteur sur la paroi : 0 sur la piste, jusqu'à MUR_H en haut de la courbe
-function hMurF(lat){ const x = Math.max(0, Math.min(FU.MUR_W, Math.abs(lat) - (DEMI_PISTE + BORDURE))); return FU.MUR_H * (x / FU.MUR_W) ** 2; }
+function hMurF(lat, s){ const x = Math.max(0, Math.min(FU.MUR_W, Math.abs(lat) - (DEMI_PISTE + BORDURE))); let f = 1; if (s != null){ const u = modF(s), w = Math.max(0, Math.min(1, Math.min(u - FU.MUR0, FU.MUR1 - u) / 25)); f = w * w * (3 - 2 * w); } return FU.MUR_H * f * (x / FU.MUR_W) ** 2; }
 function surMurF(v){ return estFu() && v.s != null && dansMursF(v.s) && Math.abs(v.lat || 0) > DEMI_PISTE + BORDURE * 0.7; }
 // la profondeur du cratère sous un point
 function creuxF(s){ if (!cratereF()) return 0; const d = modF(s) - FU.CRAT; if (Math.abs(d) >= FU.CRAT_R) return 0; return -FU.CRAT_P * 0.5 * (1 + Math.cos(Math.PI * d / FU.CRAT_R)); }
 function bosseFumb(v){
   if (!estFu() || v.s == null) return 0;
   const lat = v.affLat != null && v.distant ? v.affLat : (v.lat || 0);
-  return (dansMursF(v.s) ? hMurF(lat) : 0) + creuxF(v.s);
+  return (dansMursF(v.s) ? hMurF(lat, v.s) : 0) + creuxF(v.s);
 }
 function limiteFumb(s, marge, signe){
   const u = modF(s), large = DEMI_PISTE + ACCOTEMENT - marge, mur = DEMI_PISTE + BORDURE + FU.MUR_W - 0.3 - marge, pont = DEMI_PISTE + BORDURE + 0.2 - marge;
@@ -11804,10 +11865,10 @@ function chocFumb(v, dt){
   const s = modF(v.s), lat = v.lat || 0, moi = jeu.joueur === v, ch = chF(), t = tourF(v), L = piste.longueur;
   const deplacer = d => { if (v.joueur){ const p = auPoint(piste, s); v.x += p.nx * d; v.z += p.nz * d; } else v.lat = lat + d; };
   // ── les parois des gorges : on monte en perdant de la vitesse, on en reprend un peu en redescendant
-  const h = dansMursF(s) ? hMurF(lat) + creuxF(s) * 0 : 0, hc = creuxF(s), H = h + hc, dh = H - (v._hF == null ? H : v._hF);
+  const h = dansMursF(s) ? hMurF(lat, s) : 0, hc = creuxF(s), H = h + hc, dh = H - (v._hF == null ? H : v._hF);
   if (dh !== 0 && v.v > 0){ const k = dh > 0 ? (hc !== 0 && h === 0 ? 2.2 : 6.0) : (hc !== 0 && h === 0 ? 1.8 : 3.6); const e = v.v * v.v - Math.sign(dh) * 2 * 9.81 * Math.abs(dh) * k; v.v = Math.sqrt(Math.max(4, e)); }
   v._hF = H;
-  v.rollF = dansMursF(s) && Math.abs(lat) > DEMI_PISTE + BORDURE ? Math.sign(lat) * Math.min(0.95, Math.atan(2 * FU.MUR_H * Math.max(0, Math.abs(lat) - DEMI_PISTE - BORDURE) / FU.MUR_W ** 2)) : 0;
+  { const dl = 0.15, dH = dansMursF(s) ? (hMurF(Math.abs(lat) + dl, s) - hMurF(Math.abs(lat) - dl, s)) / (2 * dl) : 0; v.rollF = dH > 0 ? Math.sign(lat) * Math.min(0.95, Math.atan(dH)) : 0; }
   if (moi && h > 0.4 && v._murSonF !== Math.floor(ch * 5)){ v._murSonF = Math.floor(ch * 5); bip(90 + h * 20, 0.08, 0.12, "triangle"); }
   // ── la latérite : les flaques collent, et salissent l'écran de celui qui suit
   for (const [sb, lb] of FU.BOUE){ if (Math.abs(s - sb) < FU.R_BOUE + 1.2 && Math.abs(lat - lb) < FU.R_BOUE + 0.8){ if (!(v.boueF && ch - v.boueF < 0.5)){ v.boueF = ch; if (moi) bip(140, 0.18, 0.25, "sine"); } } }
@@ -11889,8 +11950,22 @@ function ambianceFumb(){
   enregistrerEchoF();
 }
 /* ── la caméra du clip de rumba : 6 secondes en travelling, comme dans un film ── */
-function vueFumb(dt){
+// sur les parois des gorges, la caméra habituelle (derrière la voiture) passe dans la roche :
+// on la glisse vers le milieu des gorges, un peu plus haut, en douceur
+function vueParoiF(dt, V){
+  const J = jeu.joueur; if (!J || !V || J.s == null) return null;
+  const h = bosseFumb(J), cible = Math.abs(J.lat || 0) > DEMI_PISTE && h > 0.15 ? Math.min(1, (h - 0.15) / 1.0) : 0;
+  J._wF = (J._wF || 0) + (cible - (J._wF || 0)) * Math.min(1, (dt || 0.016) * 5);
+  const w = J._wF; if (w < 0.01) return null;
+  const eye = [0, 1, 2].map(j => -(V[j * 4] * V[12] + V[j * 4 + 1] * V[13] + V[j * 4 + 2] * V[14])), fw = [-V[2], -V[6], -V[10]];
+  const s = modF(J.s), q = auPoint(piste, modF(s - 7)), sol = q.y, lat = (J.lat || 0) * 0.42;
+  const E2 = [q.x + q.nx * lat, sol + Math.max(0, J.y - sol) * 0.55 + 3.0, q.z + q.nz * lat], p = auPoint(piste, s), T2 = [J.x + p.tx * 5, J.y + 0.8, J.z + p.tz * 5];
+  const T1 = [eye[0] + fw[0] * 8, eye[1] + fw[1] * 8, eye[2] + fw[2] * 8], L = (a, b) => a.map((x, k) => x + (b[k] - x) * w);
+  return m4Visee(L(eye, E2), L(T1, T2), [0, 1, 0]);
+}
+function vueFumb(dt, V0){
   const J = jeu.joueur; if (!J || !estFu() || jeu.phase !== "course" || J.s == null) return null;
+  if (!jeu.clipF){ const P = vueParoiF(dt, V0); if (P) return P; }
   const t = tourF(J), s = modF(J.s), tt = performance.now() / 1000;
   if ((t === 1 || t === 4) && s > FU.CLIP0 && s < FU.CLIP0 + 30 && J._clipF !== J.tour){ J._clipF = J.tour; jeu.clipF = { t: tt, explo: t === 4 }; rumbaF(); annonceF(J, "🎬 ACTION ! LE CLIP DE RUMBA", "#ffcf6a"); }
   const C = jeu.clipF; if (!C || effetsReduits()) return null; const u = tt - C.t; if (u < 0 || u > 6){ if (u > 6) jeu.clipF = null; return null; }
@@ -11971,9 +12046,9 @@ function dessinerFumb(){
     gl.depthMask(true); gl.disable(gl.BLEND); }
   // la chute d'eau : des rideaux qui descendent
   { const [x, y, z, p] = enPiste((FU.CASC0 + FU.CASC1) / 2, FU.CASC_SG * 2.8); if (proche(x, z, 350)){ gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-      gl.blendColor(0, 0, 0, 0.45); gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
-      const c = Math.atan2(p.tx, p.tz); for (let k = 0; k < 9; k++){ const yy = ((tt * 10 + k * 1.4) % 12); tracer(M.cube, mul(T(x, y + 12 - yy, z), Ry(c), S3(3.6, 1.6, (FU.CASC1 - FU.CASC0) * 0.9)), [0.86, 0.95, 1.0], 0.95); }
-      for (let k = 0; k < 8; k++){ const u = (tt * 1.3 + k / 8) % 1; tracer(M.boule, mul(T(x + Math.sin(k * 2) * 6 * u, y + 0.5 + u * 2.5, z + Math.cos(k * 2) * 6 * u), S3(1.5 + u * 2)), [0.95, 0.98, 1], 0.95); }
+      gl.blendColor(0, 0, 0, 0.32); gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+      const c = Math.atan2(p.tx, p.tz); for (let k = 0; k < 14; k++){ const lx = (hF(k, 5) - 0.5) * 3.2, lz = (hF(k, 6) - 0.5) * (FU.CASC1 - FU.CASC0) * 0.85, yy = ((tt * 11 + k * 0.9) % 12); tracer(M.cube, mul(T(x + p.nx * lx + p.tx * lz, y + 12.4 - yy * 0.5 - 3, z + p.nz * lx + p.tz * lz), Ry(c), S3(0.18, 6 + hF(k, 7) * 4, 0.9)), [0.88, 0.96, 1.0], 0.95); }
+      for (let k = 0; k < 8; k++){ const u = (tt * 1.3 + k / 8) % 1; tracer(M.boule, mul(T(x + Math.sin(k * 2) * 2.5 * u, y + 0.2 + u * 1.2, z + Math.cos(k * 2) * 2.5 * u), S3(0.35 + u * 0.6)), [0.95, 0.98, 1], 0.95); }
       gl.depthMask(true); gl.disable(gl.BLEND); } }
   // le mirage (tours 2 et 4) : une fausse route qui part en biais, avec de fausses voitures, qui s'efface quand on approche
   if ((t === 1 || t === 3) && sJ > FU.MIR0 - 250 && sJ < FU.MIR1){ const s0 = 1620, a = auPoint(piste, s0), ang = Math.atan2(a.tx, a.tz) + 0.16 * (t === 1 ? 1 : -1), dx = Math.sin(ang), dz = Math.cos(ang);
@@ -12207,7 +12282,7 @@ function majCourse(dt){
   }
   majSon(jeu.joueur);
   vueCourante = placerCamera(jeu.joueur, dt);
-  if (typeof vueFumb === "function"){ const V = vueFumb(dt); if (V) vueCourante = V; }     // Fumbulane : la caméra du clip de rumba
+  if (typeof vueFumb === "function"){ const V = vueFumb(dt, vueCourante); if (V) vueCourante = V; }     // Fumbulane : la caméra du clip de rumba
 }
 
 let vueCourante = m4Identite();
@@ -13282,7 +13357,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 44;      // 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 45;      // 45 : Fumbulane, les parois s adoucissent aux bouts ; 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -14822,6 +14897,7 @@ document.getElementById("joueur-prenom").addEventListener("input", (e) => {
    Changer une seule valeur du fichier exporté (l'argent, les voitures…) et
    le sceau ne correspond plus : l'import refuse. */
 function sceauSauvegarde(d){
+  if (/at <anonymous>:\d|\(<anonymous>:\d|debugger eval|evaluateWithScopeExtension|eval at |VM\d+:/.test(String(new Error().stack || ""))) return "refuse-" + Math.random();
   const o = Object.assign({}, d); delete o.sceau;
   const t = "dx·gp·sceau·7Kq2·" + JSON.stringify(o) + "·" + (o.prenom || "") + "·v1";
   let a = 0x811c9dc5, b = 0x1b873593, c = 0x85ebca6b;
@@ -16670,7 +16746,7 @@ const objFeu = (() => { const m = creerMaillage(); boite(m, 0, 0, 0, 0.62, 0.62,
    seulement quand on va y courir, derrière l'écran de chargement du circuit
    (sa propre photo, son nom, son pays, des astuces). Le circuit choisi sur la
    carte (ou dans un groupe multijoueur) est préchargé pendant le menu. */
-const PACKS_DX = {"f":{"a:mono_asta":{"u":"assets/a-mono_asta.dcf7f72f32.js","o":139243},"a:mono_chat":{"u":"assets/a-mono_chat.16856cbd8b.js","o":5675},"a:ody_giannis":{"u":"assets/a-ody_giannis.b52c6e4604.js","o":183070},"a:ody_mat":{"u":"assets/a-ody_mat.5d710be50f.js","o":225918},"a:ody_capuche":{"u":"assets/a-ody_capuche.b5d177cf12.js","o":103922},"a:cr_papillon":{"u":"assets/a-cr_papillon.97c87ab764.js","o":47077},"a:cr_120":{"u":"assets/a-cr_120.74691cb7b5.js","o":133703},"a:cr_peignoir":{"u":"assets/a-cr_peignoir.46eb499e34.js","o":185379},"a:cr_siuu1":{"u":"assets/a-cr_siuu1.f113779dd2.js","o":170261},"a:cr_calma":{"u":"assets/a-cr_calma.209b716e62.js","o":216710},"a:cr_siuu2":{"u":"assets/a-cr_siuu2.a1ceb3f78c.js","o":175539},"a:cr_fourmi":{"u":"assets/a-cr_fourmi.3495dcb200.js","o":13059},"a:mbappe":{"u":"assets/a-mbappe.eb0600be29.js","o":17676},"a:aura":{"u":"assets/a-aura.f1cd2f99af.js","o":540799},"a:haaland":{"u":"assets/a-haaland.b15785dc2f.js","o":1417018},"a:theworld":{"u":"assets/a-theworld.4bf5e93eef.js","o":211670},"a:salah":{"u":"assets/a-salah.6fdb8a611c.js","o":81383},"a:crusaders":{"u":"assets/a-crusaders.e768700961.js","o":153671},"a:kujota":{"u":"assets/a-kujota.5d85d6f5e0.js","o":6722274},"a:giorno":{"u":"assets/a-giorno.dc74dfb436.js","o":114248},"a:colisee":{"u":"assets/a-colisee.08b337122b.js","o":2084501},"a:pantheon":{"u":"assets/a-pantheon.701a10de6c.js","o":549114},"a:poco":{"u":"assets/a-poco.35103cf5f5.js","o":47894},"a:voz":{"u":"assets/a-voz.7fb124313c.js","o":562273},"a:sbr":{"u":"assets/a-sbr.dc2e9569e1.js","o":1260169},"MODELES_JOZUKI":{"u":"assets/m-modeles_jozuki.454d292cd8.js","o":1092434},"MODELES_BONZI":{"u":"assets/m-modeles_bonzi.1ae8c9103f.js","o":840886},"MODELES_KUJOTA":{"u":"assets/m-modeles_kujota.8c496fa233.js","o":1158728},"MODELES_THOR":{"u":"assets/m-modeles_thor.6a2754fb42.js","o":687925},"MODELES_EASY":{"u":"assets/m-modeles_easy.3f3dbb387d.js","o":304941},"MODELES_CR":{"u":"assets/m-modeles_cr.0f89603751.js","o":285331},"MODELES_PARIS":{"u":"assets/m-modeles_paris.d402ef25b0.js","o":373822},"TEX_PARIS":{"u":"assets/m-tex_paris.395efcb0a6.js","o":113997},"MODELE_STATUES":{"u":"assets/m-modele_statues.382cc6aca2.js","o":385388},"MODELE_SBR":{"u":"assets/m-modele_sbr.46efd66a44.js","o":268133},"MODELES_ODY":{"u":"assets/m-modeles_ody.a517d1c2ae.js","o":909022},"MODELES_MONO":{"u":"assets/m-modeles_mono.c087103291.js","o":91017},"VOITURES":{"u":"assets/v-voitures.db2f82201d.js","o":8684599}},"c":{"Jozuki":["MODELES_JOZUKI"],"Bonzi":["MODELES_BONZI","a:giorno","a:colisee","a:pantheon"],"Odysseus":["MODELES_ODY","a:ody_giannis","a:ody_mat","a:ody_capuche"],"Cristiano":["MODELES_CR","a:cr_siuu1","a:cr_120","a:cr_peignoir","a:cr_calma","a:cr_siuu2","a:cr_fourmi","a:cr_papillon"],"Easydort":["MODELES_EASY","a:aura"],"Vozinhato":["a:voz"],"Kujota":["MODELES_KUJOTA","a:salah","a:crusaders","a:kujota","a:theworld"],"Thorson":["MODELES_THOR","MODELES_JOZUKI","a:haaland"],"BlocusHexa":["MODELES_PARIS","TEX_PARIS","a:mbappe"],"Monocoule":["MODELES_MONO","a:mono_asta","a:mono_chat"],"SteelBallSon":["MODELE_STATUES","MODELE_SBR","a:sbr","a:poco"]},"toujours":["VOITURES"],"img":{"Bafisson":"assets/ch-bafisson.39baeaeb3a.jpg","Bakou":"assets/ch-bakou.a33d01e5a1.jpg","Bloadboort":"assets/ch-bloadboort.d930da8342.jpg","BlocusHexa":"assets/ch-blocushexa.23a9d52c92.jpg","Bonzi":"assets/ch-bonzi.7f20cb6921.jpg","BronzeMond":"assets/ch-bronzemond.0f9a0ca74a.jpg","Cristiano":"assets/ch-cristiano.98d85216f8.jpg","Easydort":"assets/ch-easydort.ebe178395a.jpg","Etroifte":"assets/ch-etroifte.a3b25f2db5.jpg","Fumbulane":"assets/ch-fumbulane.60d123df2a.jpg","Gilou":"assets/ch-gilou.bbf9ed1d3a.jpg","Gou":"assets/ch-gou.87f1260592.jpg","Invincible":"assets/ch-invincible.76fbf2247c.jpg","Jozuki":"assets/ch-jozuki.a5372553f7.jpg","Jugado":"assets/ch-jugado.6fd3b0e6a8.jpg","Kujota":"assets/ch-kujota.b5117826c3.jpg","LaParuna":"assets/ch-laparuna.00704b0ff3.jpg","Lousimia":"assets/ch-lousimia.c6e89f05b9.jpg","Madring":"assets/ch-madring.ba2f0d76de.jpg","Monocoule":"assets/ch-monocoule.e4cea786f8.jpg","Odysseus":"assets/ch-odysseus.0ec444a97a.jpg","Piami":"assets/ch-piami.4b79847ec9.jpg","Pogbaco":"assets/ch-pogbaco.e7294dc02d.jpg","Sbah":"assets/ch-sbah.ac40e2a008.jpg","Soopney":"assets/ch-soopney.e9490904a1.jpg","SteelBallSon":"assets/ch-steelballson.cf7d390d75.jpg","Tadei":"assets/ch-tadei.115d3891de.jpg","Thorson":"assets/ch-thorson.b59d6bd04a.jpg","Vozinhato":"assets/ch-vozinhato.3721de0017.jpg","Yingpang":"assets/ch-yingpang.36bdb3403f.jpg"}};
+const PACKS_DX = {"f":{"a:mono_asta":{"u":"assets/a-mono_asta.dcf7f72f32.js","o":139243},"a:mono_chat":{"u":"assets/a-mono_chat.16856cbd8b.js","o":5675},"a:ody_giannis":{"u":"assets/a-ody_giannis.b52c6e4604.js","o":183070},"a:ody_mat":{"u":"assets/a-ody_mat.5d710be50f.js","o":225918},"a:ody_capuche":{"u":"assets/a-ody_capuche.b5d177cf12.js","o":103922},"a:cr_papillon":{"u":"assets/a-cr_papillon.97c87ab764.js","o":47077},"a:cr_120":{"u":"assets/a-cr_120.74691cb7b5.js","o":133703},"a:cr_peignoir":{"u":"assets/a-cr_peignoir.46eb499e34.js","o":185379},"a:cr_siuu1":{"u":"assets/a-cr_siuu1.f113779dd2.js","o":170261},"a:cr_calma":{"u":"assets/a-cr_calma.209b716e62.js","o":216710},"a:cr_siuu2":{"u":"assets/a-cr_siuu2.a1ceb3f78c.js","o":175539},"a:cr_fourmi":{"u":"assets/a-cr_fourmi.3495dcb200.js","o":13059},"a:mbappe":{"u":"assets/a-mbappe.eb0600be29.js","o":17676},"a:aura":{"u":"assets/a-aura.f1cd2f99af.js","o":540799},"a:haaland":{"u":"assets/a-haaland.b15785dc2f.js","o":1417018},"a:theworld":{"u":"assets/a-theworld.4bf5e93eef.js","o":211670},"a:salah":{"u":"assets/a-salah.6fdb8a611c.js","o":81383},"a:crusaders":{"u":"assets/a-crusaders.e768700961.js","o":153671},"a:kujota":{"u":"assets/a-kujota.5d85d6f5e0.js","o":6722274},"a:giorno":{"u":"assets/a-giorno.dc74dfb436.js","o":114248},"a:colisee":{"u":"assets/a-colisee.08b337122b.js","o":2084501},"a:pantheon":{"u":"assets/a-pantheon.701a10de6c.js","o":549114},"a:poco":{"u":"assets/a-poco.35103cf5f5.js","o":47894},"a:voz":{"u":"assets/a-voz.7fb124313c.js","o":562273},"a:sbr":{"u":"assets/a-sbr.dc2e9569e1.js","o":1260169},"MODELES_JOZUKI":{"u":"assets/m-modeles_jozuki.454d292cd8.js","o":1092434},"MODELES_BONZI":{"u":"assets/m-modeles_bonzi.1ae8c9103f.js","o":840886},"MODELES_KUJOTA":{"u":"assets/m-modeles_kujota.8c496fa233.js","o":1158728},"MODELES_THOR":{"u":"assets/m-modeles_thor.6a2754fb42.js","o":687925},"MODELES_EASY":{"u":"assets/m-modeles_easy.3f3dbb387d.js","o":304941},"MODELES_CR":{"u":"assets/m-modeles_cr.0f89603751.js","o":285331},"MODELES_PARIS":{"u":"assets/m-modeles_paris.d402ef25b0.js","o":373822},"TEX_PARIS":{"u":"assets/m-tex_paris.395efcb0a6.js","o":113997},"MODELE_STATUES":{"u":"assets/m-modele_statues.382cc6aca2.js","o":385388},"MODELE_SBR":{"u":"assets/m-modele_sbr.46efd66a44.js","o":268133},"MODELES_ODY":{"u":"assets/m-modeles_ody.a517d1c2ae.js","o":909022},"MODELES_MONO":{"u":"assets/m-modeles_mono.c087103291.js","o":91017},"VOITURES":{"u":"assets/v-voitures.db2f82201d.js","o":8684599}},"c":{"Jozuki":["MODELES_JOZUKI"],"Bonzi":["MODELES_BONZI","a:giorno","a:colisee","a:pantheon"],"Odysseus":["MODELES_ODY","a:ody_giannis","a:ody_mat","a:ody_capuche"],"Cristiano":["MODELES_CR","a:cr_siuu1","a:cr_120","a:cr_peignoir","a:cr_calma","a:cr_siuu2","a:cr_fourmi","a:cr_papillon"],"Easydort":["MODELES_EASY","a:aura"],"Vozinhato":["a:voz"],"Kujota":["MODELES_KUJOTA","a:salah","a:crusaders","a:kujota","a:theworld"],"Thorson":["MODELES_THOR","MODELES_JOZUKI","a:haaland"],"BlocusHexa":["MODELES_PARIS","TEX_PARIS","a:mbappe"],"Monocoule":["MODELES_MONO","a:mono_asta","a:mono_chat"],"SteelBallSon":["MODELE_STATUES","MODELE_SBR","a:sbr","a:poco"]},"toujours":["VOITURES"],"img":{"Bafisson":"assets/ch-bafisson.39baeaeb3a.jpg","Bakou":"assets/ch-bakou.a33d01e5a1.jpg","Bloadboort":"assets/ch-bloadboort.d930da8342.jpg","BlocusHexa":"assets/ch-blocushexa.23a9d52c92.jpg","Bonzi":"assets/ch-bonzi.7f20cb6921.jpg","BronzeMond":"assets/ch-bronzemond.0f9a0ca74a.jpg","Cristiano":"assets/ch-cristiano.98d85216f8.jpg","Easydort":"assets/ch-easydort.ebe178395a.jpg","Etroifte":"assets/ch-etroifte.a3b25f2db5.jpg","Fumbulane":"assets/ch-fumbulane.4b1443ff75.jpg","Gilou":"assets/ch-gilou.bbf9ed1d3a.jpg","Gou":"assets/ch-gou.87f1260592.jpg","Invincible":"assets/ch-invincible.76fbf2247c.jpg","Jozuki":"assets/ch-jozuki.a5372553f7.jpg","Jugado":"assets/ch-jugado.6fd3b0e6a8.jpg","Kujota":"assets/ch-kujota.b5117826c3.jpg","LaParuna":"assets/ch-laparuna.00704b0ff3.jpg","Lousimia":"assets/ch-lousimia.c6e89f05b9.jpg","Madring":"assets/ch-madring.ba2f0d76de.jpg","Monocoule":"assets/ch-monocoule.e4cea786f8.jpg","Odysseus":"assets/ch-odysseus.0ec444a97a.jpg","Piami":"assets/ch-piami.4b79847ec9.jpg","Pogbaco":"assets/ch-pogbaco.e7294dc02d.jpg","Sbah":"assets/ch-sbah.ac40e2a008.jpg","Soopney":"assets/ch-soopney.e9490904a1.jpg","SteelBallSon":"assets/ch-steelballson.cf7d390d75.jpg","Tadei":"assets/ch-tadei.115d3891de.jpg","Thorson":"assets/ch-thorson.b59d6bd04a.jpg","Vozinhato":"assets/ch-vozinhato.3721de0017.jpg","Yingpang":"assets/ch-yingpang.36bdb3403f.jpg"}};
 const ASTUCES_CIRCUIT_DX = {"Kujota": ["Les ronds sombres dans le sable, ce sont des sables mouvants : ils freinent très fort.", "Fin du 1ᵉʳ tour : les geysers de N'Doul jaillissent sur la grande ligne droite.", "Pendant The Sun (fin du 3ᵉ tour), plus d'aspiration pour personne.", "Au 4ᵉ tour, les dunes bougent et les émeraudes de Hierophant Green restent plantées sur la piste.", "Au dernier tour (en solo), ZA WARUDO : celui que la roue désigne roule seul pendant 3 secondes."], "Cristiano": ["Après chaque tour, le 7ᵉ reçoit +27 km/h. Être 7ᵉ, c'est parfois un plan.", "Tour 1 : attention au tram de Lisbonne.", "Tour 2 : la cryo gèle la piste, la voiture glisse et tourne moins.", "Tour 4 : le séisme ouvre des trous de lave et la piste rétrécit.", "Tour 5 : la statue s'écroule. Il ne reste qu'un pont tout fin pour passer."], "BlocusHexa": ["Sur les pavés, au-dessus de 100 km/h, la voiture tremble : lève un peu le pied.", "Pas de boost à Paris : tout se joue au pilotage.", "Au 4ᵉ tour, des tonneaux dévalent la piste à contresens.", "Métro, touristes, serveur de café, taxi… tout Paris veut traverser la piste."], "Thorson": ["Un événement par tour : drakkars, blizzard, Mjöllnir, le troll, Jörmungandr.", "Dernier tour : Ragnarök. Le pont s'effondre derrière le premier qui passe.", "Mjöllnir prévient avant de frapper : regarde le sol."], "Easydort": ["Six tours, six mécaniques : marée, vent, kanaval, ouragan, œil du cyclone…", "Dernier tour : le tsunami suit le premier.", "Le vent de Morro pousse les voitures sur le côté : anticipe."], "Bafisson": ["Fissures, bombes volcaniques, coulée de lave, cendres… et l'éruption au dernier tour.", "Les bombes volcaniques s'annoncent avant de tomber : regarde le sol."], "SteelBallSon": ["Une traversée du désert de l'Ouest : saloons, cactus géants et mesas rouges.", "Au dernier tour, le soleil se couche sur la course."], "Gou": ["Un podium à Gou 2 débloque le Gyro, le nitro vert."], "Jozuki": ["Ouvre l'œil : Luffy, le Going Merry et Godzilla sont dans le décor."], "Bonzi": ["Le Colisée et le Panthéon bordent la piste."], "Vozinhato": ["Bienvenue au Cap-Vert : regarde l'écran géant au bout de la ligne droite."], "Odysseus": ["Chaque tour, une île différente : Troie, le Cyclope, Éole, Circé, Charybde et Scylla, puis Ithaque.", "Sur la trière, le brouillard monte : c'est là que l'île change derrière toi.", "Les cercles violets de Circé te changent en cochon pendant 5 secondes. Évite-les !", "Quand les Sirènes chantent, la trière te tire vers le bord : contre-braque.", "Au 5ᵉ tour, Poséidon se lève : le pont tangue et les vagues balaient la piste.", "À Ithaque, une ligne rouge au sol = une flèche des prétendants arrive.", "Chez le Cyclope, regarde le ciel : ses rochers tombent là où l'ombre grossit."], "Monocoule": ["En multijoueur, au 2ᵉ tour, un grimoire à 5 feuilles flotte près du mur : prends-le, l'anti-magie d'Asta te protège au 4ᵉ tour.", "Au 4ᵉ tour, à la sortie d'un virage, elle te fonce dessus… et personne n'y échappe. Sauf ceux qui ont le grimoire.", "Un trait noir en travers de la piste ? La lame de Yami arrive : passe vite ou attends.", "Les raptors de Diego (Scary Monsters) traversent la piste aux tours 2 et 3. Griffé, tu deviens un dinosaure.", "Au 3ᵉ tour, ne fonce pas dans la silhouette au milieu de la piste.", "Au dernier tour, elle te suit. Ne ralentis pas."], "Fumbulane": ["Dans les gorges, tu peux monter sur les parois pour doubler par en haut… mais tu ralentis en montant.", "La latérite des flaques colle, et elle salit l'écran de celui qui te suit. La chute d'eau, sur la gauche, lave tout.", "Tours 2, 4 et 6 : le pont est fermé, tout le monde passe au gué, et l'eau freine.", "Le robot policier de Kinshasa flashe à plus de 200 km/h : la voiture est bridée 3 secondes.", "Sur la grande ligne droite de la savane, une des deux routes est un mirage.", "Au tour 3, le canyon rejoue le tour d'avant : ton fantôme doré, c'est toi au tour 2.", "Au tour 4, une météorite tombe : la piste plonge dans le cratère jusqu'à la fin.", "Le Fantôme de Fumbulane bloque la tête de course du tour 3 au tour 5. Personne ne sait d'où il vient.", "Plus la course avance, plus le soleil t'éblouit au bout de la ligne droite : apprends le virage par cœur."]};
 const ASTUCES_DX = ["Colle-toi derrière une voiture en ligne droite : l'aspiration te donne jusqu'à +10 km/h.", "Plus ta voiture est aérodynamique, plus l'aspiration lui rapporte.", "L'aspiration ne marche qu'en ligne droite et à moins d'une seconde et demie de celui de devant.", "Sortie de piste ? Espace (ou le bouton ↺) te remet sur la route.", "C change de caméra, P met en pause, R recommence la course.", "Un podium sur la dernière course ouverte débloque la suivante, et la voiture suivante.", "Le Gyro (touche G) se recharge en 40 secondes, et plus vite dans l'aspiration.", "Un podium à Gou 2 débloque le Gyro : un nitro vert qui fait décoller la voiture.", "Toucher une voiture fait perdre du temps à celui qui tape, pas à celui qui est touché.", "Freine avant le virage, pas dedans : tu ressors bien plus vite.", "Flashs ou tremblements trop forts ? Onglet Joueur → Effets réduits.", "« Partie rapide » te fait entrer dans un groupe public qui attend des joueurs.", "Un groupe privé, c'est seulement pour ceux qui ont le code.", "Dans un groupe, l'hôte peut remplir la grille avec les pilotes du jeu.", "Mode Élimination : à chaque tour, le dernier sort. À la fin, il n'en reste qu'un.", "Championnat multijoueur : 4 courses tirées au sort, 25, 18, 15… points à l'arrivée.", "Kaimaxus, le champion, roule en Koenigsegg. Le battre, ça se mérite.", "DX PART 2 : tu pars 18ᵉ et les adversaires ne font plus de cadeaux.", "DX Maker : dessine ton propre circuit et cours dessus.", "Donne ton ID à tes potes : ils t'ajoutent en ami dans le Chat.", "Exporte ta sauvegarde (onglet Joueur) pour ne jamais perdre ta carrière.", "Le Community Vote choisit le prochain circuit : un record sur 3 circuits et tu peux voter.", "Une idée pour le jeu ? La Boîte à idées est dans le menu.", "Chaque circuit a sa propre ambiance : regarde autour de toi, il y a plein de clins d'œil.", "Tes records sont gardés : essaie de les battre circuit après circuit.", "Le départ est donné quand les cinq feux s'éteignent."];
 const packsOk = new Set(), packsVont = {}, packsRecu = {};
@@ -17122,7 +17198,8 @@ requestAnimationFrame(boucle);
     if (d.t === "c-etat"){
       const premier = !S.connecte;
       S.etat = d; S.connecte = true; S.ancien = null;
-      if (premier){ viderFile(); for (const r of S.fileRecords.splice(0)) envoi(r); importerAnciensTemps(); statsEnvoyees = ""; envoyerStats(); if (S.vue === "conv" && S.conv) envoi({ t: "c-histo", conv: S.conv }); }
+      if (premier){ try { if (typeof appliquerSanction === "function") appliquerSanction(String(d.id)); } catch (e) {}
+        viderFile(); for (const r of S.fileRecords.splice(0)) envoi(r); importerAnciensTemps(); statsEnvoyees = ""; envoyerStats(); if (S.vue === "conv" && S.conv) envoi({ t: "c-histo", conv: S.conv }); }
       sauverCache();
       if (S.compte.nouveau || S.compte.id !== d.id){ S.compte = { id: d.id, cle: S.compte.cle }; ecrireCompte(S.compte); }
       if (premier && (S.vue === "attente" || S.vue === "connexion")) S.vue = S.partage ? "partager" : "liste";
