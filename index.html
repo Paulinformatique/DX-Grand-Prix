@@ -4468,12 +4468,15 @@ function construireDecor(piste){
     // le cœur de la ville : des maisons et des immeubles partout à l'intérieur du circuit, rue après rue
     { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const q of P){ x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z); }
       const dedans = (x, z) => { let w = 0; for (let k = 0; k < nb; k += 2){ const a = P[k], b = P[(k + 2) % nb]; if ((a.z > z) !== (b.z > z) && x < a.x + (z - a.z) / (b.z - a.z) * (b.x - a.x)) w ^= 1; } return w; };
-      for (let x = x0 + 20; x < x1; x += 30) for (let z = z0 + 20; z < z1; z += 30){ if (alC() < 0.12) continue; const xx = x + (alC() - 0.5) * 6, zz = z + (alC() - 0.5) * 6;
-        if (!dedans(xx, zz) || !libreD(xx, zz, 10)) continue; const gros = alC() < 0.4, M = gros ? MC.immeuble_l : MC.maison_l, H = gros ? 13 + alC() * 6 : 7 + alC() * 3, a = Math.floor(alC() * 4) * Math.PI / 2;
+      // ville allégée : une maison tous les 40 m, et seulement à moins de 200 m de la piste (au-delà on ne la voit pas)
+      const presDePiste = (x, z) => { for (let k = 0; k < nb; k += 3){ const dx = P[k].x - x, dz = P[k].z - z; if (dx * dx + dz * dz < 200 * 200) return true; } return false; };
+      for (let x = x0 + 20; x < x1; x += 40) for (let z = z0 + 20; z < z1; z += 40){ if (alC() < 0.12) continue; const xx = x + (alC() - 0.5) * 8, zz = z + (alC() - 0.5) * 8;
+        if (!dedans(xx, zz) || !presDePiste(xx, zz) || !libreD(xx, zz, 10)) continue; const gros = alC() < 0.4, M = gros ? MC.immeuble_l : MC.maison_l, H = gros ? 13 + alC() * 6 : 7 + alC() * 3, a = Math.floor(alC() * 4) * Math.PI / 2;
         poserC(M, xx, solEn(xx, zz)[0] - 0.2, zz, Math.sin(a), Math.cos(a), H, teinte(M, COULEURS[Math.floor(alC() * COULEURS.length)])); reserver(xx, zz, 10); } }
     // les maisons et immeubles de Lisbonne, de toutes les couleurs, le long de la piste
-    for (let s = 20; s < L; s += 16 + alC() * 10) for (const sg of [1, -1]){ if (alC() < 0.3) continue;
-      const p = auPoint(piste, s), gros = alC() < 0.45, M = gros ? MC.immeuble : MC.maison, H = gros ? 15 + alC() * 4 : 7 + alC() * 2;
+    let nMaisonCR = 0;   // une maison détaillée sur trois, les autres en modèle léger
+    for (let s = 20; s < L; s += 19 + alC() * 11) for (const sg of [1, -1]){ if (alC() < 0.3) continue;
+      const p = auPoint(piste, s), gros = alC() < 0.45, M = gros ? (MC.immeuble_l || MC.immeuble) : (++nMaisonCR % 3 && MC.maison_l ? MC.maison_l : MC.maison), H = gros ? 15 + alC() * 4 : 7 + alC() * 2;
       const prof = (gros ? 1.04 : 0.74) * H, dec = sg * (DEMI_PISTE + ACCOTEMENT + 6 + prof / 2), x = p.x + p.nx * dec, z = p.z + p.nz * dec, r = Math.max(prof, (gros ? 0.85 : 1.65) * H) / 2;
       if (!libreD(x, z, r)) continue;
       poserC(M, x, solEn(x, z)[0] - 0.2, z, -p.nx * sg, -p.nz * sg, H, teinte(M, COULEURS[Math.floor(alC() * COULEURS.length)])); reserver(x, z, r); }
