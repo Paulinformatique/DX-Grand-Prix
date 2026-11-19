@@ -6766,8 +6766,8 @@ function retirerVoitures(liste){
   if (!carriere.possedees.includes(carriere.voiture)) carriere.voiture = 0;
 }
 // les comptes qui ont utilisé la faille : une fois, et seulement sur ce compte-là
-const SANCTIONS_DX = { "80437751": { id: "faille-sauvegarde-1", argent: 20000000 }, "34086666": { id: "faille-sauvegarde-1", argent: 20000000 } };
-function messageSanction(){
+const SANCTIONS_DX = { "80437751": { id: "faille-sauvegarde-1", retirer: true, argent: 20000000 }, "34086666": { id: "faille-sauvegarde-1", retirer: true, argent: 20000000 } };
+function messageSanction(texte){
   const nom = (typeof nomJeu === "function" && nomJeu()) || carriere.prenom || "";
   const fond = document.createElement("div");
   fond.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(5,8,14,.78);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Bahnschrift,'Segoe UI',sans-serif";
@@ -6775,7 +6775,7 @@ function messageSanction(){
   boite.style.cssText = "max-width:440px;width:100%;background:#151b27;border:1px solid #f2b632;border-radius:14px;padding:22px 22px 18px;color:#e9edf5;box-shadow:0 20px 60px rgba(0,0,0,.6)";
   const titre = document.createElement("div"); titre.textContent = "🔧 Message de l'équipe DX Grand Prix";
   titre.style.cssText = "font-weight:800;letter-spacing:.04em;color:#f2b632;font-size:17px;margin-bottom:12px";
-  const corps = document.createElement("div"); corps.textContent = MSG_SANCTION.replace("{nom}", nom).replace("Salut  !", "Salut !");
+  const corps = document.createElement("div"); corps.textContent = String(texte || MSG_SANCTION).replace("{nom}", nom).replace("Salut  !", "Salut !");
   corps.style.cssText = "white-space:pre-line;line-height:1.45;font-size:15px";
   const ok = document.createElement("button"); ok.textContent = "Compris !";
   ok.style.cssText = "margin-top:18px;width:100%;height:42px;border:0;border-radius:10px;background:#f2b632;color:#151b27;font:800 15px Bahnschrift,sans-serif;cursor:pointer";
@@ -6783,8 +6783,13 @@ function messageSanction(){
   boite.append(titre, corps, ok); fond.append(boite); document.body.append(fond);
 }
 const MSG_SANCTION = "Salut {nom} ! On a vu que ton garage avait les 18 voitures sans que tu aies passé les courses qui les débloquent : tu es passé par une faille de la sauvegarde. Elle est corrigée maintenant.\n\nTes voitures ont été retirées (tu gardes la BMW M3), mais toute ta progression reste : courses, victoires, records.\n\nEt comme tu nous as aidés à trouver le bug : +20 000 000 berries pour toi 💰. Bonne course !";
-function appliquerSanction(id){ if (coffre.sanction(id)) setTimeout(messageSanction, 300); }
-const coffre = (() => {
+function appliquerSanction(id, liste, admin){
+  if (admin === false) coffre.refuserAdmin();
+  const sl = [SANCTIONS_DX[id], ...(Array.isArray(liste) ? liste : [])].filter(Boolean); let msg = null;
+  for (const s of sl) if (coffre.sanction(s)) msg = s.msg || (s.id === "faille-sauvegarde-1" ? MSG_SANCTION : msg);
+  if (msg) setTimeout(() => messageSanction(msg), 300);
+}
+const coffre = (() => { let adminNon = false;
   const CHAMPS = ["argent", "possedees", "niveau", "niveau2", "podiums", "coursesFaites", "gyro", "meilleuresPlaces", "victoireFinale", "victoireFinale2", "toutDebloque", "avantTout", "stats", "sanctions"];
   const CLE = "apex-gp", SECOURS = "apex-gp-s", MARQUE = "dx-sv1", DATE_SCEAU = 1794310000000;
   const sceau = (d) => {
@@ -6825,11 +6830,23 @@ const coffre = (() => {
       setInterval(() => { if (ref != null && copie() !== ref) revenir();
         if (premier){ premier = false; try { const x = voituresIllegitimes(); if (x.length){ retirerVoitures(x); carriere.maj = Date.now(); ref = copie(); this.ecrire(); try { rafraichirGarage(); rafraichirMenu(); } catch (e) {} } } catch (e) {} } }, 400); },
     // un compte qui a utilisé la faille : ses voitures (sauf la BMW) retirées, sa prime, une seule fois
-    sanction(id){ const s = SANCTIONS_DX[id]; if (!s || suspect()) return false; carriere.sanctions = carriere.sanctions || {};
+    // une correction (du jeu ou envoyée par le serveur) : une seule fois chacune
+    //   retirer : garage → BMW M3, plus de « tout débloquer » ; effacer : carrière remise à zéro ; argent : prime
+    sanction(s){ if (!s || !s.id || suspect()) return false; carriere.sanctions = carriere.sanctions || {};
       if (carriere.sanctions[s.id]) return false;
-      if (carriere.toutDebloque){ carriere.toutDebloque = false; delete carriere.avantTout; }
-      carriere.possedees = [0]; carriere.voiture = 0; carriere.argent = (carriere.argent || 0) + s.argent; carriere.sanctions[s.id] = Date.now();
+      if (s.effacer){ const garde = Object.assign({}, carriere.sanctions); for (const k of Object.keys(carriere)) delete carriere[k];
+        Object.assign(carriere, { argent: 0, voiture: 0, possedees: [0], records: {}, circuitsPerso: [], prenom: "", stats: { courses: 0, podiums: 0, victoires: 0 }, versionCarriere: 2, sanctions: garde }); }
+      if (s.retirer || s.effacer){ carriere.toutDebloque = false; delete carriere.avantTout; carriere.possedees = [0]; carriere.voiture = 0; }
+      carriere.argent = (carriere.argent || 0) + (+s.argent || 0); carriere.sanctions[s.id] = Date.now();
       carriere.maj = Date.now(); ref = copie(); this.ecrire(); try { garageSel = 0; rafraichirGarage(); rafraichirMenu(); } catch (e) {} return true; },
+    // le serveur dit que ce compte n'est pas l'administrateur : plus de « tout débloquer » (même avec le bon prénom)
+    adminRefuse: () => adminNon,
+    refuserAdmin(){ if (suspect()) return false; adminNon = true;
+      if (carriere.toutDebloque){ const a = carriere.avantTout || { possedees: [0], voiture: 0 }; carriere.possedees = (a.possedees || []).length ? a.possedees.slice() : [0];
+        carriere.voiture = carriere.possedees.includes(a.voiture) ? a.voiture : 0; carriere.toutDebloque = false; delete carriere.avantTout;
+        try { const x = voituresIllegitimes(); if (x.length) retirerVoitures(x); } catch (e) {}
+        carriere.maj = Date.now(); ref = copie(); this.ecrire(); }
+      try { appliquerAdmin(); rafraichirGarage(); rafraichirMenu(); } catch (e) {} return true; },
     // une sauvegarde : seulement si elle vient du jeu
     valider(){ if (suspect()){ if (ref != null) revenir(); return false; } ref = copie(); return true; },
     ecrire(){ const d = JSON.parse(JSON.stringify(carriere)); d.sceau = sceau(d); const t = JSON.stringify(d);
@@ -6862,6 +6879,10 @@ function sauver(){
 }
 charger();
 coffre.depart();
+Object.freeze(coffre);
+for (const n of ["estAdmin", "appliquerAdmin", "basculerTout", "sceauSauvegarde", "voitureOuverte", "seuilVoiture", "courseOuverte", "ordreCourses", "sauver", "charger",
+                 "recommencerCarriere", "empreinte", "voituresIllegitimes", "retirerVoitures", "appliquerSanction", "messageSanction"])
+  try { if (typeof window !== "undefined" && window === globalThis && !(navigator && navigator.userAgent === "serveur") && typeof window[n] === "function") Object.defineProperty(window, n, { writable: false }); } catch (e) {}
 
 
 /* ──────────────────────── 8. ÉTAT DE LA COURSE ─────────────────────── */
@@ -15655,7 +15676,7 @@ function empreinte(t){
   for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, "0");
 }
-function estAdmin(){ return empreinte((carriere.prenom || "").trim().toLowerCase()) === EMPREINTE_ADMIN; }
+function estAdmin(){ return !coffre.adminRefuse() && empreinte((carriere.prenom || "").trim().toLowerCase()) === EMPREINTE_ADMIN; }
 function appliquerAdmin(){
   const admin = estAdmin();
   for (const id of ["btn-atelier", "btn-tout", "btn-tout-carte", "btn-trapezoidu"]) document.getElementById(id).style.display = admin ? "" : "none";
@@ -17226,7 +17247,7 @@ requestAnimationFrame(boucle);
     if (d.t === "c-etat"){
       const premier = !S.connecte;
       S.etat = d; S.connecte = true; S.ancien = null;
-      if (premier){ try { if (typeof appliquerSanction === "function") appliquerSanction(String(d.id)); } catch (e) {}
+      if (premier){ try { if (typeof appliquerSanction === "function") appliquerSanction(String(d.id), d.sanctions || [], d.admin); } catch (e) {}
         viderFile(); for (const r of S.fileRecords.splice(0)) envoi(r); importerAnciensTemps(); statsEnvoyees = ""; envoyerStats(); if (S.vue === "conv" && S.conv) envoi({ t: "c-histo", conv: S.conv }); }
       sauverCache();
       if (S.compte.nouveau || S.compte.id !== d.id){ S.compte = { id: d.id, cle: S.compte.cle }; ecrireCompte(S.compte); }
