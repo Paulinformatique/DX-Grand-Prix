@@ -6784,7 +6784,7 @@ function messageSanction(texte){
 }
 const MSG_SANCTION = "Salut {nom} ! On a vu que ton garage avait les 18 voitures sans que tu aies passé les courses qui les débloquent : tu es passé par une faille de la sauvegarde. Elle est corrigée maintenant.\n\nTes voitures ont été retirées (tu gardes la BMW M3), mais toute ta progression reste : courses, victoires, records.\n\nEt comme tu nous as aidés à trouver le bug : +20 000 000 berries pour toi 💰. Bonne course !";
 function appliquerSanction(id, liste, admin){
-  if (admin === false) coffre.refuserAdmin();
+  if (admin === true || admin === false) coffre.majAdmin(admin);
   const sl = [SANCTIONS_DX[id], ...(Array.isArray(liste) ? liste : [])].filter(Boolean); let msg = null;
   for (const s of sl) if (coffre.sanction(s)) msg = s.msg || (s.id === "faille-sauvegarde-1" ? MSG_SANCTION : msg);
   if (msg) setTimeout(() => messageSanction(msg), 300);
@@ -6841,7 +6841,8 @@ const coffre = (() => { let adminNon = false;
       carriere.maj = Date.now(); ref = copie(); this.ecrire(); try { garageSel = 0; rafraichirGarage(); rafraichirMenu(); } catch (e) {} return true; },
     // le serveur dit que ce compte n'est pas l'administrateur : plus de « tout débloquer » (même avec le bon prénom)
     adminRefuse: () => adminNon,
-    refuserAdmin(){ if (suspect()) return false; adminNon = true;
+    majAdmin(ok){ if (suspect()) return false; if (ok === true){ if (adminNon){ adminNon = false; try { appliquerAdmin(); } catch (e) {} } return true; }
+      if (ok !== false || adminNon) return false; adminNon = true;
       if (carriere.toutDebloque){ const a = carriere.avantTout || { possedees: [0], voiture: 0 }; carriere.possedees = (a.possedees || []).length ? a.possedees.slice() : [0];
         carriere.voiture = carriere.possedees.includes(a.voiture) ? a.voiture : 0; carriere.toutDebloque = false; delete carriere.avantTout;
         try { const x = voituresIllegitimes(); if (x.length) retirerVoitures(x); } catch (e) {}
@@ -13520,7 +13521,9 @@ function nouvelleLiaison(S, autre, initiateur, surOuvert, surDonnee, surFerme){
   return L;
 }
 const codeAleatoire = () => Array.from({ length: 5 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.floor(Math.random() * 24)]).join("");
-const monNomMulti = () => (document.getElementById("mu-nom").value || "").trim().slice(0, 16) || (carriere.prenom || "").trim() || "Joueur";
+// le nom montré aux autres : jamais le mot de passe de l'administrateur
+function nomPublic(n){ n = String(n || "").trim().slice(0, 16); return n && empreinte(n.toLowerCase()) === EMPREINTE_ADMIN ? "Trapezoidululu" : n; }
+const monNomMulti = () => nomPublic((document.getElementById("mu-nom").value || "").trim().slice(0, 16) || (carriere.prenom || "").trim()) || "Joueur";
 // les courses de la carte (pas les circuits de l'atelier : les autres ne les ont pas)
 function coursesMulti(){
   const perso = new Set((carriere.circuitsPerso || []).map(c => c.nom));
@@ -14431,7 +14434,7 @@ function afficherSalon(){
   if (!reseau.hote) multiStatut(reseau.joueurs.length ? "En attente du départ donné par l'hôte…" : "");
 }
 document.getElementById("btn-multi").onclick = () => {
-  document.getElementById("mu-nom").value = document.getElementById("mu-nom").value || (carriere.prenom || "");
+  document.getElementById("mu-nom").value = document.getElementById("mu-nom").value || nomPublic(carriere.prenom);
   if (reseau.peer && (reseau.hote || reseau.conn)) afficherSalon(); else afficherEntree();
   montrer("ecran-multi");
 };
@@ -17147,7 +17150,8 @@ requestAnimationFrame(boucle);
     if (s < 60) return "vu à l'instant"; if (s < 3600) return "vu il y a " + Math.floor(s / 60) + " min";
     if (s < 86400) return "vu il y a " + Math.floor(s / 3600) + " h"; return "vu il y a " + Math.floor(s / 86400) + " j"; };
   // le nom du joueur, celui de l'écran Joueur (vide : le serveur donne « Joueur 12 »)
-  const nomJeu = () => { try { return (carriere.prenom || "").trim().slice(0, 16); } catch (e) { return ""; } };
+  // (le mot de passe de l'administrateur ne part jamais comme nom : on envoie « Trapezoidululu » à la place)
+  const nomJeu = () => { try { const n = (carriere.prenom || "").trim().slice(0, 16); return empreinte(n.toLowerCase()) === EMPREINTE_ADMIN ? "Trapezoidululu" : n; } catch (e) { return ""; } };
 
   // mes stats du jeu, montrées sur mon profil
   function statsJeu(){
@@ -17247,6 +17251,7 @@ requestAnimationFrame(boucle);
     if (d.t === "c-etat"){
       const premier = !S.connecte;
       S.etat = d; S.connecte = true; S.ancien = null;
+      try { if (!premier && typeof coffre !== "undefined" && coffre.majAdmin) coffre.majAdmin(d.admin); } catch (e) {}
       if (premier){ try { if (typeof appliquerSanction === "function") appliquerSanction(String(d.id), d.sanctions || [], d.admin); } catch (e) {}
         viderFile(); for (const r of S.fileRecords.splice(0)) envoi(r); importerAnciensTemps(); statsEnvoyees = ""; envoyerStats(); if (S.vue === "conv" && S.conv) envoi({ t: "c-histo", conv: S.conv }); }
       sauverCache();
