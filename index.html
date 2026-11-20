@@ -7336,8 +7336,8 @@ function majJoueur(v, dt){
     if (liegeCR(v)){                       // Cristiano, 4ᵉ tour : le liège renvoie la voiture vers l'autre côté
       v.cap = vers + da; v.capVit = v.cap; v.v *= 0.95; const q = Math.sign(v.lat) * (limite - 0.4); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q;
       secousse = 0.8; if (jeu.joueur === v){ v.liegeT = jeu.chrono; bip(240, 0.12, 0.3, "sine"); setTimeout(() => bip(360, 0.1, 0.25, "sine"), 90); }
-    } else if (piste.def.nom === "Fumbulane" && typeof dansMursF === "function" && (dansMursF(v.s) || (modF(v.s) > FU.GORGE0 - 60 && modF(v.s) < FU.GORGE1 + 40))){     // Fumbulane : contre les falaises des gorges, on glisse
-      v.v *= dansMursF(v.s) ? 0.995 : 0.985; v.cap += da * 0.5; v.capVit = v.cap; const q = Math.sign(v.lat) * (limite - 0.15); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q;
+    } else if (piste.def.nom === "Fumbulane" && typeof dansMursF === "function" && (dansMursF(v.s) || (modF(v.s) > FU.GORGE0 - 60 && modF(v.s) < FU.GORGE1 + 40) || (modF(v.s) > FU.PONT0 - 70 && modF(v.s) < FU.PONT1 + 25))){     // Fumbulane : contre les falaises des gorges et les bords du pont et du gué, on glisse
+      const auPontF = modF(v.s) > FU.PONT0 - 70 && modF(v.s) < FU.PONT1 + 25; v.v *= dansMursF(v.s) ? 0.995 : auPontF ? 0.99 : 0.985; v.cap += da * (auPontF ? 0.7 : 0.5); v.capVit = v.cap; const q = Math.sign(v.lat) * (limite - (auPontF ? 0.3 : 0.15)); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q;
     } else if (piste.def.nom === "Monocoule"){       // Monocoule : on frotte et on glisse le long du mur
       const fort = !(v._murMT > jeu.chrono - 0.3); v.v *= fort ? 0.86 : 0.99; v.cap += da * 0.6; v.capVit = v.cap;
       const q = Math.sign(v.lat) * (limite - 0.2); v.lat = q; v.x = p.x + p.nx * q; v.z = p.z + p.nz * q; v._murMT = jeu.chrono; if (fort) secousse = 0.4;
