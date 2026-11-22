@@ -101,6 +101,26 @@ try { (function(){
   *{margin:0;padding:0;box-sizing:border-box}
   .acc-pastille[hidden],.acc-nouveau[hidden]{display:none!important}
   .mu-point{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2fbf71;box-shadow:0 0 0 3px rgba(47,191,113,.18);margin-right:8px;vertical-align:1px}
+
+  #compte-dx{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;padding:16px;
+    background:radial-gradient(ellipse at 50% 30%,rgba(30,40,58,.96),rgba(6,9,14,.985));-webkit-user-select:text;user-select:text}
+  #compte-dx.on{display:flex}
+  #compte-dx .cd-boite{width:min(100%,420px);background:var(--panneau);border:1px solid var(--trait);border-radius:18px;padding:26px 22px 20px;
+    box-shadow:0 24px 70px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:12px;max-height:100%;overflow:auto}
+  #compte-dx h2{font-size:22px;letter-spacing:.04em;text-align:center;color:#fff;margin:0}
+  #compte-dx .cd-logo{text-align:center;color:var(--or);font-weight:800;letter-spacing:.35em;font-size:12px}
+  #compte-dx p{color:#b9c3d2;font-size:13.5px;line-height:1.45;text-align:center;margin:0}
+  #compte-dx label{display:flex;flex-direction:column;gap:5px;font-size:12px;letter-spacing:.12em;color:var(--gris);text-transform:uppercase}
+  #compte-dx input{font:inherit;font-size:16px;color:#fff;background:#0c121b;border:1px solid var(--trait);border-radius:10px;padding:11px 12px;outline:none;text-transform:none;letter-spacing:0}
+  #compte-dx input:focus{border-color:var(--or)}
+  #compte-dx .cd-btn{font:inherit;font-weight:800;letter-spacing:.14em;font-size:14px;border:0;border-radius:12px;padding:13px;cursor:pointer;background:var(--or);color:#1a1205}
+  #compte-dx .cd-btn:disabled{opacity:.55;cursor:default}
+  #compte-dx .cd-lien{font:inherit;background:none;border:0;color:var(--gris);font-size:13px;cursor:pointer;text-decoration:underline;padding:4px}
+  #compte-dx .cd-onglets{display:flex;gap:6px;background:#0c121b;border-radius:12px;padding:4px}
+  #compte-dx .cd-onglets button{flex:1;font:inherit;font-weight:700;font-size:13px;letter-spacing:.08em;border:0;border-radius:9px;padding:9px;cursor:pointer;background:none;color:var(--gris)}
+  #compte-dx .cd-onglets button.on{background:var(--trait);color:#fff}
+  #compte-dx .cd-err{color:#ff7a6b;font-size:13px;text-align:center;min-height:17px}
+  #compte-dx .cd-note{color:#7f8aa0;font-size:12px;text-align:center}
   .mu-point-gris{background:#8a96a8;box-shadow:none}
 
   :root{
@@ -555,6 +575,8 @@ try { (function(){
   </div>
 </div>
 
+<div id="compte-dx" aria-modal="true" role="dialog"><div class="cd-boite" id="compte-dx-boite"></div></div>
+
 <!-- ================= MENU PRINCIPAL ================= -->
 <div class="ecran" id="ecran-accueil">
   <button id="btn-langue" type="button" title="Switch to English" style="position:fixed;top:8px;right:16px;z-index:11;font:inherit;font-size:13px;color:#9aa6b8;background:none;border:1px solid #2c3746;border-radius:999px;padding:5px 12px;cursor:pointer">🌐 Français</button>
@@ -908,6 +930,7 @@ try { (function(){
     <button class="lien" id="tz-onglet-donnees">📊 Données</button>
     <button class="lien" id="tz-onglet-idees">💡 Idées reçues</button>
     <button class="lien" id="tz-onglet-joueurs">👥 Tous les joueurs</button>
+    <button class="lien" id="tz-onglet-comptes">☁️ Comptes</button>
     <button class="lien" id="tz-actualiser">↻ Actualiser</button>
   </div>
   <div id="tz-contenu" style="width:min(820px,100%);text-align:left"></div>
@@ -13437,7 +13460,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 51;      // 51 : qualifs sans Gyro ni événements ; 50 : en qualifs les bots ignorent les autres ; 49 : pas d aspiration en qualifs ; 48 : qualifs, plus d élan au départ ; 47 : qualifs (option du salon), regarder derrière ; 46 : on glisse le long des rails au lieu de rester bloqué (pont de Fumbulane, barrière de Thorson) ; 45 : Fumbulane, les parois s adoucissent aux bouts ; 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 52;      // 52 : comptes DX (pseudo + mot de passe, sauvegarde en ligne), qualifs au début de la dernière ligne droite ; 51 : qualifs sans Gyro ni événements ; 50 : en qualifs les bots ignorent les autres ; 49 : pas d aspiration en qualifs ; 48 : qualifs, plus d élan au départ ; 47 : qualifs (option du salon), regarder derrière ; 46 : on glisse le long des rails au lieu de rester bloqué (pont de Fumbulane, barrière de Thorson) ; 45 : Fumbulane, les parois s adoucissent aux bouts ; 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -13599,6 +13622,7 @@ function connecterServeur(){
     tenter();
   });
 }
+function compteMultiDX(){ try { const c = window.TCHAT && window.TCHAT.compte; return c && c.id && c.cle ? { cpt: c.id, cle: c.cle } : {}; } catch (e) { return {}; } }
 async function serveurOuvrir(premier, debut){
   debut = debut || performance.now();
   multiReinit();
@@ -13618,7 +13642,7 @@ async function serveurOuvrir(premier, debut){
     }
     multiStatut("Connexion au serveur perdue."); groupeFerme();
   };
-  ws.send(JSON.stringify(premier));
+  ws.send(JSON.stringify(Object.assign({}, premier, compteMultiDX())));
   reseau.vuHote = performance.now();
   if (performance.now() - debut > 2500) multiStatut("Connecté ! Le serveur prépare le jeu…");
   reseau.veille = setInterval(() => {
@@ -13738,10 +13762,23 @@ function equipeEtatMulti(id, fe, row){
 /* ───── Qualifs (multijoueur) ───── */
 const QUALIF_MAX = 180;           // 3 min pour boucler son tour chrono
 const qualifM = () => !!(jeu.multi && jeu.multi.mode === "qualif");
-// tout le monde au même endroit, 130 m avant la ligne (de l élan), au milieu de la piste
+// tout le monde au même endroit, au début de la dernière ligne droite (de l élan), au milieu de la piste
+// le départ des qualifs : au début de la ligne droite qui mène à la ligne (juste après le dernier virage), pour prendre tout l'élan
+// (on remonte depuis la ligne jusqu'à la première vraie ligne droite, 120 m au moins ; un virage collé à la ligne fait partie de l'élan ; 800 m au plus)
+function departQualif(){
+  const K = d => { let m = 0; for (let e = -10; e <= 10; e += 5) m = Math.max(m, Math.abs(auPoint(piste, -(d + e)).courbure)); return m; };
+  let debut = null;
+  for (let d = 0; d <= 1200; d += 5){
+    const droit = K(d) < 0.004;
+    if (droit && debut == null) debut = d;
+    if (!droit && debut != null){ if (d - debut >= 120) return -Math.min(d - 8, 800); debut = null; }
+  }
+  return debut != null ? -800 : -130;
+}
 function placerQualif(){
+  const s0 = departQualif();
   for (const v of jeu.voitures){
-    v.s = -130; v.lat = 0;          // de l élan : 130 m avant la ligne v.distance = v.s; v.qT0 = null; v.qTemps = null;
+    v.s = s0; v.lat = 0; v.distance = v.s; v.qT0 = null; v.qTemps = null;
     const p = auPoint(piste, v.s);
     v.x = p.x; v.y = p.y; v.z = p.z; v.cap = p.cap; v.capVit = p.cap;
     v.idx = Math.round(((v.s % piste.longueur) + piste.longueur) % piste.longueur / piste.pas);
@@ -14970,6 +15007,22 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
         carte(`🏁 Dernières parties en ligne`,
           pt.length ? pt.map(x => `<div style="border-top:1px solid var(--trait);padding-top:6px"><b>${esc(x.circuit)}</b> · ${esc(x.mode)} · <span class="aide" style="margin:0">${quand(x.t)}</span><br>` +
             (x.joueurs || []).map(j => `${j.place}. ${esc(j.nom)}${j.parti ? " (parti)" : j.tf != null ? " — " + temps(j.tf) : j.elim ? " (éliminé)" : ""}`).join(" · ") + `</div>`).join("") : `<div class="aide">Pas encore de partie enregistrée.</div>`);
+    } else if (onglet === "comptes"){
+      const l = donnees.comptesDX || [], f = (filtre || "").trim().toLowerCase();
+      const v = l.filter(j => !f || j.login.toLowerCase().includes(f) || (j.nom || "").toLowerCase().includes(f) || String(j.id).includes(f.replace(/[#\s]/g, "")));
+      zone.innerHTML = (donnees.comptesDXActifs === false ? `<p class="aide" style="color:#ff7a6b">La table dx_sauvegardes n'existe pas encore dans Supabase : les comptes ne sont pas ouverts.</p>` : "") +
+        (mdpDonne ? carte("🔑 Mot de passe provisoire", mdpDonne.erreur ? esc(mdpDonne.erreur) : `<div>Pour <b>${esc(mdpDonne.login)}</b> <span class="aide" style="margin:0">#${esc(mdpDonne.id)}</span></div><div style="font-size:26px;letter-spacing:.12em;color:#fff;user-select:all;-webkit-user-select:all">${esc(mdpDonne.mdp)}</div><div class="aide" style="margin:0">Donne-le au joueur (il ne s'affichera plus) : il se connecte avec, puis le change dans l'onglet Joueur.</div>`) : "") +
+        `<input id="tz-filtre" class="mu-champ" placeholder="Chercher un pseudo ou un #ID…" value="${esc(filtre)}" style="width:100%;box-sizing:border-box;margin:8px 0">` +
+        carte(`☁️ ${l.length} compte${l.length > 1 ? "s" : ""} enregistré${l.length > 1 ? "s" : ""} (pseudo + mot de passe)${f ? " · " + v.length + " trouvé" + (v.length > 1 ? "s" : "") : ""}`,
+          (v.length ? v.slice(0, 400).map(j => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--trait);padding:6px 2px">
+            <span>${j.enLigne ? "🟢" : "⚪"} <b>${esc(j.login)}</b> <span class="aide" style="margin:0">#${esc(j.id)}${j.nom && j.nom !== j.login ? " · affiché « " + esc(j.nom) + " »" : ""}<br>${j.smaj ? "sauvegarde en ligne " + quand(j.smaj) : "pas encore de sauvegarde"} · ${j.appareils} appareil${j.appareils > 1 ? "s" : ""}</span></span>
+            <button class="lien" data-mdp="${esc(j.id)}" data-login="${esc(j.login)}" style="white-space:nowrap">🔑 Nouveau mot de passe</button></div>`).join("") : `<div class="aide">Personne pour l'instant.</div>`) +
+          `<div class="aide" style="margin:6px 0 0">Les mots de passe ne sont jamais gardés en clair (même ici) : pour un oubli, donne un mot de passe provisoire.</div>`);
+      const ch = document.getElementById("tz-filtre");
+      ch.oninput = () => { filtre = ch.value; const pos = ch.selectionStart; rendre(); const n = document.getElementById("tz-filtre"); n.focus(); n.setSelectionRange(pos, pos); };
+      for (const b of zone.querySelectorAll("[data-mdp]")) b.onclick = () => {
+        if (!confirm("Donner un nouveau mot de passe provisoire à " + b.dataset.login + " ? Son ancien mot de passe ne marchera plus.")) return;
+        window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin-mdp", id: b.dataset.mdp }); };
     } else if (onglet === "joueurs"){
       const tous = donnees.tous || [], f = (filtre || "").trim().toLowerCase();
       const l = tous.filter(j => !f || j.nom.toLowerCase().includes(f) || String(j.id).includes(f.replace(/[#\s]/g, "")));
@@ -14989,6 +15042,7 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
     document.getElementById("tz-onglet-donnees").style.color = onglet === "donnees" ? "var(--or)" : "";
     document.getElementById("tz-onglet-idees").style.color = onglet === "idees" ? "var(--or)" : "";
     document.getElementById("tz-onglet-joueurs").style.color = onglet === "joueurs" ? "var(--or)" : "";
+    document.getElementById("tz-onglet-comptes").style.color = onglet === "comptes" ? "var(--or)" : "";
   }
   let essais = null;
   function demander(){
@@ -14996,7 +15050,10 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
     const go = () => window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin" });
     if (!go()) essais = setInterval(() => { if (go() || ++k > 40) clearInterval(essais); }, 500);
   }
-  window.addEventListener("dx-chat", e => { if (e.detail.t === "c-admin"){ donnees = e.detail; rendre(); } });
+  let mdpDonne = null;
+  window.addEventListener("dx-chat", e => { if (e.detail.t === "c-admin"){ donnees = e.detail; rendre(); }
+    if (e.detail.t === "c-admin-mdp-ok"){ mdpDonne = e.detail; onglet = "comptes"; rendre(); } });
+  document.getElementById("tz-onglet-comptes").onclick = () => { onglet = "comptes"; mdpDonne = null; rendre(); };
   document.getElementById("btn-trapezoidu").onclick = () => { if (!estAdmin()) return; donnees = null; rendre(); montrer("ecran-trapezoidu"); demander(); };
   document.getElementById("tz-onglet-donnees").onclick = () => { onglet = "donnees"; rendre(); };
   document.getElementById("tz-onglet-idees").onclick = () => { onglet = "idees"; rendre(); };
@@ -15131,7 +15188,7 @@ document.getElementById("btn-exporter").onclick = () => {
 document.getElementById("btn-importer").onclick = () => document.getElementById("fichier-import").click();
 document.getElementById("btn-recommencer").onclick = () => {
   if (!confirm("Recommencer ta carrière ? Ta progression, ton argent et tes voitures repartent de zéro (le prénom, les records et les circuits sont gardés).")) return;
-  recommencerCarriere(); sauver(); appliquerAdmin(); rafraichirJoueur(); rafraichirGarage(); rafraichirMenu();
+  recommencerCarriere(); carriere.recommenceT = Date.now(); sauver(); appliquerAdmin(); rafraichirJoueur(); rafraichirGarage(); rafraichirMenu();
 };
 document.getElementById("fichier-import").onchange = (e) => {
   const f = e.target.files && e.target.files[0];
@@ -17404,7 +17461,187 @@ requestAnimationFrame(boucle);
   // le joueur change de prénom dans le jeu : son nom suit dans le chat
   setInterval(() => { if (S.connecte && nomJeu() !== S.nomEnvoye){ S.nomEnvoye = nomJeu(); envoi({ t: "c-nom", nom: S.nomEnvoye }); } }, 2000);
 
+
+  /* ───── Comptes DX : pseudo + mot de passe, sauvegarde en ligne ─────
+     Le compte du chat (ID + code de l'appareil) devient un vrai compte : un pseudo et un mot de passe
+     pour le retrouver sur n'importe quel appareil (progression, amis, ID). La sauvegarde suit toute seule. */
+  const CD = { vue: null, err: "", attente: false, enCreation: null, dernierPousse: 0, tPopup: 0, sansServeur: false };
+  const estAdminLocal = () => { try { return empreinte(String(carriere.prenom || "").trim().toLowerCase()) === EMPREINTE_ADMIN; } catch (e) { return false; } };
+  const pseudoPropose = () => { const n = nomJeu(); return /^joueur\s*\d*$/i.test(n) ? "" : n; };
+  const boite = () => document.getElementById("compte-dx-boite");
+  function champ(lab, type, val, auto){ const l = document.createElement("label"); l.textContent = lab;
+    const i = document.createElement("input"); i.type = type; i.value = val || ""; i.maxLength = type === "password" ? 64 : 16; i.autocomplete = auto || "off"; i.spellcheck = false;
+    for (const ev of ["keydown", "keyup", "keypress"]) i.addEventListener(ev, e => { e.stopPropagation(); if (ev === "keydown" && e.key === "Enter"){ const b = boite().querySelector(".cd-btn"); if (b && !b.disabled) b.click(); } });
+    l.appendChild(i); return [l, i]; }
+  function bouton(txt, fn, cls){ const b = document.createElement("button"); b.className = cls || "cd-btn"; b.textContent = txt; b.onclick = fn; return b; }
+  function para(txt, cls){ const p = document.createElement(cls === "err" ? "div" : "p"); if (cls) p.className = "cd-" + cls; p.textContent = txt; return p; }
+  function popupCompte(vue){
+    CD.vue = vue; if (!CD.tPopup) CD.tPopup = Date.now();
+    const o = document.getElementById("compte-dx"); o.classList.add("on");
+    const B = boite(); B.replaceChildren();
+    const logo = document.createElement("div"); logo.className = "cd-logo"; logo.textContent = "DX GRAND PRIX"; B.appendChild(logo);
+    const err = para(CD.err, "err");
+    if (vue === "creer" || vue === "nouveau"){
+      const h = document.createElement("h2"); h.textContent = vue === "creer" ? "Crée ton compte" : "Créer un compte"; B.appendChild(h);
+      if (vue === "nouveau"){ const on = document.createElement("div"); on.className = "cd-onglets";
+        const a = bouton("SE CONNECTER", () => { CD.err = ""; popupCompte("connexion"); }, "cd-tab"), b2 = bouton("CRÉER UN COMPTE", () => {}, "cd-tab on"); on.append(a, b2); B.appendChild(on); }
+      B.appendChild(para(vue === "creer" ? "Choisis un pseudo et un mot de passe. Ta progression, tes amis et ton ID restent les mêmes : avec ton compte, tu les retrouves sur n'importe quel appareil."
+                                         : "Ta progression sera sauvegardée en ligne : tu la retrouves sur n'importe quel appareil avec ton pseudo et ton mot de passe."));
+      const [l1, i1] = champ("Pseudo", "text", CD.saisiePseudo != null ? CD.saisiePseudo : (vue === "creer" ? pseudoPropose() : ""), "username");
+      const [l2, i2] = champ("Mot de passe", "password", "", "new-password"), [l3, i3] = champ("Confirme le mot de passe", "password", "", "new-password");
+      B.append(l1, l2, l3, err);
+      const go = bouton(CD.attente ? "…" : "CRÉER MON COMPTE", () => {
+        CD.saisiePseudo = i1.value; const login = i1.value.replace(/\s+/g, " ").trim();
+        const e = login.length < 3 || login.length > 16 ? "Ton pseudo doit faire entre 3 et 16 caractères."
+          : /^joueur\s*\d*$/i.test(login) ? "Choisis un vrai pseudo (pas « Joueur … »)."
+          : i2.value.length < 6 ? "Ton mot de passe doit faire au moins 6 caractères."
+          : i2.value !== i3.value ? "Les deux mots de passe ne sont pas les mêmes." : "";
+        if (e){ CD.err = e; popupCompte(vue); return; }
+        CD.err = ""; CD.attente = true; CD.enCreation = { login, mdp: i2.value };
+        if (vue === "nouveau" && !S.compte){
+          // tout nouveau : le compte du chat d'abord (avec ce pseudo), puis le pseudo + mot de passe
+          if (!estAdminLocal()){ carriere.prenom = login; try { sauver(); } catch (x) {} }
+          assurerCompte();
+        } else if (enLigneServeur()) envoi({ t: "c-compte-creer", login, mdp: i2.value });
+        else assurerCompte();
+        popupCompte(vue);
+      });
+      go.disabled = CD.attente; B.appendChild(go);
+      if (CD.attente){ clearTimeout(CD.minAtt); CD.minAtt = setTimeout(() => { if (CD.attente && (CD.vue === "creer" || CD.vue === "nouveau")){ CD.attente = false; CD.lienPlusTard = true; CD.err = "Le serveur ne répond pas pour l'instant : réessaie, ou plus tard."; popupCompte(CD.vue); } }, 20000); }
+      if (CD.lienPlusTard) B.appendChild(bouton("Plus tard", () => { CD.lienPlusTard = false; CD.enCreation = null; fermerPopupCompte(); if (!S.compte) assurerCompte(); }, "cd-lien"));
+      B.appendChild(para("Retiens bien ton mot de passe : il n'y a pas d'e-mail pour le récupérer. En cas d'oubli, contacte Sltfils.", "note"));
+      setTimeout(() => { try { (i1.value ? i2 : i1).focus(); } catch (e) {} }, 50);
+    } else if (vue === "connexion"){
+      const h = document.createElement("h2"); h.textContent = "Bienvenue !"; B.appendChild(h);
+      const on = document.createElement("div"); on.className = "cd-onglets";
+      on.append(bouton("SE CONNECTER", () => {}, "cd-tab on"), bouton("CRÉER UN COMPTE", () => { CD.err = ""; popupCompte("nouveau"); }, "cd-tab")); B.appendChild(on);
+      B.appendChild(para("Tu as déjà joué à DX Grand Prix ? Connecte-toi : tu retrouves ta progression, tes amis et ton ID."));
+      const [l1, i1] = champ("Pseudo", "text", CD.saisiePseudo || "", "username"), [l2, i2] = champ("Mot de passe", "password", "", "current-password");
+      B.append(l1, l2, err);
+      const go = bouton(CD.attente ? "…" : "SE CONNECTER", () => {
+        CD.saisiePseudo = i1.value;
+        if (!i1.value.trim() || !i2.value){ CD.err = "Entre ton pseudo et ton mot de passe."; popupCompte("connexion"); return; }
+        CD.err = ""; CD.attente = true; popupCompte("connexion"); seConnecterDX(i1.value.trim(), i2.value);
+      });
+      go.disabled = CD.attente; B.appendChild(go);
+      B.appendChild(para("Mot de passe oublié ? Contacte Sltfils : il te donnera un mot de passe provisoire.", "note"));
+      setTimeout(() => { try { (i1.value ? i2 : i1).focus(); } catch (e) {} }, 50);
+    } else if (vue === "mdp"){
+      const h = document.createElement("h2"); h.textContent = "Changer mon mot de passe"; B.appendChild(h);
+      const [l1, i1] = champ("Mot de passe actuel", "password", "", "current-password"), [l2, i2] = champ("Nouveau mot de passe", "password", "", "new-password"), [l3, i3] = champ("Confirme le nouveau", "password", "", "new-password");
+      B.append(l1, l2, l3, err);
+      const go = bouton(CD.attente ? "…" : "CHANGER", () => {
+        const e = i2.value.length < 6 ? "Ton mot de passe doit faire au moins 6 caractères." : i2.value !== i3.value ? "Les deux mots de passe ne sont pas les mêmes." : "";
+        if (e){ CD.err = e; popupCompte("mdp"); return; }
+        CD.err = ""; CD.attente = true; envoi({ t: "c-mdp", ancien: i1.value, mdp: i2.value }); popupCompte("mdp"); });
+      go.disabled = CD.attente; B.appendChild(go);
+      B.appendChild(bouton("Annuler", () => fermerPopupCompte(), "cd-lien"));
+      setTimeout(() => { try { i1.focus(); } catch (e) {} }, 50);
+    } else if (vue === "recup"){
+      const h = document.createElement("h2"); h.textContent = "☁️ Ta sauvegarde arrive…"; B.appendChild(h);
+      B.appendChild(para("On récupère ta progression, le jeu va se recharger."));
+    }
+    // le serveur ne répond pas (il se réveille) : au bout de 25 s, on peut jouer quand même
+    if ((vue === "connexion" || vue === "nouveau") && !S.compte && CD.sansServeur) ajouterSansServeur();
+  }
+  // (ajouté sans redessiner : ce qui est déjà tapé reste)
+  function ajouterSansServeur(){ const B = boite(); if (!B || B.querySelector(".cd-sans")) return;
+    const n = para("Le serveur ne répond pas pour l'instant.", "note"); n.classList.add("cd-sans"); B.appendChild(n);
+    B.appendChild(bouton("Jouer sans compte pour l'instant", () => { fermerPopupCompte(); assurerCompte(); }, "cd-lien")); }
+  function fermerPopupCompte(){ CD.vue = null; CD.attente = false; CD.err = ""; CD.saisiePseudo = null; document.getElementById("compte-dx").classList.remove("on"); }
+  // se connecter à son compte depuis un autre appareil : pseudo + mot de passe → l'ID et une clé pour cet appareil
+  function seConnecterDX(login, mdp){
+    const url = adresse(); if (!url){ CD.attente = false; CD.err = "Pas de serveur."; popupCompte("connexion"); return; }
+    let ws; try { ws = new WebSocket(url); } catch (e) { CD.attente = false; CD.err = "Connexion impossible."; popupCompte("connexion"); return; }
+    const fin = setTimeout(() => { try { ws.close(); } catch (e) {} if (CD.attente){ CD.attente = false; CD.err = "Le serveur ne répond pas (il se réveille peut-être) : réessaie dans 30 s."; popupCompte("connexion"); } }, 45000);
+    ws.onopen = () => ws.send(JSON.stringify({ t: "c-login", login, mdp }));
+    ws.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch (_) { return; }
+      if (d.t === "c-login-refus"){ clearTimeout(fin); try { ws.close(); } catch (x) {} CD.attente = false; CD.err = d.raison; popupCompte("connexion"); }
+      if (d.t === "c-login-ok"){ clearTimeout(fin); try { ws.close(); } catch (x) {}
+        if (S.ws){ const w = S.ws; S.ws = null; try { w.close(); } catch (x) {} }
+        S.compte = { id: d.id, cle: d.cle }; ecrireCompte(S.compte); S.etat = null; S.histos = {}; S.connecte = false;
+        CD.recupAttendue = true; popupCompte("recup"); connecter(); } };
+    ws.onerror = () => {};
+  }
+  // la sauvegarde scellée (comme l'export), envoyée au serveur quand elle a changé
+  function saveScellee(){ try { if (typeof coffre !== "undefined" && coffre.exporter) coffre.exporter(); } catch (e) {}
+    const d = JSON.parse(JSON.stringify(carriere)); delete d.sceau; d.sceau = sceauSauvegarde(d); return JSON.stringify(d); }
+  // la version en ligne que cet appareil a vue en dernier (envoyée ou récupérée)
+  const lireBase = () => { try { const b = JSON.parse(localStorage.getItem("dx-cloud-base") || "null"); return b && S.compte && b.id === S.compte.id ? +b.smaj || 0 : 0; } catch (e) { return 0; } };
+  const ecrireBase = smaj => { try { if (S.compte) localStorage.setItem("dx-cloud-base", JSON.stringify({ id: S.compte.id, smaj })); } catch (e) {} };
+  function pousserSave(force, ecraser){
+    const C = S.etat && S.etat.compteDX; if (!C || !C.lie || !enLigneServeur() || CD.recupAttendue || CD.enConflit) return;
+    const m = +carriere.maj || 0; if (!force && m <= CD.dernierPousse) return;
+    CD.dernierPousse = m; envoi({ t: "c-save", save: saveScellee(), base: lireBase(), force: !!ecraser });
+  }
+  setInterval(() => pousserSave(false), 8000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") pousserSave(false); });
+  // la progression d'une sauvegarde (courses ouvertes, voitures, podiums, courses jouées)
+  const scoreProg = c => !c ? 0 : (+c.niveau || 0) * 10000 + (+c.niveau2 || 0) * 10000 + ((c.possedees || []).length) * 100 + ((c.podiums || []).length) * 10 + (+((c.stats || {}).courses) || 0);
+  function copieSecours(){ try { const l = JSON.parse(localStorage.getItem("dx-avant-cloud") || "[]"); l.push({ t: Date.now(), save: saveScellee() });
+    localStorage.setItem("dx-avant-cloud", JSON.stringify(l.slice(-3))); } catch (e) {} }
+  const enCourseC = () => typeof jeu !== "undefined" && ["compte", "course", "pause", "arrivee", "highlights"].includes(jeu.phase);
+  function adopterSave(s, smaj){
+    let d = null; try { d = JSON.parse(s); } catch (e) {}
+    if (d && enCourseC() && !CD.recupAttendue){ setTimeout(() => adopterSave(s, smaj), 3000); return; }       // pas en pleine course : au retour au menu
+    // la sauvegarde en ligne a MOINS de progression que celle de cet appareil : on garde celle d'ici (et elle part en ligne)
+    if (d && scoreProg(d) < scoreProg(carriere) && !((+d.recommenceT || 0) > (+carriere.recommenceT || 0))){       // (sauf « Recommencer ma carrière » fait exprès ailleurs)
+      CD.recupAttendue = false; if (CD.vue === "recup") fermerPopupCompte();
+      try { sauver(); } catch (e) {}          // (elle devient la plus récente)
+      CD.enConflit = false; CD.dernierPousse = +carriere.maj || 0; envoi({ t: "c-save", save: saveScellee(), base: smaj || 0, force: true }); return; }
+    copieSecours();
+    let ok = false;
+    try { ok = !!d && (typeof coffre !== "undefined" && coffre.importer ? coffre.importer(d) : (d.sceau === sceauSauvegarde(d) && (Object.assign(carriere, d), delete carriere.sceau, sauver(), true))); } catch (e) {}
+    if (ok){ ecrireBase(+smaj || 0); popupCompte("recup"); setTimeout(() => location.reload(), 900); }
+    else { CD.recupAttendue = false; CD.enConflit = false; fermerPopupCompte(); toastLocal("La sauvegarde en ligne n'a pas pu être lue."); }
+  }
+  // pas en pleine course : le pop-up attend le retour au menu
+  function creerQuandPossible(){
+    const C = S.etat && S.etat.compteDX; if (!C || !C.actif || C.lie || CD.vue === "creer") return;
+    if (typeof jeu !== "undefined" && ["compte", "course", "pause", "arrivee", "highlights"].includes(jeu.phase)){ setTimeout(creerQuandPossible, 3000); return; }
+    popupCompte("creer");
+  }
+  function compteEtat(d, premier){
+    const C = d.compteDX; if (!C) return;
+    if (!C.actif){ if (CD.vue === "creer") fermerPopupCompte(); return; }
+    if (!C.lie){
+      if (CD.enCreation){ envoi({ t: "c-compte-creer", login: CD.enCreation.login, mdp: CD.enCreation.mdp }); return; }
+      if (!CD.vue || CD.vue === "nouveau" && S.compte) creerQuandPossible();
+      return;
+    }
+    if (CD.vue === "creer" || CD.vue === "nouveau") fermerPopupCompte();
+    if (premier || CD.recupAttendue){
+      // une version en ligne que cet appareil n'a pas encore vue (ou un nouvel appareil) : on la récupère d'abord
+      if (CD.recupAttendue || (C.smaj > 0 && C.smaj !== lireBase())){ CD.enConflit = true; envoi({ t: "c-save-lire" }); }
+      else { CD.recupAttendue = false; if (CD.vue === "recup") fermerPopupCompte(); pousserSave(false); }
+    }
+  }
+  function compteRecu(d){
+    if (d.t === "c-compte-ok"){
+      const login = d.login, cree = !!CD.enCreation; CD.enCreation = null; fermerPopupCompte();
+      if (!estAdminLocal() && carriere.prenom !== login){ carriere.prenom = login; try { sauver(); } catch (e) {} }
+      try { rafraichirJoueur(); rafraichirMenu(); } catch (e) {}
+      if (cree) toastLocal("✅ Compte créé : " + login + " · ta progression est sauvegardée en ligne");
+      setTimeout(() => pousserSave(true), 300); return true; }
+    if (d.t === "c-compte-refus"){ CD.attente = false; CD.enCreation = null; CD.err = d.raison; popupCompte(CD.vue || "creer"); return true; }
+    if (d.t === "c-save-donnees"){ if (d.save) adopterSave(d.save, d.smaj); else { CD.recupAttendue = false; CD.enConflit = false; if (CD.vue === "recup") fermerPopupCompte(); pousserSave(true, true); } return true; }
+    if (d.t === "c-save-vieille"){ CD.enConflit = true; envoi({ t: "c-save-lire" }); return true; }
+    if (d.t === "c-save-ok"){ ecrireBase(d.smaj); CD.enConflit = false; if (S.etat && S.etat.compteDX) S.etat.compteDX.smaj = d.smaj; CD.vuSave = Date.now(); try { joueurTchat(); } catch (e) {} return true; }
+    if (d.t === "c-mdp-ok"){ toastLocal("✅ Mot de passe changé"); fermerPopupCompte(); return true; }
+    if (d.t === "c-mdp-refus"){ CD.attente = false; CD.err = d.raison; popupCompte("mdp"); return true; }
+    return false;
+  }
+  // au démarrage : un compte sur cet appareil → on s'y connecte ; sinon : se connecter ou créer un compte
+  function demarrageCompte(){
+    if (robot || !adresse()){ assurerCompte(); return; }
+    if (S.compte){ assurerCompte(); return; }
+    popupCompte("connexion");
+    // (réveille le serveur et vérifie qu'il répond : sinon, au bout de 25 s, on peut jouer sans compte)
+    try { const w = new WebSocket(adresse()); w.onopen = () => { CD.serveurOk = true; try { w.close(); } catch (e) {} }; w.onerror = () => {}; } catch (e) {}
+    setTimeout(() => { if (!S.compte && !CD.serveurOk && CD.vue && CD.vue !== "recup"){ CD.sansServeur = true; ajouterSansServeur(); } }, 25000);
+  }
   function recu(d){
+    if (compteRecu(d)) return;
     if (d.t === "c-etat"){
       const premier = !S.connecte;
       S.etat = d; S.connecte = true; S.ancien = null;
@@ -17415,9 +17652,9 @@ requestAnimationFrame(boucle);
       if (S.compte.nouveau || S.compte.id !== d.id){ S.compte = { id: d.id, cle: S.compte.cle }; ecrireCompte(S.compte); }
       if (premier && (S.vue === "attente" || S.vue === "connexion")) S.vue = S.partage ? "partager" : "liste";
       if (S.ouvert && S.vue === "profil" && S.profil && !S.profil.moi) envoi({ t: "c-profil", id: S.profil.id });     // profil ouvert : à jour (en course ?)
-      rendre(); badge(); joueurTchat(); return;
+      rendre(); badge(); joueurTchat(); try { compteEtat(d, premier); } catch (e) { console.warn("compte", e); } return;
     }
-    if (d.t === "c-idee-ok" || d.t === "c-idee-refus" || d.t === "c-admin" || d.t === "c-vote" || d.t === "c-vote-res"){ try { window.dispatchEvent(new CustomEvent("dx-chat", { detail: d })); } catch (e) {} return; }
+    if (d.t === "c-idee-ok" || d.t === "c-idee-refus" || d.t === "c-admin" || d.t === "c-admin-mdp-ok" || d.t === "c-vote" || d.t === "c-vote-res"){ try { window.dispatchEvent(new CustomEvent("dx-chat", { detail: d })); } catch (e) {} return; }
     if (d.t === "c-refus"){
       if (!S.connecte){
         const ws = S.ws; S.ws = null; try { ws.close(); } catch (e) {}
@@ -17966,6 +18203,8 @@ requestAnimationFrame(boucle);
     z.replaceChildren(el("div", { class: "carte", style: "cursor:default;flex-direction:column;align-items:flex-start;gap:4px" },
       el("div", { class: "det", style: "margin:0;letter-spacing:.2em" }, "MON ID"),
       el("div", { class: "tx-id" }, id),
+      E && E.compteDX && E.compteDX.lie ? el("div", { class: "det", style: "color:#7dff8e" }, "☁️ Compte « " + E.compteDX.login + " » · progression sauvegardée en ligne") : null,
+      E && E.compteDX && E.compteDX.lie ? el("button", { class: "lien", style: "padding-left:0", onclick: () => { CD.err = ""; popupCompte("mdp"); } }, "🔑 Changer mon mot de passe") : null,
       el("div", { class: "det" }, E ? "Donne cet ID à tes potes : ils t'ajoutent en ami dans le 💬 Chat et vous pouvez vous écrire."
                                     : "Connexion au serveur… (ton ID arrive)"),
       el("div", { class: "rangee", style: "justify-content:flex-start" },
@@ -17997,7 +18236,7 @@ requestAnimationFrame(boucle);
 
   // au démarrage : si on a déjà un compte, on se connecte (pour voir ses messages et apparaître en ligne)
   // au démarrage : chacun a son compte (créé tout seul) et se connecte, pour ses messages, son profil et ses temps
-  setTimeout(assurerCompte, 1500);
+  setTimeout(demarrageCompte, 1500);
   joueurTchat();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible"){ if (S.compte && !S.ws) connecter(); if (S.ouvert && S.vue === "conv") rendre(); } });
 })();
