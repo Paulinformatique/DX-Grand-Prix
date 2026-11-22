@@ -7175,7 +7175,7 @@ const GYRO = {
 };
 const gyroAcquis = () => !!(carriere.gyro || carriere.toutDebloque);
 function gyroDispo(){
-  if (jeu.multi) return !!jeu.multi.gyro;
+  if (jeu.multi) return !!jeu.multi.gyro && jeu.multi.mode !== "qualif";
   if (!gyroAcquis() || jeu.partieCourse !== 2 || jeu.essai) return false;
   const o = ordreCourses(), r = o.findIndex(([, i]) => i === jeu.circuit), rs = o.findIndex(([c]) => c.nom === "SteelBallSon");
   return rs >= 0 && r >= rs;
@@ -9759,6 +9759,7 @@ function lancerEmeraudes(){
   for (let k = 0; k < 10; k++) setTimeout(() => bip(880 + (k % 5) * 140, 0.08, 0.15, "square"), 3200 + k * 800);
 }
 const VOL_E = 2.0;                                   // durée du vol d'une émeraude
+function qualifEv(){ return !!(jeu.multi && jeu.multi.mode === "qualif"); }
 function obstaclesKujota(){
   if (jeu.obstK && jeu.obstK.piste === piste) return jeu.obstK;
   const dr = droitePrincipale(), P = piste.pts, nb = piste.nb, L = piste.longueur;
@@ -9774,6 +9775,7 @@ const etatGeyser = e => { const u = ((jeu.chrono + e.ph) % PERIODE_G) / JET_G; r
 // les obstacles de Kujota existent en solo, sur le serveur, et chez un joueur relié au serveur
 const obstaclesMultiK = () => !jeu.multi || typeof globalThis.__srv !== "undefined" || (typeof reseau !== "undefined" && !!reseau.serveur);
 function obstaclesPour(v){
+  if (qualifEv()) return null;
   if (!obstaclesMultiK() || !piste || !piste.def || piste.def.nom !== "Kujota" || v.tempsFinal != null) return null;
   lancerEmeraudes();                                  // (le serveur ne passe pas par l'affichage : on vérifie ici aussi)
   const O = obstaclesKujota(), l = v.tour === 0 ? O.geysers.slice() : [];
@@ -9848,7 +9850,7 @@ const estBaf = () => !!piste && !!piste.def && piste.def.nom === "Bafisson";
 const PER_B = 5.5, PER_E = 6.5, AVERT_B = 1.6, FLAQUE_B = 2.6, PER_F = 3.2, OUVERT_F = 1.25;
 const CENDRE = [0.34, 0.33, 0.33];
 function evBaf(tour){
-  if (!estBaf() || tour == null || tour < 0) return null;
+  if (!estBaf() || tour == null || tour < 0 || qualifEv()) return null;
   const n = toursEvt();
   if (tour === n - 1) return "eruption";
   return ["fiss", "bombes", "coulee", "cendres"][tour] || null;
@@ -10075,7 +10077,7 @@ function dessinerEvenementsBaf(ctx2, W, H, E){
 const NEIGE_T = [0.92, 0.94, 0.97];
 const estThor = () => !!piste && !!piste.def && piste.def.nom === "Thorson";
 function evThor(tour){
-  if (!estThor() || tour == null || tour < 0) return null;
+  if (!estThor() || tour == null || tour < 0 || qualifEv()) return null;
   if (tour === toursEvt() - 1) return "ragnarok";
   return ["drakkars", "blizzard", "mjollnir", "troll", "jormun"][tour] || null;
 }
@@ -10372,7 +10374,7 @@ function dessinerEvenementsThor3D(B, t){
 const PLUIE_E = [0.62, 0.68, 0.76];
 const estEasy = () => !!piste && !!piste.def && piste.def.nom === "Easydort";
 function evEasy(tour){
-  if (!estEasy() || tour == null || tour < 0) return null;
+  if (!estEasy() || tour == null || tour < 0 || qualifEv()) return null;
   if (tour === toursEvt() - 1) return "tsunami";
   return ["maree", "vent", "kanaval", "ouragan", "oeil"][tour] || null;
 }
@@ -10599,7 +10601,7 @@ function dessinerEvenementsEasy(ctx2, W, H, E){
    tonneaux) suit le chrono ; les bots voient tout et l'évitent. */
 const estBH = () => !!piste && !!piste.def && piste.def.nom === "BlocusHexa";
 function evBH(tour){
-  if (!estBH() || tour == null || tour < 0) return null;
+  if (!estBH() || tour == null || tour < 0 || qualifEv()) return null;
   const tc = toursEvt(), k = tour >= tc - 1 ? 4 : Math.min(tour, 3);
   return [
     { blocus: 1, metro: 1 },
@@ -10835,7 +10837,7 @@ function dessinerEvenementsBH(ctx2, W, H, E){
    le cratère s'ouvrent quand LE PREMIER entame le tour 4 / le tour 5. */
 const estCR = () => !!piste && !!piste.def && piste.def.nom === "Cristiano";
 function evCR(tour){
-  if (!estCR() || tour == null || tour < 0) return null;
+  if (!estCR() || tour == null || tour < 0 || qualifEv()) return null;
   const tc = toursEvt(), k = tour >= tc - 1 ? 4 : Math.min(tour, 3);
   return [
     { tram: 1, coqs: 1, canons: 3 },
@@ -11263,6 +11265,7 @@ const roulisO = () => Math.sin(chO() * 0.8);
 function limiteOdy(s, marge, signe){ return DEMI_PISTE + ACCOTEMENT - marge; }
 
 function obstaclesOdy(v){
+  if (qualifEv()) return [];
   const k = ileO(v), out = [], s = modO(v.s || 0), bat = surBateauO(s), c = traverseeO(v);
   if (!bat && k === 1){
     for (const r of lancersO("cyc")) if (r.age > r.vol - 0.9) out.push({ s: r.s, lat: r.lat, r: 2.6, id: "c" + r.n, f: 0.55, roc: 1, actif: r.tombe });
@@ -11279,7 +11282,7 @@ function obstaclesOdy(v){
   return out;
 }
 function capOdy(v){
-  if (!estOdy() || v.s == null || v.tempsFinal != null) return 1;
+  if (!estOdy() || v.s == null || v.tempsFinal != null || qualifEv()) return 1;
   let f = 1; const s = modO(v.s);
   if (cochonOdy(v)) f *= 0.55;
   if (v.tornO && chO() - v.tornO.t < 1.6) f *= 0.5;
@@ -11288,7 +11291,7 @@ function capOdy(v){
   return f;
 }
 function chocOdy(v, dt){
-  if (!estOdy() || v.s == null || v.tempsFinal != null) return;
+  if (!estOdy() || v.s == null || v.tempsFinal != null || qualifEv()) return;
   const s = modO(v.s), lat = v.lat || 0, moi = jeu.joueur === v, ch = chO(), k = ileO(v), bat = surBateauO(s), c = traverseeO(v), L = piste.longueur;
   const secouer = q => { if (moi && typeof secousse !== "undefined") secousse = Math.max(secousse, q); };
   // pousser de côté (les humains : leur position ; les pilotes du jeu : leur écart)
@@ -11596,6 +11599,7 @@ function yamiM(s0){ const per = 5.2, ch = chM() + hM(s0, 3) * per, u = ch % per;
 function bulleLatM(j){ return Math.sin(chM() * 0.7 + j * 2.1) * (DEMI_PISTE - 1.5); }
 
 function obstaclesMono(v){
+  if (qualifEv()) return [];
   const out = [], t = tourM(v);
   if (t === 1 && jeu.multi) out.push({ s: MONO.GRIM, lat: latM(0.78), r: 1.9, id: "g5", grim5: 1 });      // le grimoire à 5 feuilles : en multijoueur seulement
   if (t === 2) APPARITIONS_M.forEach(([s, f], j) => out.push({ s, lat: latM(f), r: 1.7, id: "ap" + j, monstre: 1 }));
@@ -13433,7 +13437,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 50;      // 50 : en qualifs les bots ignorent les autres ; 49 : pas d aspiration en qualifs ; 48 : qualifs, plus d élan au départ ; 47 : qualifs (option du salon), regarder derrière ; 46 : on glisse le long des rails au lieu de rester bloqué (pont de Fumbulane, barrière de Thorson) ; 45 : Fumbulane, les parois s adoucissent aux bouts ; 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 51;      // 51 : qualifs sans Gyro ni événements ; 50 : en qualifs les bots ignorent les autres ; 49 : pas d aspiration en qualifs ; 48 : qualifs, plus d élan au départ ; 47 : qualifs (option du salon), regarder derrière ; 46 : on glisse le long des rails au lieu de rester bloqué (pont de Fumbulane, barrière de Thorson) ; 45 : Fumbulane, les parois s adoucissent aux bouts ; 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
@@ -13796,7 +13800,7 @@ function recevoirQualifs(d){
   const moi = d.classement.find(x => x.id === reseau.moi);
   if (moi && moi.t == null) bandeau("⏱ Temps écoulé : tu es exclu des qualifs, tu regardes la course", 4500);
   else if (moi) bandeau("🏁 Qualifs finies : tu pars P" + (d.classement.indexOf(moi) + 1) + " !", 4000);
-  if (jeu.multi && qualifM() && (jeu.phase === "fini" || jeu.phase === "arrivee")) allerClassement();     // tout le monde a fini : le classement, puis la course
+  // (la course enchaîne tout de suite : pas d'écran de classement entre les deux)
 }
 // le classement en direct des qualifs : ceux qui ont fini (par temps), puis ceux qui roulent (chrono qui tourne)
 function lignesQualif(){
