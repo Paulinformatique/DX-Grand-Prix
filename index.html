@@ -17483,8 +17483,8 @@ requestAnimationFrame(boucle);
     const err = para(CD.err, "err");
     if (vue === "creer" || vue === "nouveau"){
       const h = document.createElement("h2"); h.textContent = vue === "creer" ? "Crée ton compte" : "Créer un compte"; B.appendChild(h);
-      if (vue === "nouveau"){ const on = document.createElement("div"); on.className = "cd-onglets";
-        const a = bouton("SE CONNECTER", () => { CD.err = ""; popupCompte("connexion"); }, "cd-tab"), b2 = bouton("CRÉER UN COMPTE", () => {}, "cd-tab on"); on.append(a, b2); B.appendChild(on); }
+      { const on = document.createElement("div"); on.className = "cd-onglets";
+        const b2 = bouton("CRÉER MON COMPTE", () => {}, "cd-tab on"), a = bouton("J'AI DÉJÀ UN COMPTE", () => { CD.err = ""; popupCompte("connexion"); }, "cd-tab"); on.append(b2, a); B.appendChild(on); }
       B.appendChild(para(vue === "creer" ? "Choisis un pseudo et un mot de passe. Ta progression, tes amis et ton ID restent les mêmes : avec ton compte, tu les retrouves sur n'importe quel appareil."
                                          : "Ta progression sera sauvegardée en ligne : tu la retrouves sur n'importe quel appareil avec ton pseudo et ton mot de passe."));
       const [l1, i1] = champ("Pseudo", "text", CD.saisiePseudo != null ? CD.saisiePseudo : (vue === "creer" ? pseudoPropose() : ""), "username");
@@ -17514,7 +17514,7 @@ requestAnimationFrame(boucle);
     } else if (vue === "connexion"){
       const h = document.createElement("h2"); h.textContent = "Bienvenue !"; B.appendChild(h);
       const on = document.createElement("div"); on.className = "cd-onglets";
-      on.append(bouton("SE CONNECTER", () => {}, "cd-tab on"), bouton("CRÉER UN COMPTE", () => { CD.err = ""; popupCompte("nouveau"); }, "cd-tab")); B.appendChild(on);
+      on.append(bouton("CRÉER MON COMPTE", () => { CD.err = ""; popupCompte(S.compte ? "creer" : "nouveau"); }, "cd-tab"), bouton("J'AI DÉJÀ UN COMPTE", () => {}, "cd-tab on")); B.appendChild(on);
       B.appendChild(para("Tu as déjà joué à DX Grand Prix ? Connecte-toi : tu retrouves ta progression, tes amis et ton ID."));
       const [l1, i1] = champ("Pseudo", "text", CD.saisiePseudo || "", "username"), [l2, i2] = champ("Mot de passe", "password", "", "current-password");
       B.append(l1, l2, err);
@@ -17597,16 +17597,17 @@ requestAnimationFrame(boucle);
   }
   // pas en pleine course : le pop-up attend le retour au menu
   function creerQuandPossible(){
-    const C = S.etat && S.etat.compteDX; if (!C || !C.actif || C.lie || CD.vue === "creer") return;
+    const C = S.etat && S.etat.compteDX; if (!C || !C.actif || C.lie || CD.vue) return;
     if (typeof jeu !== "undefined" && ["compte", "course", "pause", "arrivee", "highlights"].includes(jeu.phase)){ setTimeout(creerQuandPossible, 3000); return; }
-    popupCompte("creer");
+    const aJoue = (+carriere.niveau || 0) > 0 || (carriere.possedees || []).length > 1 || (+((carriere.stats || {}).courses) || 0) > 0 || (+carriere.argent || 0) > 0;
+    popupCompte(aJoue ? "creer" : "connexion");
   }
   function compteEtat(d, premier){
     const C = d.compteDX; if (!C) return;
     if (!C.actif){ if (CD.vue === "creer") fermerPopupCompte(); return; }
     if (!C.lie){
       if (CD.enCreation){ envoi({ t: "c-compte-creer", login: CD.enCreation.login, mdp: CD.enCreation.mdp }); return; }
-      if (!CD.vue || CD.vue === "nouveau" && S.compte) creerQuandPossible();
+      if (!CD.vue) creerQuandPossible();
       return;
     }
     if (CD.vue === "creer" || CD.vue === "nouveau") fermerPopupCompte();
@@ -17633,8 +17634,7 @@ requestAnimationFrame(boucle);
   }
   // au démarrage : un compte sur cet appareil → on s'y connecte ; sinon : se connecter ou créer un compte
   function demarrageCompte(){
-    if (robot || !adresse()){ assurerCompte(); return; }
-    if (S.compte){ assurerCompte(); return; }
+    assurerCompte(); return;
     popupCompte("connexion");
     // (réveille le serveur et vérifie qu'il répond : sinon, au bout de 25 s, on peut jouer sans compte)
     try { const w = new WebSocket(adresse()); w.onopen = () => { CD.serveurOk = true; try { w.close(); } catch (e) {} }; w.onerror = () => {}; } catch (e) {}
