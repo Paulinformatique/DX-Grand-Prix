@@ -7532,8 +7532,9 @@ function majIA(v, dt){
   // Dépassements : on ne considère que la voiture la plus proche devant
   // ET dans la même trajectoire. Côte à côte, on ne lève pas le pied.
   let devant = null, ecart = Infinity;
+  const seulQ = !!(jeu.multi && jeu.multi.mode === "qualif");
   for (const a of jeu.voitures){
-    if (a === v) continue;
+    if (a === v || seulQ) continue;
     const d = a.distance - v.distance;
     if (d > 0 && d < 24 && Math.abs(a.lat - v.lat) < 3.4 && d < ecart){
       ecart = d; devant = a;
@@ -7573,7 +7574,7 @@ function majIA(v, dt){
   if (longueDroite && !devant){
     let sillage = null, meilleur = Infinity;
     for (const a of jeu.voitures){
-      if (a === v) continue;
+      if (a === v || seulQ) continue;
       const d = a.distance - v.distance;
       if (d > 9 && d / Math.max(v.v, 10) < 1.5 && Math.abs(a.lat - v.lat) < 4.5 && d < meilleur){ meilleur = d; sillage = a; }
     }
@@ -7691,7 +7692,7 @@ function majIA(v, dt){
      l'intérieur ; l'attaquant devait piler, se remettait de l'autre côté…
      et ne passait jamais. */
   if (jeu.chrono > 4) for (const a of jeu.voitures){
-    if (a === v) continue;
+    if (a === v || seulQ) continue;
     const d = a.distance - v.distance, sep = a.lat - v.lat;
     if (d > -7 && d < 5 && Math.abs(sep) >= 1.6){
       const limite = a.lat - Math.sign(sep) * 3.0;
@@ -7708,7 +7709,7 @@ function majIA(v, dt){
       const cle = Math.round((v.s + dB) / 10);
       if (v.balleCle !== cle){
         v.balleCle = cle;
-        const seul = !jeu.voitures.some(a => a !== v && Math.abs(a.distance - v.distance) < 22 && Math.abs(a.lat - v.lat) < 6);
+        const seul = seulQ || !jeu.voitures.some(a => a !== v && Math.abs(a.distance - v.distance) < 22 && Math.abs(a.lat - v.lat) < 6);
         v.evite = seul || Math.random() < 0.5;
       }
       if (v.evite){
@@ -7730,7 +7731,7 @@ function majIA(v, dt){
       const cle = Math.round((v.s + dF) / 10);
       if (v.flecheCle !== cle){
         v.flecheCle = cle;
-        const seul = !jeu.voitures.some(a => a !== v && Math.abs(a.distance - v.distance) < 22 && Math.abs(a.lat - v.lat) < 6);
+        const seul = seulQ || !jeu.voitures.some(a => a !== v && Math.abs(a.distance - v.distance) < 22 && Math.abs(a.lat - v.lat) < 6);
         v.vaFleche = seul || Math.random() < 0.5;
       }
       if (v.vaFleche) vise = latFleche(jeu.chrono + dF / Math.max(v.v, 8));
@@ -7749,7 +7750,7 @@ function majIA(v, dt){
   {
     let gene = null, dG = Infinity;
     for (const a of jeu.voitures){
-      if (a === v) continue;
+      if (a === v || seulQ) continue;
       const d = a.distance - v.distance;
       if (d > 0 && d < 30 && Math.abs(a.lat - v.lat) < 1.9 && d < dG){ dG = d; gene = a; }
     }
@@ -13432,7 +13433,7 @@ function rafraichirJoueur(){
    avec 0,11 s de retard, interpolées, et se traversent (pas de choc). */
 /* Version du multijoueur : tout le monde doit avoir la même (sinon grilles et
    messages ne se comprennent pas). À augmenter à chaque changement réseau. */
-const MULTI_VERSION = 49;      // 49 : pas d aspiration en qualifs ; 48 : qualifs, plus d élan au départ ; 47 : qualifs (option du salon), regarder derrière ; 46 : on glisse le long des rails au lieu de rester bloqué (pont de Fumbulane, barrière de Thorson) ; 45 : Fumbulane, les parois s adoucissent aux bouts ; 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
+const MULTI_VERSION = 50;      // 50 : en qualifs les bots ignorent les autres ; 49 : pas d aspiration en qualifs ; 48 : qualifs, plus d élan au départ ; 47 : qualifs (option du salon), regarder derrière ; 46 : on glisse le long des rails au lieu de rester bloqué (pont de Fumbulane, barrière de Thorson) ; 45 : Fumbulane, les parois s adoucissent aux bouts ; 44 : Fumbulane (les gorges, le gué, le robot, le cratère, le Fantôme) ; 43 : modes Relais et Course en duo ; 42 : modes Chat et souris, Roi de la piste ; 41 : ZA WARUDO, le tour de l élu ne compte pas l arrêt du temps ; 40 : Monocoule, on glisse le long des murs ; 39 : Monocoule, le mur de l épée d Asta ; 38 : Monocoule entonnoir + bots qui esquivent ; 37 : Monocoule (les backrooms, la Monochrome) ; 36 : plus de chocs avec une voiture sur un pont au-dessus ; 35 : Odysseus (l odyssée, la trière, les îles) ; 34 : groupes publics / privés, partie rapide, joueurs en ligne, circuits chargés à la demande ; 32 : plus d'aspiration pendant The Sun (Kujota) ; 31 : Cristiano (Lisbonne, CR7, 5 tours d'événements, le 7ᵉ +25 km/h), pavés de BlocusHexa —      // 30 : Kujota, les sables mouvants freinent deux fois plus —      // 29 : BlocusHexa (Paris), pavés, Arc de Triomphe, événements —      // 28 : Easydort, vent progressif, bots qui glissent aussi dans les virages —      // 27 : Easydort, œil du cyclone plus fort, Kanaval suit le premier —      // 26 : Easydort, marée et vent plus forts —      // 25 : Easydort, l île (marée, vent, Kanaval, ouragan, œil, tsunami) —      // 24 : Thorson, barrière à l entrée du pont effondré —      // 23 : Thorson, Ragnarök progressif —      // 22 : Thorson, lances et boucliers lancés au-dessus du pont —      // 21 : Thorson, les événements (boucliers, verglas, éclairs, troll, serpent, pont effondré) —      // 20 : vitesse retrouvée en douceur au bas des descentes —      // 19 : la pente compte (montées, descentes) —      // 18 : Thorson, le relief et le pont (garde-corps) —      // 17 : Bafisson, le volcan (fissures, bombes, coulées, cendres, éruption) —      // 16 : Kujota, ZA WARUDO en multi (avec le serveur) —      // 15 : Kujota, geysers et émeraudes en multi (avec le serveur) —      // 14 : Kujota, les bots contournent les sables mouvants sans sortir —      // 13 : Kujota (sable, sables mouvants, dunes) — le serveur doit rouler pareil
 /* Le serveur de jeu (Render). Vide : l'ancien mode (direct + relais Supabase).
    ?serveur=ws://… dans l'adresse pour essayer un autre serveur. */
 const SERVEUR_URL = "wss://dx-grandprix-serveyr.onrender.com";
