@@ -6867,7 +6867,10 @@ const coffre = (() => { let adminNon = false;
       carriere.argent = (carriere.argent || 0) + (+s.argent || 0); carriere.sanctions[s.id] = Date.now();
       if (s.part2){ try { const n = ordreCourses().length; carriere.niveau = Math.max(+carriere.niveau || 0, n);
         const p = new Set(carriere.possedees || [0]); VOITURES.forEach((a, i) => { if (a.rang < VOITURES.length && seuilVoiture(a) <= n) p.add(i); });
-        carriere.possedees = [...p].sort((x, y) => x - y); carriere.argent = Math.max(+carriere.argent || 0, +s.argentMin || 0); } catch (e) {} }
+        carriere.possedees = [...p].sort((x, y) => x - y); carriere.argent = Math.max(+carriere.argent || 0, +s.argentMin || 0);
+        // la Part 2 : ouverte jusqu'à la dernière course où il a un temps au classement
+        const l = Array.isArray(s.p2Courses) ? s.p2Courses : []; let n2 = +carriere.niveau2 || 0;
+        ordreCourses().forEach(([c], i) => { if (l.includes(c.nom + " 2")) n2 = Math.max(n2, i); }); carriere.niveau2 = n2; } catch (e) {} }
       carriere.maj = Date.now(); ref = copie(); this.ecrire(); try { garageSel = 0; rafraichirGarage(); rafraichirMenu(); } catch (e) {} return true; },
     // le serveur dit que ce compte n'est pas l'administrateur : plus de « tout débloquer » (même avec le bon prénom)
     adminRefuse: () => adminNon,
