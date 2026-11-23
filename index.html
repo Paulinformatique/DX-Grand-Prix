@@ -15011,15 +15011,26 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
       const l = donnees.comptesDX || [], f = (filtre || "").trim().toLowerCase();
       const v = l.filter(j => !f || j.login.toLowerCase().includes(f) || (j.nom || "").toLowerCase().includes(f) || String(j.id).includes(f.replace(/[#\s]/g, "")));
       zone.innerHTML = (donnees.comptesDXActifs === false ? `<p class="aide" style="color:#ff7a6b">La table dx_sauvegardes n'existe pas encore dans Supabase : les comptes ne sont pas ouverts.</p>` : "") +
+        (savesVues ? carte("💾 Sauvegardes en ligne · " + esc(savesVues.login || savesVues.id), savesVues.erreur ? esc(savesVues.erreur) : (() => {
+          const ligne = (r, n) => !r ? `<div class="aide">illisible</div>` : `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--trait);padding:6px 2px">
+            <span>${n < 0 ? "<b>Actuelle</b>" : "Ancienne"} · ${r.maj ? quand(r.maj) : "?"}<br><span class="aide" style="margin:0">${r.niveau} courses${r.niveau2 ? " + " + r.niveau2 + " (part 2)" : ""} · ${r.voitures} voiture${r.voitures > 1 ? "s" : ""} · ${r.podiums} podiums · ${r.courses} jouées · ${Math.round(r.argent).toLocaleString("fr-FR")} $${r.gyro ? " · Gyro" : ""}</span></span>
+            ${n >= 0 ? `<button class="lien" data-restaure="${n}" style="white-space:nowrap">♻️ Remettre</button>` : ""}</div>`;
+          return (savesVues.restaure ? `<div style="color:#7dff8e">✅ Remise : le jeu du joueur la fusionne avec la sienne (rien ne se perd).</div>` : "") + ligne(savesVues.actuelle, -1) + (savesVues.histo || []).map(ligne).join("") +
+            ((savesVues.histo || []).length ? "" : `<div class="aide">Pas encore d'ancienne version.</div>`) +
+            `<div class="aide" style="margin:6px 0 0">« Remettre » ne retire rien au joueur : sa partie garde tout ce qu'elle a, et récupère ce que cette version avait en plus.</div>`; })()) : "") +
         (mdpDonne ? carte("🔑 Mot de passe provisoire", mdpDonne.erreur ? esc(mdpDonne.erreur) : `<div>Pour <b>${esc(mdpDonne.login)}</b> <span class="aide" style="margin:0">#${esc(mdpDonne.id)}</span></div><div style="font-size:26px;letter-spacing:.12em;color:#fff;user-select:all;-webkit-user-select:all">${esc(mdpDonne.mdp)}</div><div class="aide" style="margin:0">Donne-le au joueur (il ne s'affichera plus) : il se connecte avec, puis le change dans l'onglet Joueur.</div>`) : "") +
         `<input id="tz-filtre" class="mu-champ" placeholder="Chercher un pseudo ou un #ID…" value="${esc(filtre)}" style="width:100%;box-sizing:border-box;margin:8px 0">` +
         carte(`☁️ ${l.length} compte${l.length > 1 ? "s" : ""} enregistré${l.length > 1 ? "s" : ""} (pseudo + mot de passe)${f ? " · " + v.length + " trouvé" + (v.length > 1 ? "s" : "") : ""}`,
           (v.length ? v.slice(0, 400).map(j => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--trait);padding:6px 2px">
             <span>${j.enLigne ? "🟢" : "⚪"} <b>${esc(j.login)}</b> <span class="aide" style="margin:0">#${esc(j.id)}${j.nom && j.nom !== j.login ? " · affiché « " + esc(j.nom) + " »" : ""}<br>${j.smaj ? "sauvegarde en ligne " + quand(j.smaj) : "pas encore de sauvegarde"} · ${j.appareils} appareil${j.appareils > 1 ? "s" : ""}</span></span>
-            <button class="lien" data-mdp="${esc(j.id)}" data-login="${esc(j.login)}" style="white-space:nowrap">🔑 Nouveau mot de passe</button></div>`).join("") : `<div class="aide">Personne pour l'instant.</div>`) +
+            <span style="display:flex;flex-direction:column;align-items:flex-end"><button class="lien" data-mdp="${esc(j.id)}" data-login="${esc(j.login)}" style="white-space:nowrap">🔑 Nouveau mot de passe</button>
+            <button class="lien" data-saves="${esc(j.id)}" style="white-space:nowrap">💾 Sauvegardes</button></span></div>`).join("") : `<div class="aide">Personne pour l'instant.</div>`) +
           `<div class="aide" style="margin:6px 0 0">Les mots de passe ne sont jamais gardés en clair (même ici) : pour un oubli, donne un mot de passe provisoire.</div>`);
       const ch = document.getElementById("tz-filtre");
       ch.oninput = () => { filtre = ch.value; const pos = ch.selectionStart; rendre(); const n = document.getElementById("tz-filtre"); n.focus(); n.setSelectionRange(pos, pos); };
+      for (const b of zone.querySelectorAll("[data-saves]")) b.onclick = () => { savesVues = { id: b.dataset.saves, erreur: "Chargement…" }; rendre(); window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin-saves", id: b.dataset.saves }); };
+      for (const b of zone.querySelectorAll("[data-restaure]")) b.onclick = () => { if (!savesVues || !confirm("Remettre cette version à " + (savesVues.login || "") + " ? (fusionnée avec sa partie actuelle)")) return;
+        window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin-restaurer", id: savesVues.id, n: +b.dataset.restaure }); };
       for (const b of zone.querySelectorAll("[data-mdp]")) b.onclick = () => {
         if (!confirm("Donner un nouveau mot de passe provisoire à " + b.dataset.login + " ? Son ancien mot de passe ne marchera plus.")) return;
         window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin-mdp", id: b.dataset.mdp }); };
@@ -15050,9 +15061,10 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
     const go = () => window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin" });
     if (!go()) essais = setInterval(() => { if (go() || ++k > 40) clearInterval(essais); }, 500);
   }
-  let mdpDonne = null;
+  let mdpDonne = null, savesVues = null;
   window.addEventListener("dx-chat", e => { if (e.detail.t === "c-admin"){ donnees = e.detail; rendre(); }
-    if (e.detail.t === "c-admin-mdp-ok"){ mdpDonne = e.detail; onglet = "comptes"; rendre(); } });
+    if (e.detail.t === "c-admin-mdp-ok"){ mdpDonne = e.detail; onglet = "comptes"; rendre(); }
+    if (e.detail.t === "c-admin-saves"){ savesVues = e.detail; onglet = "comptes"; rendre(); } });
   document.getElementById("tz-onglet-comptes").onclick = () => { onglet = "comptes"; mdpDonne = null; rendre(); };
   document.getElementById("btn-trapezoidu").onclick = () => { if (!estAdmin()) return; donnees = null; rendre(); montrer("ecran-trapezoidu"); demander(); };
   document.getElementById("tz-onglet-donnees").onclick = () => { onglet = "donnees"; rendre(); };
@@ -17581,20 +17593,59 @@ requestAnimationFrame(boucle);
   function copieSecours(){ try { const l = JSON.parse(localStorage.getItem("dx-avant-cloud") || "[]"); l.push({ t: Date.now(), save: saveScellee() });
     localStorage.setItem("dx-avant-cloud", JSON.stringify(l.slice(-3))); } catch (e) {} }
   const enCourseC = () => typeof jeu !== "undefined" && ["compte", "course", "pause", "arrivee", "highlights"].includes(jeu.phase);
+  // deux sauvegardes fusionnées : tout ce qui a été gagné d'un côté OU de l'autre reste (courses, voitures, podiums, records, argent…)
+  function fusionCarrieres(a, b){
+    const base = scoreProg(b) > scoreProg(a) ? b : a, autre = base === a ? b : a, r = JSON.parse(JSON.stringify(base)); delete r.sceau;
+    const uni = (x, y) => [...new Set([...(x || []), ...(y || [])])];
+    for (const k of ["niveau", "niveau2", "argent", "recommenceT"]) if ((+autre[k] || 0) > (+r[k] || 0)) r[k] = autre[k];
+    r.possedees = uni(r.possedees, autre.possedees); if (!r.possedees.includes(0)) r.possedees.unshift(0);
+    r.podiums = uni(r.podiums, autre.podiums); r.coursesFaites = uni(r.coursesFaites, autre.coursesFaites);
+    for (const k of ["gyro", "victoireFinale", "victoireFinale2"]) if (autre[k] && !r[k]) r[k] = autre[k];
+    const mini = k => { const o = Object.assign({}, autre[k] || {}); for (const [x, v] of Object.entries(r[k] || {})) if (!(o[x] < v)) o[x] = v; r[k] = o; };
+    mini("meilleuresPlaces"); mini("records"); mini("recordsCourse");
+    r.stats = Object.assign({}, autre.stats || {}, r.stats || {}); for (const [x, v] of Object.entries(autre.stats || {})) if ((+v || 0) > (+r.stats[x] || 0)) r.stats[x] = v;
+    r.sanctions = Object.assign({}, autre.sanctions || {}, r.sanctions || {});
+    for (const k of Object.keys(autre)) if (!(k in r) && k !== "sceau") r[k] = autre[k];
+    if (!r.possedees.includes(r.voiture)) r.voiture = 0;
+    return r;
+  }
+  const CH_PROG = ["argent", "possedees", "niveau", "niveau2", "podiums", "coursesFaites", "gyro", "meilleuresPlaces", "victoireFinale", "victoireFinale2", "stats", "records", "recordsCourse"];
+  const resume = c => JSON.stringify(CH_PROG.map(k => { const v = c[k]; return Array.isArray(v) ? [...v].sort() : v && typeof v === "object" ? Object.keys(v).sort().map(x => [x, v[x]]) : v == null ? null : v; }));
+  // adopter une version (sauvegarde en ligne, ou secours) : on la fusionne avec celle d'ici ; si rien ne change ici, on n'y touche pas
+  function adopterFusion(d, smaj, raison){
+    // « Recommencer ma carrière » fait exprès sur un autre appareil : on repart de sa version (une copie de celle d'ici est gardée)
+    const recommence = (+d.recommenceT || 0) > (+carriere.recommenceT || 0);
+    const ici = JSON.parse(JSON.stringify(carriere)), m = recommence ? (() => { const x = JSON.parse(JSON.stringify(d)); delete x.sceau; return x; })() : fusionCarrieres(ici, d);
+    if (resume(m) === resume(ici)) return false;          // rien de nouveau pour cet appareil
+    copieSecours();
+    m.sceau = sceauSauvegarde(m); let ok = false;
+    try { ok = typeof coffre !== "undefined" && coffre.importer ? coffre.importer(m) : (Object.assign(carriere, m), delete carriere.sceau, sauver(), true); } catch (e) {}
+    if (ok && smaj != null) ecrireBase(+smaj || 0);
+    if (ok) try { localStorage.setItem("dx-fusion-msg", raison || ""); } catch (e) {}
+    return ok;
+  }
   function adopterSave(s, smaj){
     let d = null; try { d = JSON.parse(s); } catch (e) {}
     if (d && enCourseC() && !CD.recupAttendue){ setTimeout(() => adopterSave(s, smaj), 3000); return; }       // pas en pleine course : au retour au menu
-    // la sauvegarde en ligne a MOINS de progression que celle de cet appareil : on garde celle d'ici (et elle part en ligne)
-    if (d && scoreProg(d) < scoreProg(carriere) && !((+d.recommenceT || 0) > (+carriere.recommenceT || 0))){       // (sauf « Recommencer ma carrière » fait exprès ailleurs)
-      CD.recupAttendue = false; if (CD.vue === "recup") fermerPopupCompte();
-      try { sauver(); } catch (e) {}          // (elle devient la plus récente)
-      CD.enConflit = false; CD.dernierPousse = +carriere.maj || 0; envoi({ t: "c-save", save: saveScellee(), base: smaj || 0, force: true }); return; }
-    copieSecours();
-    let ok = false;
-    try { ok = !!d && (typeof coffre !== "undefined" && coffre.importer ? coffre.importer(d) : (d.sceau === sceauSauvegarde(d) && (Object.assign(carriere, d), delete carriere.sceau, sauver(), true))); } catch (e) {}
-    if (ok){ ecrireBase(+smaj || 0); popupCompte("recup"); setTimeout(() => location.reload(), 900); }
-    else { CD.recupAttendue = false; CD.enConflit = false; fermerPopupCompte(); toastLocal("La sauvegarde en ligne n'a pas pu être lue."); }
+    if (!d || !d.sceau || d.sceau !== sceauSauvegarde(d)){ CD.recupAttendue = false; CD.enConflit = false; fermerPopupCompte(); toastLocal("La sauvegarde en ligne n'a pas pu être lue."); return; }
+    if (adopterFusion(d, smaj, "")){ popupCompte("recup"); setTimeout(() => location.reload(), 900); return; }
+    // rien à prendre : la version d'ici (qui contient déjà tout) part en ligne
+    CD.recupAttendue = false; if (CD.vue === "recup") fermerPopupCompte();
+    try { sauver(); } catch (e) {}
+    CD.enConflit = false; CD.dernierPousse = +carriere.maj || 0; envoi({ t: "c-save", save: saveScellee(), base: smaj || 0, force: true });
   }
+  // au démarrage : les copies de secours de cet appareil (gardées avant chaque récupération) sont refusionnées, rien ne se perd
+  setTimeout(() => { try {
+    const msg = localStorage.getItem("dx-fusion-msg"); if (msg != null){ localStorage.removeItem("dx-fusion-msg"); if (msg) toastLocal(msg); }
+    const l = JSON.parse(localStorage.getItem("dx-avant-cloud") || "[]"), r0 = +carriere.recommenceT || 0;
+    let change = false;
+    for (const x of l){ if (!x || !x.save || +x.t < r0) continue; let d = null; try { d = JSON.parse(x.save); } catch (e) { continue; }
+      if (!d || d.sceau !== sceauSauvegarde(d) || (+d.recommenceT || 0) < r0 && false) continue;
+      const ici = JSON.parse(JSON.stringify(carriere)), m = fusionCarrieres(ici, d);
+      if (resume(m) === resume(ici)) continue;
+      m.sceau = sceauSauvegarde(m); if (coffre.importer(m)) change = true; }
+    if (change){ CD.dernierPousse = 0; toastLocal("♻️ Progression récupérée depuis la copie de secours de cet appareil"); try { rafraichirJoueur(); rafraichirGarage(); rafraichirMenu(); } catch (e) {} }
+  } catch (e) { console.warn("secours", e); } }, 2500);
   // pas en pleine course : le pop-up attend le retour au menu
   function creerQuandPossible(){
     const C = S.etat && S.etat.compteDX; if (!C || !C.actif || C.lie || CD.vue) return;
@@ -17654,7 +17705,7 @@ requestAnimationFrame(boucle);
       if (S.ouvert && S.vue === "profil" && S.profil && !S.profil.moi) envoi({ t: "c-profil", id: S.profil.id });     // profil ouvert : à jour (en course ?)
       rendre(); badge(); joueurTchat(); try { compteEtat(d, premier); } catch (e) { console.warn("compte", e); } return;
     }
-    if (d.t === "c-idee-ok" || d.t === "c-idee-refus" || d.t === "c-admin" || d.t === "c-admin-mdp-ok" || d.t === "c-vote" || d.t === "c-vote-res"){ try { window.dispatchEvent(new CustomEvent("dx-chat", { detail: d })); } catch (e) {} return; }
+    if (d.t === "c-idee-ok" || d.t === "c-idee-refus" || d.t === "c-admin" || d.t === "c-admin-mdp-ok" || d.t === "c-admin-saves" || d.t === "c-vote" || d.t === "c-vote-res"){ try { window.dispatchEvent(new CustomEvent("dx-chat", { detail: d })); } catch (e) {} return; }
     if (d.t === "c-refus"){
       if (!S.connecte){
         const ws = S.ws; S.ws = null; try { ws.close(); } catch (e) {}
