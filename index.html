@@ -6865,6 +6865,9 @@ const coffre = (() => { let adminNon = false;
         Object.assign(carriere, { argent: 0, voiture: 0, possedees: [0], records: {}, circuitsPerso: [], prenom: "", stats: { courses: 0, podiums: 0, victoires: 0 }, versionCarriere: 2, sanctions: garde }); }
       if (s.retirer || s.effacer){ carriere.toutDebloque = false; delete carriere.avantTout; carriere.possedees = [0]; carriere.voiture = 0; }
       carriere.argent = (carriere.argent || 0) + (+s.argent || 0); carriere.sanctions[s.id] = Date.now();
+      if (s.part2){ try { const n = ordreCourses().length; carriere.niveau = Math.max(+carriere.niveau || 0, n);
+        const p = new Set(carriere.possedees || [0]); VOITURES.forEach((a, i) => { if (a.rang < VOITURES.length && seuilVoiture(a) <= n) p.add(i); });
+        carriere.possedees = [...p].sort((x, y) => x - y); carriere.argent = Math.max(+carriere.argent || 0, +s.argentMin || 0); } catch (e) {} }
       carriere.maj = Date.now(); ref = copie(); this.ecrire(); try { garageSel = 0; rafraichirGarage(); rafraichirMenu(); } catch (e) {} return true; },
     // le serveur dit que ce compte n'est pas l'administrateur : plus de « tout débloquer » (même avec le bon prénom)
     adminRefuse: () => adminNon,
@@ -15011,7 +15014,16 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
       const l = donnees.comptesDX || [], f = (filtre || "").trim().toLowerCase();
       const v = l.filter(j => !f || j.login.toLowerCase().includes(f) || (j.nom || "").toLowerCase().includes(f) || String(j.id).includes(f.replace(/[#\s]/g, "")));
       zone.innerHTML = (donnees.comptesDXActifs === false ? `<p class="aide" style="color:#ff7a6b">La table dx_sauvegardes n'existe pas encore dans Supabase : les comptes ne sont pas ouverts.</p>` : "") +
-        (fusionFaite ? carte("🔗 Fusion", fusionFaite.erreur ? esc(fusionFaite.erreur) : "✅ Fusionné dans le compte <b>" + esc(fusionFaite.login || "") + "</b> : un seul joueur au classement, et son appareil récupère le compte.") : "") +
+        (fusionFaite ? carte(fusionFaite.annonce ? "📣 Message" : "🔗 Fusion", fusionFaite.erreur ? esc(fusionFaite.erreur) : fusionFaite.annonce ? "✅ « On a retrouvé ton compte » envoyé à <b>" + esc(fusionFaite.login || "") + "</b> (il le voit tout de suite s'il est en ligne, sinon à sa prochaine venue)."
+          : "✅ Fusionné dans le compte <b>" + esc(fusionFaite.login || "") + "</b> : un seul joueur au classement, son appareil récupère le compte, et il reçoit le message « On a retrouvé ton compte ».") : "") +
+        ((donnees.memeNom || []).length ? carte("👯 Même nom sur plusieurs ID (" + donnees.memeNom.length + ")", donnees.memeNom.map(g => `<div style="border-top:1px solid var(--trait);padding:6px 2px">
+            <b>${esc(g.nom)}</b>${g.membres.map(x => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 0 0 12px">
+              <span class="aide" style="margin:0">#${esc(x.id)}${x.login ? " · ☁️ compte « " + esc(x.login) + " »" : ""} · ${x.records} records${x.courses != null ? " · " + x.courses + " courses" : ""}${x.voitures != null ? " · " + x.voitures + " voitures" : ""}${x.vu ? " · vu " + quand(x.vu) : ""}</span>
+              ${x.id === g.cible ? `<span class="aide" style="margin:0;color:#7dff8e">gardé</span>` : x.login ? "" : `<button class="lien" data-fusion2="${esc(x.id)}" data-vers="${esc(g.cible)}" data-login="${esc(g.nom)} #${esc(g.cible)}" style="white-space:nowrap">🔗 Fusionner</button>`}</div>`).join("")}</div>`).join("") +
+            `<div class="aide" style="margin:6px 0 0">Vérifie que c'est bien la même personne (deux joueurs différents peuvent avoir le même nom) : on garde celui qui a un compte ☁️, sinon le plus récent.</div>`) : "") +
+        carte("🔗 Fusionner un ancien ID dans un compte", `<div class="aide" style="margin:0 0 6px">Pour un doublon qui n'a pas le même nom (cherche son ancien ID dans « 👥 Tous les joueurs »).</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><input id="tz-fu-ancien" class="mu-champ" placeholder="Ancien ID (#12345678)" style="flex:1;min-width:120px">
+          <input id="tz-fu-vers" class="mu-champ" placeholder="Pseudo du compte" style="flex:1;min-width:120px"><button class="lien" id="tz-fu-go">🔗 Fusionner</button></div>`) +
         (savesVues ? carte("💾 Sauvegardes en ligne · " + esc(savesVues.login || savesVues.id), savesVues.erreur ? esc(savesVues.erreur) : (() => {
           const ligne = (r, n) => !r ? `<div class="aide">illisible</div>` : `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--trait);padding:6px 2px">
             <span>${n < 0 ? "<b>Actuelle</b>" : "Ancienne"} · ${r.maj ? quand(r.maj) : "?"}<br><span class="aide" style="margin:0">${r.niveau} courses${r.niveau2 ? " + " + r.niveau2 + " (part 2)" : ""} · ${r.voitures} voiture${r.voitures > 1 ? "s" : ""} · ${r.podiums} podiums · ${r.courses} jouées · ${Math.round(r.argent).toLocaleString("fr-FR")} berries${r.gyro ? " · Gyro" : ""}</span></span>
@@ -15025,13 +15037,22 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
           (v.length ? v.slice(0, 400).map(j => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--trait);padding:6px 2px">
             <span>${j.enLigne ? "🟢" : "⚪"} <b>${esc(j.login)}</b> <span class="aide" style="margin:0">#${esc(j.id)}${j.nom && j.nom !== j.login ? " · affiché « " + esc(j.nom) + " »" : ""}<br>${j.smaj ? "sauvegarde en ligne " + quand(j.smaj) : "pas encore de sauvegarde"} · ${j.appareils} appareil${j.appareils > 1 ? "s" : ""}</span></span>
             <span style="display:flex;flex-direction:column;align-items:flex-end"><button class="lien" data-mdp="${esc(j.id)}" data-login="${esc(j.login)}" style="white-space:nowrap">🔑 Nouveau mot de passe</button>
-            <button class="lien" data-saves="${esc(j.id)}" style="white-space:nowrap">💾 Sauvegardes</button></span></div>` +
+            <button class="lien" data-saves="${esc(j.id)}" style="white-space:nowrap">💾 Sauvegardes</button>
+            <button class="lien" data-annonce="${esc(j.id)}" data-login="${esc(j.login)}" style="white-space:nowrap">📣 « Compte retrouvé »</button></span></div>` +
             (j.doublons || []).map(x => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:2px 2px 6px 22px;color:#ffb35c">
               <span>⚠️ Doublon : « ${esc(x.nom)} » #${esc(x.id)}<br><span class="aide" style="margin:0">${x.courses != null ? x.courses + " courses · " : ""}${x.voitures != null ? x.voitures + " voitures · " : ""}${x.records} records${x.vu ? " · vu " + quand(x.vu) : ""}</span></span>
-              <button class="lien" data-fusion="${esc(x.id)}" data-vers="${esc(j.id)}" data-login="${esc(j.login)}" style="white-space:nowrap">🔗 Fusionner</button></div>`).join("")).join("") : `<div class="aide">Personne pour l'instant.</div>`) +
+              <button class="lien" data-fusion2="${esc(x.id)}" data-vers="${esc(j.id)}" data-login="${esc(j.login)}" style="white-space:nowrap">🔗 Fusionner</button></div>`).join("")).join("") : `<div class="aide">Personne pour l'instant.</div>`) +
           `<div class="aide" style="margin:6px 0 0">Les mots de passe ne sont jamais gardés en clair (même ici) : pour un oubli, donne un mot de passe provisoire.</div>`);
       const ch = document.getElementById("tz-filtre");
       ch.oninput = () => { filtre = ch.value; const pos = ch.selectionStart; rendre(); const n = document.getElementById("tz-filtre"); n.focus(); n.setSelectionRange(pos, pos); };
+      const fuGo = (ancien, vers, login) => { if (!confirm("Fusionner #" + ancien + " dans le compte " + login + " ?\n\nSes records, ses amis et ses stats passent sur le compte, il disparaît du classement, et son appareil est redirigé vers le compte (sa progression y est ajoutée).")) return;
+        window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin-fusion", ancien, id: vers }); };
+      document.getElementById("tz-fu-go").onclick = () => { const a = document.getElementById("tz-fu-ancien").value.replace(/[#\s.\-]/g, ""), v = document.getElementById("tz-fu-vers").value.trim().toLowerCase();
+        const cpt = (donnees.comptesDX || []).find(j => j.login.toLowerCase() === v || String(j.id) === v.replace(/[#\s]/g, ""));
+        if (!/^\d{8}$/.test(a)){ alert("L'ancien ID doit faire 8 chiffres."); return; } if (!cpt){ alert("Aucun compte avec ce pseudo."); return; } fuGo(a, cpt.id, cpt.login); };
+      for (const ch of ["tz-fu-ancien", "tz-fu-vers"]) for (const ev of ["keydown", "keyup", "keypress"]) document.getElementById(ch).addEventListener(ev, e => e.stopPropagation());
+      for (const b of zone.querySelectorAll("[data-fusion2]")) b.onclick = () => fuGo(b.dataset.fusion2, b.dataset.vers, b.dataset.login);
+      for (const b of zone.querySelectorAll("[data-annonce]")) b.onclick = () => { if (!confirm("Envoyer « On a retrouvé ton compte 🎉 » à " + b.dataset.login + " ?")) return; window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin-annonce", id: b.dataset.annonce }); };
       for (const b of zone.querySelectorAll("[data-fusion]")) b.onclick = () => {
         if (!confirm("Fusionner #" + b.dataset.fusion + " dans le compte " + b.dataset.login + " ?\n\nSes records, ses amis et ses stats passent sur le compte, il disparaît du classement, et son appareil est redirigé vers le compte (sa progression y est ajoutée).")) return;
         window.TCHAT_api && TCHAT_api.envoyer({ t: "c-admin-fusion", ancien: b.dataset.fusion, id: b.dataset.vers }); };
@@ -17716,6 +17737,7 @@ requestAnimationFrame(boucle);
   }
   function recu(d){
     if (compteRecu(d)) return;
+    if (d.t === "c-annonce"){ try { appliquerSanction(String(S.etat && S.etat.id || ""), [d.s]); } catch (e) {} return; }
     if (d.t === "c-etat"){
       const premier = !S.connecte;
       S.etat = d; S.connecte = true; S.ancien = null;
