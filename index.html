@@ -15013,7 +15013,7 @@ document.getElementById("btn-retour-actus").onclick = () => { rafraichirMenu(); 
       zone.innerHTML = (donnees.comptesDXActifs === false ? `<p class="aide" style="color:#ff7a6b">La table dx_sauvegardes n'existe pas encore dans Supabase : les comptes ne sont pas ouverts.</p>` : "") +
         (savesVues ? carte("💾 Sauvegardes en ligne · " + esc(savesVues.login || savesVues.id), savesVues.erreur ? esc(savesVues.erreur) : (() => {
           const ligne = (r, n) => !r ? `<div class="aide">illisible</div>` : `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--trait);padding:6px 2px">
-            <span>${n < 0 ? "<b>Actuelle</b>" : "Ancienne"} · ${r.maj ? quand(r.maj) : "?"}<br><span class="aide" style="margin:0">${r.niveau} courses${r.niveau2 ? " + " + r.niveau2 + " (part 2)" : ""} · ${r.voitures} voiture${r.voitures > 1 ? "s" : ""} · ${r.podiums} podiums · ${r.courses} jouées · ${Math.round(r.argent).toLocaleString("fr-FR")} $${r.gyro ? " · Gyro" : ""}</span></span>
+            <span>${n < 0 ? "<b>Actuelle</b>" : "Ancienne"} · ${r.maj ? quand(r.maj) : "?"}<br><span class="aide" style="margin:0">${r.niveau} courses${r.niveau2 ? " + " + r.niveau2 + " (part 2)" : ""} · ${r.voitures} voiture${r.voitures > 1 ? "s" : ""} · ${r.podiums} podiums · ${r.courses} jouées · ${Math.round(r.argent).toLocaleString("fr-FR")} berries${r.gyro ? " · Gyro" : ""}</span></span>
             ${n >= 0 ? `<button class="lien" data-restaure="${n}" style="white-space:nowrap">♻️ Remettre</button>` : ""}</div>`;
           return (savesVues.restaure ? `<div style="color:#7dff8e">✅ Remise : le jeu du joueur la fusionne avec la sienne (rien ne se perd).</div>` : "") + ligne(savesVues.actuelle, -1) + (savesVues.histo || []).map(ligne).join("") +
             ((savesVues.histo || []).length ? "" : `<div class="aide">Pas encore d'ancienne version.</div>`) +
@@ -17487,6 +17487,16 @@ requestAnimationFrame(boucle);
     l.appendChild(i); return [l, i]; }
   function bouton(txt, fn, cls){ const b = document.createElement("button"); b.className = cls || "cd-btn"; b.textContent = txt; b.onclick = fn; return b; }
   function para(txt, cls){ const p = document.createElement(cls === "err" ? "div" : "p"); if (cls) p.className = "cd-" + cls; p.textContent = txt; return p; }
+  // la partie de cet appareil, en clair (pour qu'on voie qu'elle est gardée)
+  function cartePartie(texte){
+    const n = +carriere.niveau || 0, n2 = +carriere.niveau2 || 0, v = (carriere.possedees || []).length, a = Math.round(+carriere.argent || 0);
+    const d = document.createElement("div"); d.style.cssText = "background:#0c121b;border:1px solid var(--trait);border-radius:12px;padding:10px 12px;text-align:center;color:#e9edf5;font-size:13.5px;line-height:1.45";
+    const t1 = document.createElement("div"); t1.style.cssText = "color:var(--or);font-weight:800;letter-spacing:.1em;font-size:11px;margin-bottom:3px"; t1.textContent = "TA PARTIE SUR CET APPAREIL";
+    const t2 = document.createElement("div"); t2.textContent = n + " course" + (n > 1 ? "s" : "") + " débloquée" + (n > 1 ? "s" : "") + (n2 ? " (+ " + n2 + " Part 2)" : "") + " · " + v + " voiture" + (v > 1 ? "s" : "") + " · " + a.toLocaleString("fr-FR") + " berries";
+    const t3 = document.createElement("div"); t3.style.cssText = "color:#7dff8e;font-size:12.5px;margin-top:3px"; t3.textContent = texte;
+    d.append(t1, t2, t3); return d;
+  }
+  const aJoueIci = () => (+carriere.niveau || 0) > 0 || (carriere.possedees || []).length > 1 || (+((carriere.stats || {}).courses) || 0) > 0 || (+carriere.argent || 0) > 0;
   function popupCompte(vue){
     CD.vue = vue; if (!CD.tPopup) CD.tPopup = Date.now();
     const o = document.getElementById("compte-dx"); o.classList.add("on");
@@ -17494,11 +17504,14 @@ requestAnimationFrame(boucle);
     const logo = document.createElement("div"); logo.className = "cd-logo"; logo.textContent = "DX GRAND PRIX"; B.appendChild(logo);
     const err = para(CD.err, "err");
     if (vue === "creer" || vue === "nouveau"){
-      const h = document.createElement("h2"); h.textContent = vue === "creer" ? "Crée ton compte" : "Créer un compte"; B.appendChild(h);
+      const h = document.createElement("h2"); h.textContent = vue === "creer" && aJoueIci() ? "Sauvegarde ta partie" : vue === "creer" ? "Crée ton compte" : "Créer un compte"; B.appendChild(h);
       { const on = document.createElement("div"); on.className = "cd-onglets";
         const b2 = bouton("CRÉER MON COMPTE", () => {}, "cd-tab on"), a = bouton("J'AI DÉJÀ UN COMPTE", () => { CD.err = ""; popupCompte("connexion"); }, "cd-tab"); on.append(b2, a); B.appendChild(on); }
-      B.appendChild(para(vue === "creer" ? "Choisis un pseudo et un mot de passe. Ta progression, tes amis et ton ID restent les mêmes : avec ton compte, tu les retrouves sur n'importe quel appareil."
+      if (vue === "creer" && aJoueIci()) B.appendChild(cartePartie("✓ Elle est gardée : rien ne repart de zéro"));
+      B.appendChild(para(vue === "creer" ? (aJoueIci() ? "Les comptes arrivent sur DX Grand Prix ! Choisis juste un pseudo et un mot de passe : ta partie, tes amis et ton ID restent les mêmes, et tu les retrouves sur n'importe quel appareil."
+                                                       : "Choisis un pseudo et un mot de passe. Ta progression, tes amis et ton ID restent les mêmes : avec ton compte, tu les retrouves sur n'importe quel appareil.")
                                          : "Ta progression sera sauvegardée en ligne : tu la retrouves sur n'importe quel appareil avec ton pseudo et ton mot de passe."));
+      if (vue === "creer" && aJoueIci()) B.appendChild(para("Tu as déjà créé ton compte sur un autre appareil ? Va dans « J'ai déjà un compte » : ta partie d'ici y sera ajoutée.", "note"));
       const [l1, i1] = champ("Pseudo", "text", CD.saisiePseudo != null ? CD.saisiePseudo : (vue === "creer" ? pseudoPropose() : ""), "username");
       const [l2, i2] = champ("Mot de passe", "password", "", "new-password"), [l3, i3] = champ("Confirme le mot de passe", "password", "", "new-password");
       B.append(l1, l2, l3, err);
@@ -17527,7 +17540,9 @@ requestAnimationFrame(boucle);
       const h = document.createElement("h2"); h.textContent = "Bienvenue !"; B.appendChild(h);
       const on = document.createElement("div"); on.className = "cd-onglets";
       on.append(bouton("CRÉER MON COMPTE", () => { CD.err = ""; popupCompte(S.compte ? "creer" : "nouveau"); }, "cd-tab"), bouton("J'AI DÉJÀ UN COMPTE", () => {}, "cd-tab on")); B.appendChild(on);
-      B.appendChild(para("Tu as déjà joué à DX Grand Prix ? Connecte-toi : tu retrouves ta progression, tes amis et ton ID."));
+      if (aJoueIci()) B.appendChild(cartePartie("✓ Gardée : elle sera ajoutée à ton compte"));
+      B.appendChild(para("Tu as déjà créé ton compte DX (pseudo + mot de passe) ? Connecte-toi : tu retrouves ta progression, tes amis et ton ID."));
+      B.appendChild(para("Pas encore de compte ? Va dans « Créer mon compte » (ta partie sur cet appareil est gardée).", "note"));
       const [l1, i1] = champ("Pseudo", "text", CD.saisiePseudo || "", "username"), [l2, i2] = champ("Mot de passe", "password", "", "current-password");
       B.append(l1, l2, err);
       const go = bouton(CD.attente ? "…" : "SE CONNECTER", () => {
